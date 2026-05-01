@@ -668,6 +668,93 @@
       text-transform: uppercase;
     }
 
+    /* ── PARTY TAB ── */
+    .party-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .party-header {
+      border: 1.5px solid var(--ink);
+      background: var(--parchment-dark);
+      padding: 8px 10px;
+    }
+    .party-title {
+      font-family: 'Cinzel', serif;
+      font-size: 11px;
+      letter-spacing: 1.6px;
+      text-transform: uppercase;
+      color: var(--ink);
+      margin-bottom: 2px;
+    }
+    .party-note {
+      font-family: 'Crimson Text', serif;
+      font-size: 12px;
+      color: var(--ink-light);
+    }
+    .party-list {
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+    }
+    .party-item {
+      border: 1.5px solid var(--ink);
+      background: var(--parchment);
+      padding: 7px 9px;
+    }
+    .party-item-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 8px;
+      margin-bottom: 4px;
+    }
+    .party-player {
+      font-family: 'Cinzel', serif;
+      font-size: 10px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--ink-light);
+    }
+    .party-character {
+      font-family: 'Crimson Text', serif;
+      font-size: 17px;
+      font-style: italic;
+      color: var(--ink);
+      line-height: 1.1;
+      margin-bottom: 5px;
+    }
+    .party-stats {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 6px;
+    }
+    .party-stat {
+      border: 1px solid var(--border);
+      background: rgba(240, 235, 224, 0.7);
+      padding: 4px 5px;
+    }
+    .party-stat-label {
+      font-family: 'Cinzel', serif;
+      font-size: 8px;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      color: var(--ink-faint);
+    }
+    .party-stat-value {
+      font-family: 'Cinzel', serif;
+      font-size: 13px;
+      color: var(--ink);
+      margin-top: 1px;
+    }
+    .party-empty {
+      font-family: 'Crimson Text', serif;
+      font-size: 13px;
+      color: var(--ink-faint);
+      font-style: italic;
+      padding: 8px 4px;
+    }
+
     /* scrollbar */
     .tab-content::-webkit-scrollbar { width: 5px; }
     .tab-content::-webkit-scrollbar-track { background: var(--parchment-dark); }
@@ -682,6 +769,7 @@
     <div class="tab disabled" data-tab="inventory">Inventory<span class="tab-soon">soon</span></div>
     <div class="tab disabled" data-tab="combat">Combat<span class="tab-soon">soon</span></div>
     <div class="tab disabled" data-tab="techniques">Techniques<span class="tab-soon">soon</span></div>
+    <div class="tab" data-tab="party">Party</div>
   </div>
 
   <div class="tab-content">
@@ -882,6 +970,15 @@
         <div class="soon-text">Techniques — Coming Soon</div>
       </div>
     </div>
+    <div class="tab-panel" id="panel-party">
+      <div class="party-panel">
+        <div class="party-header">
+          <div class="party-title">Party Roster</div>
+          <div class="party-note">Live list of your sheet and other players currently sharing data.</div>
+        </div>
+        <div id="partyList" class="party-list"></div>
+      </div>
+    </div>
 
   </div><!-- /tab-content -->
 </div><!-- /sheet-wrapper -->
@@ -909,6 +1006,8 @@ import OBR from "https://cdn.jsdelivr.net/npm/@owlbear-rodeo/sdk@3.1.0/+esm";
 
 const STORAGE_KEY = "jjk-charsheet-v1";
 const ROLL_BROADCAST_CHANNEL = "jjk-roll-v1";
+const PARTY_BROADCAST_CHANNEL = "jjk-party-v1";
+const PARTY_SYNC_REQUEST_CHANNEL = "jjk-party-sync-v1";
 
 // ── ARCHETYPES ────────────────────────────────────────────────────────────────
 const ARCHETYPES = {
@@ -964,6 +1063,9 @@ const MAX_ROLL_HISTORY = 50;
 const MAX_GROUP_ROLL_HISTORY = 100;
 let groupRollHistory = [];
 let activeRollTab = "mine";
+let localPlayerId = null;
+let localPlayerName = "";
+const partyRoster = new Map();
 
 function getBlackFlashRange(techniqueScore) {
   if (!Number.isFinite(techniqueScore) || techniqueScore < 2) return null;
@@ -988,6 +1090,74 @@ function updateBlackFlashRangeDisplay() {
 
   valueEl.textContent = String(range);
   noteEl.textContent = `Technique ${tech}`;
+}
+
+function getPartySnapshot() {
+  const fallbackPlayer = state.playerName || "Unknown Player";
+  const playerName = localPlayerName || fallbackPlayer;
+  const playerId = localPlayerId || playerName;
+  return {
+    playerId,
+    playerName,
+    charName: state.charName || "Unnamed Character",
+    hpCurrent: state.hpCurrent || "",
+    hpMax: state.hpMax || "",
+    ceCurrent: state.ceCurrent || "",
+    ceMax: state.ceMax || "",
+    ac: state.ac || ""
+  };
+}
+
+function formatTrack(current, max) {
+  const cur = current === "" ? "-" : current;
+  const mx = max === "" ? "-" : max;
+  return `${cur} / ${mx}`;
+}
+
+function renderPartyList() {
+  const list = document.getElementById("partyList");
+  if (!list) return;
+
+  const self = getPartySnapshot();
+  const others = Array.from(partyRoster.values()).filter(entry => entry.playerId !== self.playerId);
+  const roster = [self, ...others].sort((a, b) => a.playerName.localeCompare(b.playerName));
+
+  if (!roster.length) {
+    list.innerHTML = '<div class="party-empty">No party data yet.</div>';
+    return;
+  }
+
+  list.innerHTML = roster.map(entry => `
+    <div class="party-item">
+      <div class="party-item-header">
+        <div class="party-player">${entry.playerName}</div>
+      </div>
+      <div class="party-character">${entry.charName}</div>
+      <div class="party-stats">
+        <div class="party-stat">
+          <div class="party-stat-label">HP</div>
+          <div class="party-stat-value">${formatTrack(entry.hpCurrent, entry.hpMax)}</div>
+        </div>
+        <div class="party-stat">
+          <div class="party-stat-label">CE</div>
+          <div class="party-stat-value">${formatTrack(entry.ceCurrent, entry.ceMax)}</div>
+        </div>
+        <div class="party-stat">
+          <div class="party-stat-label">AC</div>
+          <div class="party-stat-value">${entry.ac === "" ? "-" : entry.ac}</div>
+        </div>
+      </div>
+    </div>
+  `).join("");
+}
+
+function broadcastPartySnapshot() {
+  const snapshot = getPartySnapshot();
+  try {
+    OBR.broadcast.sendMessage(PARTY_BROADCAST_CHANNEL, snapshot, { destination: "REMOTE" });
+  } catch (e) {
+    // Outside OBR, ignore
+  }
 }
 
 function renderRollHistory() {
@@ -1259,6 +1429,7 @@ window.syncHP = syncHP;
 // ── SAVE / LOAD ───────────────────────────────────────────────────────────────
 function scheduleSave() {
   clearTimeout(saveTimeout);
+  renderPartyList();
   saveTimeout = setTimeout(saveState, 600);
 }
 
@@ -1269,6 +1440,7 @@ async function saveState() {
     // Outside OBR — use localStorage fallback for dev
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   }
+  broadcastPartySnapshot();
 }
 
 async function loadState() {
@@ -1315,6 +1487,7 @@ function applyStateToUI() {
 
   renderRollHistory();
   updateBlackFlashRangeDisplay();
+  renderPartyList();
 }
 
 // ── TABS ──────────────────────────────────────────────────────────────────────
@@ -1380,10 +1553,33 @@ async function init() {
   document.getElementById("rollLogTabGroup").addEventListener("click", () => switchRollTab("group"));
 
   renderRollHistory();
+  renderPartyList();
 
   // Try OBR init
   try {
     await OBR.onReady(async () => {
+      try {
+        localPlayerName = await OBR.player.getName();
+      } catch (e) {
+        localPlayerName = "";
+      }
+      try {
+        localPlayerId = await OBR.player.getId();
+      } catch (e) {
+        localPlayerId = localPlayerName || null;
+      }
+
+      OBR.broadcast.onMessage(PARTY_BROADCAST_CHANNEL, (event) => {
+        const entry = event.data;
+        if (!entry || !entry.playerId) return;
+        if (entry.playerId === localPlayerId) return;
+        partyRoster.set(entry.playerId, entry);
+        renderPartyList();
+      });
+      OBR.broadcast.onMessage(PARTY_SYNC_REQUEST_CHANNEL, () => {
+        broadcastPartySnapshot();
+      });
+
       // Listen for group roll broadcasts from other players
       OBR.broadcast.onMessage(ROLL_BROADCAST_CHANNEL, (event) => {
         groupRollHistory = [...groupRollHistory, event.data].slice(-MAX_GROUP_ROLL_HISTORY);
@@ -1391,7 +1587,7 @@ async function init() {
       });
 
       // Auto-fill player name
-      const playerName = await OBR.player.getName();
+      const playerName = localPlayerName || await OBR.player.getName();
       const playerNameField = document.getElementById("playerName");
       if (playerNameField && !playerNameField.value) {
         playerNameField.value = playerName;
@@ -1422,6 +1618,10 @@ async function init() {
         renderStats();
         applyStateToUI();
       }
+
+      renderPartyList();
+      broadcastPartySnapshot();
+      OBR.broadcast.sendMessage(PARTY_SYNC_REQUEST_CHANNEL, { requesterId: localPlayerId || "unknown" }, { destination: "REMOTE" });
     });
   } catch (e) {
     // Dev fallback
