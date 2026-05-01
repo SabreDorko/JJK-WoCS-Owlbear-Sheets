@@ -415,6 +415,7 @@
       background: var(--ink);
       color: var(--parchment);
       border: 1px solid var(--ink);
+      border-radius: 2px;
       cursor: pointer;
       padding: 0;
       flex-shrink: 0;
@@ -425,13 +426,6 @@
       transition: background 0.12s, border-color 0.12s;
     }
     .skill-roll-btn:hover { background: var(--accent); border-color: var(--accent); }
-    .skill-roll-btn span {
-      display: block;
-      transform: rotate(-45deg);
-      font-size: 9px;
-      line-height: 1;
-      pointer-events: none;
-    }
     .roll-toast.crit-success {
       border-color: #2a6e2a;
       background: #f0f7f0;
@@ -937,7 +931,7 @@ const ARCHETYPES = {
 const CENTER_STATS = [
   { key: "power",     label: "POWER",     skills: ["Athletics","Combat","Fortitude","Intimidation","Strength"] },
   { key: "speed",     label: "SPEED",     skills: ["Precision","Reaction","Stealth","Tempo"] },
-  { key: "technique", label: "TECHNIQUE", skills: ["Acrobatics","Control","Survival"] }
+  { key: "technique", label: "TECHNIQUE", skills: ["Acrobatics","Control","Survival","Talent"] }
 ];
 
 const RIGHT_STATS = [
@@ -1151,7 +1145,7 @@ function buildStatBlocks(defs, container) {
         <input class="skill-bonus-input" type="text"
                id="bonus_${def.key}_${i}" value="${sk.bonus}" placeholder="+0" maxlength="4" />
         <span class="skill-name">${skill}</span>
-        <button class="skill-roll-btn" type="button" title="Roll ${skill}"><span>⚄</span></button>
+        <button class="skill-roll-btn" type="button" title="Roll ${skill}"></button>
       `;
       skillsSide.appendChild(row);
 
@@ -1411,7 +1405,15 @@ async function init() {
         if (saved.stats) {
           [...CENTER_STATS, ...RIGHT_STATS].forEach(def => {
             if (saved.stats[def.key]) {
-              state.stats[def.key] = saved.stats[def.key];
+              const savedStat = saved.stats[def.key];
+              const savedSkills = Array.isArray(savedStat.skills) ? savedStat.skills : [];
+              state.stats[def.key] = {
+                score: savedStat.score ?? "",
+                skills: def.skills.map((_, i) => ({
+                  dot: !!savedSkills[i]?.dot,
+                  bonus: savedSkills[i]?.bonus ?? ""
+                }))
+              };
             }
           });
         }
