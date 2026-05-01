@@ -1,0 +1,1426 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>JJK Character Sheet</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600&family=Crimson+Text:ital,wght@0,400;0,600;1,400&family=Noto+Serif+JP:wght@300;400;600&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --ink: #1a1410;
+      --ink-light: #3d342a;
+      --ink-faint: #7a6a5a;
+      --parchment: #f0ebe0;
+      --parchment-dark: #e2d9c8;
+      --parchment-darker: #cfc4b0;
+      --accent: #8b1a1a;
+      --border: rgba(26,20,16,0.22);
+      --border-strong: rgba(26,20,16,0.55);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      height: 100%;
+      background: var(--parchment);
+      color: var(--ink);
+      font-family: 'Crimson Text', Georgia, serif;
+      font-size: 14px;
+      overflow: hidden;
+    }
+
+    /* ── TABS ── */
+    .tab-bar {
+      display: flex;
+      background: var(--parchment-dark);
+      border-bottom: 2px solid var(--ink);
+      flex-shrink: 0;
+    }
+    .tab {
+      padding: 7px 14px;
+      font-family: 'Cinzel', serif;
+      font-size: 10px;
+      letter-spacing: 1.2px;
+      text-transform: uppercase;
+      cursor: pointer;
+      border-right: 1px solid var(--border);
+      color: var(--ink-faint);
+      user-select: none;
+      transition: color 0.15s;
+      position: relative;
+    }
+    .tab.active {
+      background: var(--parchment);
+      color: var(--ink);
+      font-weight: 600;
+      border-bottom: 2px solid var(--parchment);
+      margin-bottom: -2px;
+    }
+    .tab.disabled { opacity: 0.38; cursor: default; }
+    .tab-soon {
+      font-size: 8px;
+      color: var(--ink-faint);
+      margin-left: 3px;
+      opacity: 0.7;
+    }
+
+    /* ── LAYOUT ── */
+    .sheet-wrapper {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+    }
+    .tab-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px 14px 16px;
+      position: relative;
+    }
+    .tab-content::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 23px,
+        rgba(26,20,16,0.045) 23px,
+        rgba(26,20,16,0.045) 24px
+      );
+      pointer-events: none;
+      z-index: 0;
+    }
+    .tab-panel { display: none; position: relative; z-index: 1; }
+    .tab-panel.active { display: block; }
+
+    /* ── HEADER ── */
+    .header-grid {
+      display: grid;
+      grid-template-columns: 1fr 44px 1fr;
+      gap: 10px;
+      align-items: start;
+      margin-bottom: 11px;
+    }
+    .jjk-label {
+      font-family: 'Cinzel', serif;
+      font-size: 8.5px;
+      letter-spacing: 2.5px;
+      color: var(--ink-faint);
+      text-transform: uppercase;
+      margin-bottom: 3px;
+    }
+    .name-input {
+      font-family: 'Crimson Text', Georgia, serif;
+      font-size: 22px;
+      font-style: italic;
+      background: transparent;
+      border: none;
+      border-bottom: 1.5px solid var(--border-strong);
+      color: var(--ink);
+      width: 100%;
+      outline: none;
+      padding: 1px 0;
+      line-height: 1.1;
+    }
+    .name-input::placeholder { color: var(--ink-faint); font-style: italic; }
+    .field-label {
+      font-size: 8px;
+      letter-spacing: 1.8px;
+      color: var(--ink-faint);
+      text-transform: uppercase;
+      font-family: 'Cinzel', serif;
+      margin-top: 3px;
+    }
+
+    .crest {
+      width: 44px; height: 44px;
+      border: 2px solid var(--ink);
+      display: flex; align-items: center; justify-content: center;
+      transform: rotate(45deg);
+      background: var(--parchment-dark);
+      flex-shrink: 0;
+    }
+    .crest-inner {
+      transform: rotate(-45deg);
+      font-size: 18px;
+      color: var(--accent);
+      font-family: 'Noto Serif JP', serif;
+      font-weight: 600;
+    }
+
+    /* ── META FIELDS ── */
+    .meta-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 5px 10px;
+    }
+    .meta-field { display: flex; flex-direction: column; gap: 1px; }
+    .meta-input, .meta-select {
+      font-family: 'Crimson Text', Georgia, serif;
+      font-size: 13px;
+      background: transparent;
+      border: none;
+      border-bottom: 1px solid var(--border);
+      color: var(--ink);
+      outline: none;
+      padding: 2px 0;
+      width: 100%;
+    }
+    .meta-input::placeholder { color: var(--ink-faint); }
+    .meta-select { cursor: pointer; }
+    .meta-select option { background: #f0ebe0; }
+    .meta-input:focus, .meta-select:focus { border-bottom-color: var(--ink); }
+    .player-name-field { margin-top: 7px; }
+    .meta-toggle-btn {
+      width: 100%;
+      background: var(--parchment-dark);
+      color: var(--ink);
+      border: 1px solid var(--border-strong);
+      font-family: 'Cinzel', serif;
+      font-size: 9px;
+      letter-spacing: 1.4px;
+      text-transform: uppercase;
+      padding: 5px 6px;
+      cursor: pointer;
+    }
+    .meta-toggle-btn:hover { border-color: var(--ink); }
+    .multi-class-field.hidden { display: none; }
+
+    /* ── DIVIDER ── */
+    .divider {
+      height: 1px;
+      background: linear-gradient(to right, transparent, var(--border-strong) 20%, var(--border-strong) 80%, transparent);
+      margin: 10px 0;
+    }
+
+    /* ── MAIN BODY ── */
+    .main-body {
+      display: grid;
+      grid-template-columns: 148px 1fr 220px;
+      gap: 10px;
+      align-items: start;
+    }
+
+    /* ── VITALS ── */
+    .vitals-col { display: flex; flex-direction: column; gap: 8px; }
+
+    .vital-box {
+      border: 1.5px solid var(--ink);
+      padding: 7px 9px 8px;
+      position: relative;
+      background: var(--parchment);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+    }
+    .vital-box::after {
+      content: '';
+      position: absolute;
+      top: 2px; left: 2px; right: 2px; bottom: 2px;
+      border: 0.5px solid var(--border);
+      pointer-events: none;
+    }
+    .vital-label {
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--ink-light);
+      font-family: 'Cinzel', serif;
+      margin-bottom: 5px;
+      display: block;
+    }
+
+    /* AC shield */
+    .shield-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0;
+    }
+    .shield-wrap svg { width: 58px; display: block; }
+    .ac-inside {
+      font-family: 'Cinzel', serif;
+      font-size: 18px;
+      font-weight: 600;
+      background: transparent;
+      border: none;
+      color: var(--ink);
+      outline: none;
+      width: 38px;
+      text-align: center;
+    }
+    .ac-inside::placeholder { color: var(--ink-faint); }
+
+    /* HP / CE rows */
+    .hp-row {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .hp-input {
+      font-family: 'Cinzel', serif;
+      font-size: 16px;
+      font-weight: 600;
+      background: transparent;
+      border: none;
+      border-bottom: 1.5px solid var(--border-strong);
+      color: var(--ink);
+      outline: none;
+      width: 38px;
+      text-align: center;
+      padding: 1px 0;
+    }
+    .hp-input::placeholder { color: var(--ink-faint); font-size: 13px; }
+    .hp-sep {
+      font-family: 'Cinzel', serif;
+      font-size: 18px;
+      color: var(--ink-faint);
+      line-height: 1;
+    }
+
+    .move-row {
+      display: flex;
+      align-items: baseline;
+      gap: 4px;
+    }
+    .move-input {
+      font-family: 'Cinzel', serif;
+      font-size: 18px;
+      font-weight: 600;
+      background: transparent;
+      border: none;
+      border-bottom: 1.5px solid var(--border-strong);
+      color: var(--ink);
+      outline: none;
+      width: 52px;
+      text-align: center;
+    }
+    .move-input::placeholder { color: var(--ink-faint); font-size: 13px; }
+    .move-unit {
+      font-family: 'Cinzel', serif;
+      font-size: 11px;
+      color: var(--ink-faint);
+    }
+
+    .black-flash-box {
+      border-color: rgba(139, 26, 26, 0.75);
+      background: linear-gradient(180deg, #f0ebe0 0%, #ebe2d2 100%);
+    }
+    .black-flash-label {
+      color: var(--accent);
+      letter-spacing: 1.5px;
+    }
+    .black-flash-value {
+      font-family: 'Cinzel', serif;
+      font-size: 24px;
+      font-weight: 600;
+      color: #110d0a;
+      line-height: 1;
+      min-height: 24px;
+    }
+    .black-flash-note {
+      margin-top: 3px;
+      font-family: 'Crimson Text', serif;
+      font-size: 11px;
+      color: var(--ink-faint);
+      font-style: italic;
+    }
+
+    .ce-note-input {
+      margin-top: 6px;
+      font-family: 'Crimson Text', serif;
+      font-size: 11px;
+      font-style: italic;
+      color: var(--ink-faint);
+      background: transparent;
+      border: none;
+      border-top: 1px dashed var(--border);
+      outline: none;
+      width: 100%;
+      resize: none;
+      padding-top: 5px;
+      line-height: 1.4;
+    }
+    .ce-note-input::placeholder { color: var(--ink-faint); }
+
+    /* ── STATS (center + right share same skill layout) ── */
+    .stats-col { display: flex; flex-direction: column; gap: 7px; }
+    .intel-col { display: flex; flex-direction: column; gap: 7px; }
+
+    .stat-block {
+      border: 1.5px solid var(--ink);
+      display: grid;
+      grid-template-columns: 70px 1fr;
+      overflow: hidden;
+      background: var(--parchment);
+      width: 100%;
+    }
+    .intel-col .stat-block {
+      grid-template-columns: 82px 1fr;
+    }
+
+    .stat-score-side {
+      background: var(--parchment-dark);
+      border-right: 1.5px solid var(--ink);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 8px 4px;
+      gap: 4px;
+    }
+    .stat-label {
+      font-family: 'Cinzel', serif;
+      font-size: 8px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--ink-light);
+      text-align: center;
+      line-height: 1.2;
+    }
+    .stat-score-input {
+      font-family: 'Cinzel', serif;
+      font-size: 26px;
+      font-weight: 600;
+      background: transparent;
+      border: none;
+      border-bottom: 1.5px solid var(--border-strong);
+      color: var(--ink);
+      outline: none;
+      width: 44px;
+      text-align: center;
+      line-height: 1;
+    }
+    .stat-score-input::placeholder { color: var(--ink-faint); font-size: 18px; }
+    .roll-btn {
+      font-family: 'Cinzel', serif;
+      font-size: 8px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      background: var(--parchment);
+      color: var(--accent);
+      border: 1px solid var(--accent);
+      padding: 2px 0;
+      cursor: pointer;
+      width: 44px;
+      transition: background 0.12s, color 0.12s;
+    }
+    .roll-btn:hover { background: var(--accent); color: var(--parchment); }
+    .skill-roll-btn {
+      font-size: 11px;
+      line-height: 1;
+      background: transparent;
+      border: none;
+      color: var(--ink-faint);
+      cursor: pointer;
+      padding: 0 1px;
+      flex-shrink: 0;
+      transition: color 0.12s;
+    }
+    .skill-roll-btn:hover { color: var(--accent); }
+    .roll-toast.crit-success {
+      border-color: #2a6e2a;
+      background: #f0f7f0;
+    }
+    .roll-toast.crit-success .roll-toast-title { color: #2a6e2a; }
+    .roll-toast.crit-fail {
+      border-color: var(--accent);
+      background: #fdf0f0;
+    }
+    .roll-toast.crit-fail .roll-toast-title { color: var(--accent); }
+    .roll-toast-container {
+      position: fixed;
+      right: 12px;
+      bottom: 52px;
+      z-index: 30;
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+      width: 240px;
+      pointer-events: none;
+    }
+    .roll-toast {
+      border: 1.5px solid var(--ink);
+      background: var(--parchment);
+      box-shadow: 0 3px 10px rgba(26, 20, 16, 0.22);
+      padding: 6px 8px;
+      opacity: 0;
+      transform: translateY(8px);
+      transition: opacity 0.2s, transform 0.2s;
+    }
+    .roll-toast.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    .roll-toast-title {
+      font-family: 'Cinzel', serif;
+      font-size: 9px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 2px;
+    }
+    .roll-toast-body {
+      font-family: 'Crimson Text', serif;
+      font-size: 12px;
+      color: var(--ink);
+      line-height: 1.25;
+    }
+    .roll-history-btn {
+      position: fixed;
+      right: 12px;
+      bottom: 12px;
+      z-index: 31;
+      font-family: 'Cinzel', serif;
+      font-size: 9px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      background: var(--ink);
+      color: var(--parchment);
+      border: 1px solid var(--ink);
+      padding: 5px 10px;
+      cursor: pointer;
+    }
+    .roll-history-btn:hover { background: var(--accent); border-color: var(--accent); }
+    .roll-history-panel {
+      position: fixed;
+      right: 12px;
+      bottom: 46px;
+      width: 300px;
+      max-height: 280px;
+      z-index: 32;
+      border: 1.5px solid var(--ink);
+      background: var(--parchment);
+      box-shadow: 0 8px 18px rgba(26, 20, 16, 0.24);
+      display: none;
+      overflow: hidden;
+    }
+    .roll-history-panel.open { display: flex; flex-direction: column; }
+    .roll-history-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 8px;
+      border-bottom: 1px solid var(--border);
+      background: var(--parchment-dark);
+      gap: 6px;
+    }
+    .roll-log-tabs {
+      display: flex;
+      gap: 0;
+    }
+    .roll-log-tab {
+      font-family: 'Cinzel', serif;
+      font-size: 8px;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      background: var(--parchment);
+      color: var(--ink-faint);
+      border: 1px solid var(--border);
+      padding: 2px 8px;
+      cursor: pointer;
+      transition: background 0.12s, color 0.12s;
+    }
+    .roll-log-tab + .roll-log-tab { border-left: none; }
+    .roll-log-tab.active {
+      background: var(--ink);
+      color: var(--parchment);
+      border-color: var(--ink);
+    }
+    .roll-history-actions {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .roll-history-action {
+      font-family: 'Cinzel', serif;
+      font-size: 8px;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      background: var(--parchment);
+      color: var(--ink);
+      border: 1px solid var(--border-strong);
+      padding: 2px 6px;
+      cursor: pointer;
+    }
+    .roll-history-action:hover { border-color: var(--ink); }
+    .roll-history-list {
+      padding: 7px 8px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .roll-history-item {
+      border: 1px solid var(--border);
+      background: rgba(240, 235, 224, 0.7);
+      padding: 5px 6px;
+    }
+    .roll-history-item-title {
+      font-family: 'Cinzel', serif;
+      font-size: 8px;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 2px;
+    }
+    .roll-history-item-body {
+      font-family: 'Crimson Text', serif;
+      font-size: 12px;
+      color: var(--ink);
+      line-height: 1.2;
+    }
+    .roll-history-empty {
+      font-family: 'Crimson Text', serif;
+      font-size: 12px;
+      color: var(--ink-faint);
+      font-style: italic;
+      padding: 6px 2px;
+    }
+    /* hide number spinners so text stays truly centered */
+    input[type=number]::-webkit-inner-spin-button,
+    input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+    input[type=number] { -moz-appearance: textfield; }
+
+    /* ── SKILL ROWS (uniform across all stat blocks) ── */
+    .skills-side {
+      padding: 7px 4px;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      justify-content: center;
+    }
+    .skill-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .skill-dot {
+      width: 11px; height: 11px;
+      border: 1.5px solid var(--ink);
+      border-radius: 50%;
+      flex-shrink: 0;
+      cursor: pointer;
+      transition: background 0.12s;
+      background: transparent;
+    }
+    .skill-dot.filled { background: var(--ink); }
+    .skill-bonus {
+      font-family: 'Cinzel', serif;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--accent);
+      width: 28px;
+      text-align: center;
+      flex-shrink: 0;
+    }
+    .skill-bonus-input {
+      font-family: 'Cinzel', serif;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--accent);
+      background: transparent;
+      border: none;
+      border-bottom: 1px solid var(--border);
+      outline: none;
+      width: 28px;
+      text-align: center;
+      flex-shrink: 0;
+    }
+    .skill-bonus-input::placeholder { color: var(--parchment-darker); }
+    .skill-name {
+      font-family: 'Crimson Text', serif;
+      font-size: 12.5px;
+      color: var(--ink);
+      flex: 1;
+      min-width: 0;
+      white-space: normal;
+      line-height: 1.2;
+    }
+
+    /* ── COMING SOON PANELS ── */
+    .soon-panel {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 300px;
+      gap: 10px;
+    }
+    .soon-kanji {
+      font-family: 'Noto Serif JP', serif;
+      font-size: 48px;
+      color: var(--border-strong);
+    }
+    .soon-text {
+      font-family: 'Cinzel', serif;
+      font-size: 11px;
+      letter-spacing: 2px;
+      color: var(--ink-faint);
+      text-transform: uppercase;
+    }
+
+    /* scrollbar */
+    .tab-content::-webkit-scrollbar { width: 5px; }
+    .tab-content::-webkit-scrollbar-track { background: var(--parchment-dark); }
+    .tab-content::-webkit-scrollbar-thumb { background: var(--ink-faint); border-radius: 2px; }
+  </style>
+</head>
+<body>
+<div class="sheet-wrapper">
+
+  <div class="tab-bar">
+    <div class="tab active" data-tab="character">Character</div>
+    <div class="tab disabled" data-tab="inventory">Inventory<span class="tab-soon">soon</span></div>
+    <div class="tab disabled" data-tab="combat">Combat<span class="tab-soon">soon</span></div>
+    <div class="tab disabled" data-tab="techniques">Techniques<span class="tab-soon">soon</span></div>
+  </div>
+
+  <div class="tab-content">
+
+    <!-- ══ CHARACTER TAB ══ -->
+    <div class="tab-panel active" id="panel-character">
+
+      <!-- Header -->
+      <div class="header-grid">
+        <div>
+          <div class="jjk-label">呪術廻戦 · Jujutsu Kaisen</div>
+          <input class="name-input" id="charName" placeholder="Character Name" />
+          <div class="field-label">Character Name</div>
+          <div class="meta-field player-name-field">
+            <div class="field-label">Player Name</div>
+            <input class="meta-input" id="playerName" placeholder="—" />
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:center;padding-top:4px;">
+          <div class="crest"><div class="crest-inner">術</div></div>
+        </div>
+        <div class="meta-grid">
+          <div class="meta-field">
+            <div class="field-label">Age</div>
+            <input class="meta-input" id="ageInput" type="number" placeholder="—" min="0" />
+          </div>
+          <div class="meta-field">
+            <div class="field-label">Grade</div>
+            <select class="meta-select" id="gradeSelect">
+              <option value="">— Grade —</option>
+              <option>4</option>
+              <option>3</option>
+              <option>2</option>
+              <option>Semi-1</option>
+              <option>1</option>
+              <option>Special Grade</option>
+            </select>
+          </div>
+          <div class="meta-field" style="grid-column:1/-1;">
+            <div class="field-label">Cursed Technique</div>
+            <input class="meta-input" id="ctInput" placeholder="—" />
+          </div>
+          <div class="meta-field">
+            <div class="field-label">Archetype</div>
+            <select class="meta-select" id="archetypeSelect" onchange="onArchetypeChange()">
+              <option value="">— Select —</option>
+              <option value="acrobat">Acrobat</option>
+              <option value="brawler">Brawler</option>
+              <option value="brutalizer">Brutalizer</option>
+              <option value="caster">Caster</option>
+              <option value="unbreakable">Unbreakable</option>
+              <option value="speedster">Speedster</option>
+              <option value="mastermind">Mastermind</option>
+              <option value="swordsman">Swordsman</option>
+              <option value="shaman">Shaman</option>
+              <option value="prodigy">Prodigy</option>
+              <option value="rebel">Rebel</option>
+              <option value="confidant">Confidant</option>
+              <option value="thrill_seeker">Thrill Seeker</option>
+              <option value="tinkerer">Tinkerer</option>
+              <option value="toxicologist">Toxicologist</option>
+            </select>
+          </div>
+          <div class="meta-field">
+            <div class="field-label">Sub-Archetype</div>
+            <select class="meta-select" id="subArchetypeSelect" disabled>
+              <option value="">— Pick archetype first —</option>
+            </select>
+          </div>
+          <div class="meta-field" style="grid-column:1/-1;">
+            <button class="meta-toggle-btn" id="addSecondArchetypeBtn" type="button">Add Second Archetype</button>
+          </div>
+          <div class="meta-field multi-class-field hidden" id="multiClassArchetypeField">
+            <div class="field-label">Second Archetype</div>
+            <select class="meta-select" id="archetypeSelect2" onchange="onArchetypeChange2()">
+              <option value="">— Select —</option>
+              <option value="acrobat">Acrobat</option>
+              <option value="brawler">Brawler</option>
+              <option value="brutalizer">Brutalizer</option>
+              <option value="caster">Caster</option>
+              <option value="unbreakable">Unbreakable</option>
+              <option value="speedster">Speedster</option>
+              <option value="mastermind">Mastermind</option>
+              <option value="swordsman">Swordsman</option>
+              <option value="shaman">Shaman</option>
+              <option value="prodigy">Prodigy</option>
+              <option value="rebel">Rebel</option>
+              <option value="confidant">Confidant</option>
+              <option value="thrill_seeker">Thrill Seeker</option>
+              <option value="tinkerer">Tinkerer</option>
+              <option value="toxicologist">Toxicologist</option>
+            </select>
+          </div>
+          <div class="meta-field multi-class-field hidden" id="multiClassSubArchetypeField">
+            <div class="field-label">Sub-Archetype 2</div>
+            <select class="meta-select" id="subArchetypeSelect2" disabled>
+              <option value="">— Pick archetype first —</option>
+            </select>
+          </div>
+          <div class="meta-field multi-class-field hidden" id="removeSecondArchetypeField" style="grid-column:1/-1;">
+            <button class="meta-toggle-btn" id="removeSecondArchetypeBtn" type="button">Remove Second Archetype</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <!-- Main body -->
+      <div class="main-body">
+
+        <!-- Vitals column -->
+        <div class="vitals-col">
+
+          <!-- Health -->
+          <div class="vital-box">
+            <span class="vital-label">Health</span>
+            <div class="hp-row">
+              <input class="hp-input" id="hpCurrent" placeholder="0" type="number" min="0" />
+              <span class="hp-sep">/</span>
+              <input class="hp-input" id="hpMax" placeholder="0" type="number" min="0" onchange="syncHP()" />
+            </div>
+          </div>
+
+          <!-- Cursed Energy -->
+          <div class="vital-box">
+            <span class="vital-label">Cursed Energy</span>
+            <div class="hp-row">
+              <input class="hp-input" id="ceCurrent" placeholder="0" type="number" min="0" />
+              <span class="hp-sep">/</span>
+              <input class="hp-input" id="ceMax" placeholder="0" type="number" min="0" />
+            </div>
+            <textarea class="ce-note-input" id="ceNote" placeholder="CE notes…" rows="2"></textarea>
+          </div>
+
+          <!-- Armor Class -->
+          <div class="vital-box">
+            <div class="shield-wrap">
+              <svg viewBox="0 0 60 68" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M30 4L5 13V36C5 50 17 62 30 66C43 62 55 50 55 36V13L30 4Z"
+                      stroke="#1a1410" stroke-width="1.8" fill="#e2d9c8"/>
+                <path d="M30 9L9 17V36C9 48 19 58 30 62C41 58 51 48 51 36V17L30 9Z"
+                      stroke="#1a1410" stroke-width="0.8" fill="none" stroke-dasharray="2 2"/>
+                <foreignObject x="11" y="22" width="38" height="28">
+                  <div xmlns="http://www.w3.org/1999/xhtml"
+                       style="display:flex;align-items:center;justify-content:center;height:100%">
+                    <input id="acInput" class="ac-inside" placeholder="—" />
+                  </div>
+                </foreignObject>
+              </svg>
+            </div>
+            <div class="vital-label" style="text-align:center;margin-top:2px;margin-bottom:0;">Armor Class</div>
+          </div>
+
+          <!-- Movement -->
+          <div class="vital-box">
+            <span class="vital-label">Movement</span>
+            <div class="move-row">
+              <input class="move-input" id="moveInput" placeholder="—" />
+              <span class="move-unit">ft</span>
+            </div>
+          </div>
+
+          <div class="vital-box black-flash-box">
+            <span class="vital-label black-flash-label">Black Flash Range</span>
+            <div class="black-flash-value" id="blackFlashRangeValue">—</div>
+            <div class="black-flash-note" id="blackFlashRangeNote">Requires Technique 2+</div>
+          </div>
+
+        </div><!-- /vitals -->
+
+        <!-- Center stats: Power, Speed, Technique -->
+        <div class="stats-col" id="centerStats"></div>
+
+        <!-- Right stats: Intelligence, Cooperation -->
+        <div class="intel-col" id="rightStats"></div>
+
+      </div><!-- /main-body -->
+    </div><!-- /character panel -->
+
+    <!-- ══ PLACEHOLDER TABS ══ -->
+    <div class="tab-panel" id="panel-inventory">
+      <div class="soon-panel">
+        <div class="soon-kanji">術</div>
+        <div class="soon-text">Inventory — Coming Soon</div>
+      </div>
+    </div>
+    <div class="tab-panel" id="panel-combat">
+      <div class="soon-panel">
+        <div class="soon-kanji">戦</div>
+        <div class="soon-text">Combat — Coming Soon</div>
+      </div>
+    </div>
+    <div class="tab-panel" id="panel-techniques">
+      <div class="soon-panel">
+        <div class="soon-kanji">呪</div>
+        <div class="soon-text">Techniques — Coming Soon</div>
+      </div>
+    </div>
+
+  </div><!-- /tab-content -->
+</div><!-- /sheet-wrapper -->
+
+<div id="rollToastContainer" class="roll-toast-container"></div>
+<button id="rollHistoryBtn" class="roll-history-btn" type="button">Roll Log</button>
+<div id="rollHistoryPanel" class="roll-history-panel">
+  <div class="roll-history-header">
+    <div class="roll-log-tabs">
+      <button id="rollLogTabMine" class="roll-log-tab active" type="button">Mine</button>
+      <button id="rollLogTabGroup" class="roll-log-tab" type="button">Everyone</button>
+    </div>
+    <div class="roll-history-actions">
+      <button id="clearRollHistoryBtn" class="roll-history-action" type="button">Clear</button>
+      <button id="closeRollHistoryBtn" class="roll-history-action" type="button">Close</button>
+    </div>
+  </div>
+  <div id="rollHistoryList" class="roll-history-list"></div>
+  <div id="groupRollHistoryList" class="roll-history-list" style="display:none;"></div>
+</div>
+
+<script type="module">
+// ── OBR SDK ──────────────────────────────────────────────────────────────────
+import OBR from "https://cdn.jsdelivr.net/npm/@owlbear-rodeo/sdk@2.0.0/+esm";
+
+const STORAGE_KEY = "jjk-charsheet-v1";
+const ROLL_BROADCAST_CHANNEL = "jjk-roll-v1";
+
+// ── ARCHETYPES ────────────────────────────────────────────────────────────────
+const ARCHETYPES = {
+  acrobat:       ["Untouchable", "Link"],
+  brawler:       ["Merciless", "Pain Glutton"],
+  brutalizer:    ["Cannibal", "Hitman"],
+  caster:        ["Sniper","Zoner"],
+  speedster:     ["Distance Runner", "Bolt"],
+  unbreakable:   ["Everlasting", "Resilient"],
+  mastermind:    ["Trickster", "Manipulator"],
+  swordsman:     ["Lazy", "Upstart"],
+  shaman:        ["Physician", "Mystic"],
+  prodigy:       ["Divine", "Damned"],
+  rebel:         ["Revolutionary", "Black Sheep"],
+  confidant:     ["Comedian", "Mentor"],
+  thrill_seeker: ["Easygoing", "Gambler"],
+  tinkerer:      ["Technician", "Engineer"],
+  toxicologist:  ["Plague", "Herbalist"],
+};
+
+// ── STAT DEFINITIONS ──────────────────────────────────────────────────────────
+const CENTER_STATS = [
+  { key: "power",     label: "POWER",     skills: ["Athletics","Combat","Fortitude","Intimidation","Strength"] },
+  { key: "speed",     label: "SPEED",     skills: ["Precision","Reaction","Stealth","Tempo"] },
+  { key: "technique", label: "TECHNIQUE", skills: ["Acrobatics","Control","Survival"] }
+];
+
+const RIGHT_STATS = [
+  { key: "intelligence", label: "INTELLIGENCE", skills: ["Cursed Technique Education","General Education","Medical Education","Perception","Tech Education"] },
+  { key: "cooperation",  label: "COOPERATION",  skills: ["Charisma","Combo","Deception","Insight","Persuasion"] }
+];
+
+// ── DEFAULT STATE ─────────────────────────────────────────────────────────────
+function defaultState() {
+  const stats = {};
+  [...CENTER_STATS, ...RIGHT_STATS].forEach(s => {
+    stats[s.key] = { score: "", skills: s.skills.map(() => ({ dot: false, bonus: "" })) };
+  });
+  return {
+    charName: "", archetype: "", subArchetype: "", age: "",
+    grade: "", ct: "", playerName: "",
+    archetype2: "", subArchetype2: "", hasSecondArchetype: false,
+    ac: "", hpCurrent: "", hpMax: "",
+    movement: "", ceCurrent: "", ceMax: "", ceNote: "",
+    rollHistory: [],
+    stats
+  };
+}
+
+let state = defaultState();
+let saveTimeout = null;
+const MAX_ROLL_HISTORY = 50;
+const MAX_GROUP_ROLL_HISTORY = 100;
+let groupRollHistory = [];
+let activeRollTab = "mine";
+
+function getBlackFlashRange(techniqueScore) {
+  if (!Number.isFinite(techniqueScore) || techniqueScore < 2) return null;
+  if (techniqueScore > 7) return null;
+  return (techniqueScore * 4) + 4;
+}
+
+function updateBlackFlashRangeDisplay() {
+  const valueEl = document.getElementById("blackFlashRangeValue");
+  const noteEl = document.getElementById("blackFlashRangeNote");
+  if (!valueEl || !noteEl) return;
+
+  const techRaw = state?.stats?.technique?.score;
+  const tech = parseInt(techRaw, 10);
+  const range = getBlackFlashRange(tech);
+
+  if (range === null) {
+    valueEl.textContent = "—";
+    noteEl.textContent = "Requires Technique 2-7";
+    return;
+  }
+
+  valueEl.textContent = String(range);
+  noteEl.textContent = `Technique ${tech}`;
+}
+
+function renderRollHistory() {
+  const list = document.getElementById("rollHistoryList");
+  if (!list) return;
+  const history = state.rollHistory || [];
+  if (!history.length) {
+    list.innerHTML = '<div class="roll-history-empty">No rolls yet.</div>';
+    return;
+  }
+  list.innerHTML = history.map(item => {
+    const label = item.skillName ? `${item.statLabel} › ${item.skillName}` : item.statLabel;
+    const critBadge = item.critStatus === "success"
+      ? `<span style="color:#2a6e2a;font-family:'Cinzel',serif;font-size:8px;"> ✦ CRIT SUCCESS</span>`
+      : item.critStatus === "fail"
+      ? `<span style="color:#8b1a1a;font-family:'Cinzel',serif;font-size:8px;"> ✦ CRIT FAIL</span>`
+      : "";
+    return `
+      <div class="roll-history-item">
+        <div class="roll-history-item-title">${item.time} • ${label}${critBadge}</div>
+        <div class="roll-history-item-body">${item.diceCount}d6: [${item.rolls.join(", ")}] = <strong>${item.total}</strong></div>
+      </div>
+    `;
+  }).join("");
+  list.scrollTop = list.scrollHeight;
+}
+
+function renderGroupRollHistory() {
+  const list = document.getElementById("groupRollHistoryList");
+  if (!list) return;
+  if (!groupRollHistory.length) {
+    list.innerHTML = '<div class="roll-history-empty">No group rolls yet.</div>';
+    return;
+  }
+  list.innerHTML = groupRollHistory.map(item => {
+    const label = item.skillName ? `${item.statLabel} › ${item.skillName}` : item.statLabel;
+    const critBadge = item.critStatus === "success"
+      ? `<span style="color:#2a6e2a;font-family:'Cinzel',serif;font-size:8px;"> ✦ CRIT SUCCESS</span>`
+      : item.critStatus === "fail"
+      ? `<span style="color:#8b1a1a;font-family:'Cinzel',serif;font-size:8px;"> ✦ CRIT FAIL</span>`
+      : "";
+    const charDisplay = item.charName
+      ? `<span style="font-weight:600;color:var(--ink);">${item.charName}</span> • `
+      : "";
+    return `
+      <div class="roll-history-item">
+        <div class="roll-history-item-title">${item.time} • ${charDisplay}${label}${critBadge}</div>
+        <div class="roll-history-item-body">${item.diceCount}d6: [${item.rolls.join(", ")}] = <strong>${item.total}</strong></div>
+      </div>
+    `;
+  }).join("");
+  list.scrollTop = list.scrollHeight;
+}
+
+function switchRollTab(tab) {
+  activeRollTab = tab;
+  document.getElementById("rollLogTabMine").classList.toggle("active", tab === "mine");
+  document.getElementById("rollLogTabGroup").classList.toggle("active", tab === "group");
+  document.getElementById("rollHistoryList").style.display = tab === "mine" ? "" : "none";
+  document.getElementById("groupRollHistoryList").style.display = tab === "group" ? "" : "none";
+  if (tab === "group") renderGroupRollHistory();
+}
+
+function pushRollHistory(statLabel, diceCount, rolls, total, critStatus, skillName) {
+  const now = new Date();
+  const time = now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  state.rollHistory = [...(state.rollHistory || []), { statLabel, diceCount, rolls, total, time, critStatus: critStatus || null, skillName: skillName || null }]
+    .slice(0, MAX_ROLL_HISTORY);
+  renderRollHistory();
+  scheduleSave();
+
+  // Add to group log and broadcast to other players
+  const charName = state.charName || state.playerName || "Unknown";
+  const groupEntry = { charName, statLabel, diceCount, rolls, total, time, critStatus: critStatus || null, skillName: skillName || null };
+  groupRollHistory = [...groupRollHistory, groupEntry].slice(-MAX_GROUP_ROLL_HISTORY);
+  if (activeRollTab === "group") renderGroupRollHistory();
+  try {
+    OBR.broadcast.sendMessage(ROLL_BROADCAST_CHANNEL, groupEntry, { destination: "REMOTE" });
+  } catch (e) { /* outside OBR */ }
+}
+
+function showRollToast(statLabel, diceCount, rolls, total, critStatus, skillName) {
+  const container = document.getElementById("rollToastContainer");
+  if (!container) return;
+
+  pushRollHistory(statLabel, diceCount, rolls, total, critStatus, skillName);
+
+  const label = skillName ? `${statLabel} › ${skillName}` : statLabel;
+  let critLine = "";
+  if (critStatus === "success") critLine = `<div style="font-family:'Cinzel',serif;font-size:10px;letter-spacing:1px;color:#2a6e2a;margin-top:3px;">✦ CRITICAL SUCCESS</div>`;
+  if (critStatus === "fail")    critLine = `<div style="font-family:'Cinzel',serif;font-size:10px;letter-spacing:1px;color:#8b1a1a;margin-top:3px;">✦ CRITICAL FAIL</div>`;
+
+  const toast = document.createElement("div");
+  toast.className = "roll-toast" + (critStatus === "success" ? " crit-success" : critStatus === "fail" ? " crit-fail" : "");
+  toast.innerHTML = `
+    <div class="roll-toast-title">${label} Roll</div>
+    <div class="roll-toast-body">Rolled ${diceCount}d6${skillName && total !== rolls.reduce((a,b)=>a+b,0) ? " + bonus" : ""}: [${rolls.join(", ")}] = <strong>${total}</strong></div>
+    ${critLine}
+  `;
+
+  container.appendChild(toast);
+  requestAnimationFrame(() => toast.classList.add("show"));
+
+  const MAX_TOASTS = 5;
+  while (container.children.length > MAX_TOASTS) {
+    container.removeChild(container.firstElementChild);
+  }
+
+  setTimeout(() => {
+    toast.classList.remove("show");
+    setTimeout(() => {
+      if (toast.parentNode) toast.parentNode.removeChild(toast);
+    }, 220);
+  }, 4200);
+}
+
+// ── RENDER STAT BLOCKS ────────────────────────────────────────────────────────
+function renderStats() {
+  buildStatBlocks(CENTER_STATS, document.getElementById("centerStats"));
+  buildStatBlocks(RIGHT_STATS,  document.getElementById("rightStats"));
+}
+
+function buildStatBlocks(defs, container) {
+  container.innerHTML = "";
+  defs.forEach(def => {
+    const sd = state.stats[def.key];
+    const block = document.createElement("div");
+    block.className = "stat-block";
+
+    // Score side
+    const scoreSide = document.createElement("div");
+    scoreSide.className = "stat-score-side";
+    scoreSide.innerHTML = `
+      <div class="stat-label">${def.label}</div>
+      <input class="stat-score-input" type="number" placeholder="—"
+             id="score_${def.key}" value="${sd.score}" min="0" />
+      <button class="roll-btn" type="button" title="Roll ${def.label.charAt(0).toUpperCase() + def.label.slice(1).toLowerCase()}">Roll</button>
+    `;
+    scoreSide.querySelector(".roll-btn").addEventListener("click", () => {
+      const n = parseInt(document.getElementById("score_" + def.key).value, 10);
+      if (!n || n < 1) return;
+      const rolls = Array.from({ length: n }, () => Math.floor(Math.random() * 6) + 1);
+      const total = rolls.reduce((a, b) => a + b, 0);
+      showRollToast(def.label, n, rolls, total);
+    });
+
+    // Skills side
+    const skillsSide = document.createElement("div");
+    skillsSide.className = "skills-side";
+    def.skills.forEach((skill, i) => {
+      const sk = sd.skills[i];
+      const row = document.createElement("div");
+      row.className = "skill-row";
+      row.innerHTML = `
+        <div class="skill-dot${sk.dot ? ' filled' : ''}"
+             id="dot_${def.key}_${i}" role="checkbox" aria-label="${skill} proficiency"></div>
+        <input class="skill-bonus-input" type="text"
+               id="bonus_${def.key}_${i}" value="${sk.bonus}" placeholder="+0" maxlength="4" />
+        <span class="skill-name">${skill}</span>
+        <button class="skill-roll-btn" type="button" title="Roll ${skill}">⚄</button>
+      `;
+      skillsSide.appendChild(row);
+
+      row.querySelector(".skill-dot").addEventListener("click", () => {
+        state.stats[def.key].skills[i].dot = !state.stats[def.key].skills[i].dot;
+        row.querySelector(".skill-dot").classList.toggle("filled");
+        scheduleSave();
+      });
+      row.querySelector(".skill-bonus-input").addEventListener("input", e => {
+        state.stats[def.key].skills[i].bonus = e.target.value;
+        scheduleSave();
+      });
+      row.querySelector(".skill-roll-btn").addEventListener("click", () => {
+        const n = parseInt(state.stats[def.key].score, 10);
+        if (!n || n < 1) return;
+        const rolls = Array.from({ length: n }, () => Math.floor(Math.random() * 6) + 1);
+        const rawTotal = rolls.reduce((a, b) => a + b, 0);
+        const bonusVal = parseInt(state.stats[def.key].skills[i].bonus, 10) || 0;
+        const total = rawTotal + bonusVal;
+        const maxPossible = n * 6;
+        const allOnes = rolls.every(r => r === 1);
+        const critStatus = allOnes ? "fail" : total >= maxPossible ? "success" : null;
+        showRollToast(def.label, n, rolls, total, critStatus, skill);
+      });
+    });
+
+    block.appendChild(scoreSide);
+    block.appendChild(skillsSide);
+    container.appendChild(block);
+
+    block.querySelector(`#score_${def.key}`).addEventListener("input", e => {
+      state.stats[def.key].score = e.target.value;
+      if (def.key === "technique") updateBlackFlashRangeDisplay();
+      scheduleSave();
+    });
+  });
+}
+
+// ── ARCHETYPE LOGIC ───────────────────────────────────────────────────────────
+window.onArchetypeChange = function() {
+  handleArchetypeChange("archetypeSelect", "subArchetypeSelect", "archetype", "subArchetype");
+  scheduleSave();
+};
+
+window.onArchetypeChange2 = function() {
+  handleArchetypeChange("archetypeSelect2", "subArchetypeSelect2", "archetype2", "subArchetype2");
+  scheduleSave();
+};
+
+function handleArchetypeChange(archetypeId, subId, archetypeKey, subKey) {
+  const arc = document.getElementById(archetypeId).value;
+  state[archetypeKey] = arc;
+  state[subKey] = "";
+  updateSubSelect(subId, arc, "");
+}
+
+function updateSubSelect(subId, arc, selectedSub) {
+  const sel = document.getElementById(subId);
+  sel.innerHTML = "";
+  if (!arc) {
+    sel.innerHTML = '<option value="">— Pick archetype first —</option>';
+    sel.disabled = true;
+    return;
+  }
+  sel.disabled = false;
+  const opts = ARCHETYPES[arc] || [];
+  sel.innerHTML = '<option value="">— Sub-Archetype —</option>' +
+    opts.map(o => `<option value="${o}"${selectedSub === o ? ' selected' : ''}>${o}</option>`).join("");
+}
+
+function updateSecondArchetypeUI() {
+  const show = !!state.hasSecondArchetype;
+  const className = "meta-field multi-class-field" + (show ? "" : " hidden");
+  document.getElementById("multiClassArchetypeField").className = className;
+  document.getElementById("multiClassSubArchetypeField").className = className;
+  document.getElementById("removeSecondArchetypeField").className = className + " grid-col-full";
+  document.getElementById("addSecondArchetypeBtn").style.display = show ? "none" : "";
+}
+
+function toggleSecondArchetype() {
+  state.hasSecondArchetype = !state.hasSecondArchetype;
+  if (!state.hasSecondArchetype) {
+    state.archetype2 = "";
+    state.subArchetype2 = "";
+    document.getElementById("archetypeSelect2").value = "";
+    updateSubSelect("subArchetypeSelect2", "", "");
+  }
+  updateSecondArchetypeUI();
+  scheduleSave();
+}
+
+// ── FIELD BINDINGS ────────────────────────────────────────────────────────────
+function bindField(id, stateKey) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.addEventListener("input", e => { state[stateKey] = e.target.value; scheduleSave(); });
+  el.addEventListener("change", e => { state[stateKey] = e.target.value; scheduleSave(); });
+}
+
+function syncHP() {
+  const max = document.getElementById("hpMax").value;
+  const cur = document.getElementById("hpCurrent");
+  if (!cur.value) { cur.value = max; state.hpCurrent = max; }
+  state.hpMax = max;
+  scheduleSave();
+}
+window.syncHP = syncHP;
+
+// ── SAVE / LOAD ───────────────────────────────────────────────────────────────
+function scheduleSave() {
+  clearTimeout(saveTimeout);
+  saveTimeout = setTimeout(saveState, 600);
+}
+
+async function saveState() {
+  try {
+    await OBR.room.setMetadata({ [STORAGE_KEY]: state });
+  } catch (e) {
+    // Outside OBR — use localStorage fallback for dev
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  }
+}
+
+async function loadState() {
+  try {
+    const meta = await OBR.room.getMetadata();
+    if (meta[STORAGE_KEY]) return meta[STORAGE_KEY];
+  } catch (e) {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) return JSON.parse(saved);
+  }
+  return null;
+}
+
+function applyStateToUI() {
+  const s = state;
+  document.getElementById("charName").value   = s.charName   || "";
+  document.getElementById("ageInput").value   = s.age        || "";
+  document.getElementById("ctInput").value    = s.ct         || "";
+  document.getElementById("playerName").value = s.playerName || "";
+  document.getElementById("acInput").value    = s.ac         || "";
+  document.getElementById("hpCurrent").value  = s.hpCurrent  || "";
+  document.getElementById("hpMax").value      = s.hpMax      || "";
+  document.getElementById("moveInput").value  = s.movement   || "";
+  document.getElementById("ceCurrent").value  = s.ceCurrent  || "";
+  document.getElementById("ceMax").value      = s.ceMax      || "";
+  document.getElementById("ceNote").value     = s.ceNote     || "";
+
+  const arcSel = document.getElementById("archetypeSelect");
+  arcSel.value = s.archetype || "";
+  updateSubSelect("subArchetypeSelect", s.archetype || "", s.subArchetype || "");
+  const subSel = document.getElementById("subArchetypeSelect");
+  if (s.subArchetype) subSel.value = s.subArchetype;
+
+  const arcSel2 = document.getElementById("archetypeSelect2");
+  arcSel2.value = s.archetype2 || "";
+  updateSubSelect("subArchetypeSelect2", s.archetype2 || "", s.subArchetype2 || "");
+  const subSel2 = document.getElementById("subArchetypeSelect2");
+  if (s.subArchetype2) subSel2.value = s.subArchetype2;
+
+  updateSecondArchetypeUI();
+
+  const gradeSel = document.getElementById("gradeSelect");
+  gradeSel.value = s.grade || "";
+
+  renderRollHistory();
+  updateBlackFlashRangeDisplay();
+}
+
+// ── TABS ──────────────────────────────────────────────────────────────────────
+document.querySelectorAll(".tab:not(.disabled)").forEach(tab => {
+  tab.addEventListener("click", () => {
+    document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+    document.querySelectorAll(".tab-panel").forEach(p => p.classList.remove("active"));
+    tab.classList.add("active");
+    document.getElementById("panel-" + tab.dataset.tab).classList.add("active");
+  });
+});
+
+// ── INIT ──────────────────────────────────────────────────────────────────────
+async function init() {
+  // Render stat blocks first (uses default state)
+  renderStats();
+  updateBlackFlashRangeDisplay();
+
+  // Bind simple fields
+  bindField("charName", "charName");
+  bindField("ageInput", "age");
+  bindField("gradeSelect", "grade");
+  bindField("ctInput", "ct");
+  bindField("playerName", "playerName");
+  bindField("acInput", "ac");
+  bindField("hpCurrent", "hpCurrent");
+  bindField("hpMax", "hpMax");
+  bindField("moveInput", "movement");
+  bindField("ceCurrent", "ceCurrent");
+  bindField("ceMax", "ceMax");
+  bindField("ceNote", "ceNote");
+  bindField("subArchetypeSelect", "subArchetype");
+  bindField("subArchetypeSelect2", "subArchetype2");
+
+  const secondArcBtn = document.getElementById("addSecondArchetypeBtn");
+  secondArcBtn.addEventListener("click", toggleSecondArchetype);
+  document.getElementById("removeSecondArchetypeBtn").addEventListener("click", toggleSecondArchetype);
+  updateSecondArchetypeUI();
+
+  const rollHistoryBtn = document.getElementById("rollHistoryBtn");
+  const rollHistoryPanel = document.getElementById("rollHistoryPanel");
+  const closeRollHistoryBtn = document.getElementById("closeRollHistoryBtn");
+  const clearRollHistoryBtn = document.getElementById("clearRollHistoryBtn");
+
+  rollHistoryBtn.addEventListener("click", () => {
+    rollHistoryPanel.classList.toggle("open");
+  });
+  closeRollHistoryBtn.addEventListener("click", () => {
+    rollHistoryPanel.classList.remove("open");
+  });
+  clearRollHistoryBtn.addEventListener("click", () => {
+    if (activeRollTab === "mine") {
+      state.rollHistory = [];
+      renderRollHistory();
+      scheduleSave();
+    } else {
+      groupRollHistory = [];
+      renderGroupRollHistory();
+    }
+  });
+
+  document.getElementById("rollLogTabMine").addEventListener("click", () => switchRollTab("mine"));
+  document.getElementById("rollLogTabGroup").addEventListener("click", () => switchRollTab("group"));
+
+  renderRollHistory();
+
+  // Try OBR init
+  try {
+    await OBR.onReady(async () => {
+      // Listen for group roll broadcasts from other players
+      OBR.broadcast.onMessage(ROLL_BROADCAST_CHANNEL, (event) => {
+        groupRollHistory = [...groupRollHistory, event.data].slice(-MAX_GROUP_ROLL_HISTORY);
+        if (activeRollTab === "group") renderGroupRollHistory();
+      });
+
+      // Auto-fill player name
+      const playerName = await OBR.player.getName();
+      const playerNameField = document.getElementById("playerName");
+      if (playerNameField && !playerNameField.value) {
+        playerNameField.value = playerName;
+        state.playerName = playerName;
+      }
+
+      // Load saved state
+      const saved = await loadState();
+      if (saved) {
+        state = { ...defaultState(), ...saved };
+        if (state.archetype2 || state.subArchetype2) state.hasSecondArchetype = true;
+        // Merge stats carefully
+        if (saved.stats) {
+          [...CENTER_STATS, ...RIGHT_STATS].forEach(def => {
+            if (saved.stats[def.key]) {
+              state.stats[def.key] = saved.stats[def.key];
+            }
+          });
+        }
+        renderStats();
+        applyStateToUI();
+      }
+    });
+  } catch (e) {
+    // Dev fallback
+    const saved = await loadState();
+    if (saved) {
+      state = { ...defaultState(), ...saved };
+      if (state.archetype2 || state.subArchetype2) state.hasSecondArchetype = true;
+      renderStats();
+      applyStateToUI();
+    }
+  }
+}
+
+init();
+</script>
+</body>
+</html>
