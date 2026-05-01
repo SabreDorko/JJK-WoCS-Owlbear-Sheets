@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: jjk-charsheet
+    runtime: static
+    buildCommand: npm install && npm run build
+    staticPublishPath: ./dist
+    headers:
+      - path: /*
+        name: Access-Control-Allow-Origin
+        value: https://www.owlbear.rodeo
+      - path: /*
+        name: Access-Control-Allow-Methods
+        value: GET, OPTIONS
+      - path: /*
+        name: Access-Control-Allow-Headers
+        value: Content-Type
