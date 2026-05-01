@@ -1147,71 +1147,85 @@ async function unlinkTokenHpBar(showToast = false) {
 async function linkSelectedTokenHpBar() {
   if (!obrReady) return;
 
-  const selected = await OBR.player.getSelection();
-  if (!selected || selected.length !== 1) {
-    await OBR.notification.show("Select exactly one token to link.", "WARNING");
-    return;
+  try {
+    const selected = await OBR.player.getSelection();
+    if (!selected || selected.length !== 1) {
+      await OBR.notification.show("Select exactly one token to link.", "WARNING");
+      return;
+    }
+
+    const tokenId = selected[0];
+    const bounds = await OBR.scene.items.getItemBounds([tokenId]);
+    const barWidth = clamp(Math.round(bounds.width * 0.75), HP_BAR_MIN_WIDTH, HP_BAR_MAX_WIDTH);
+    const ratio = getHpFillRatio();
+    const fillWidth = clamp(Math.round(barWidth * ratio), 0, barWidth);
+    const yOffset = Math.round((bounds.height / 2) + HP_BAR_OFFSET_Y);
+
+    // For attached items, position is relative to the parent item.
+    const bgBar = buildLabel()
+      .plainText(" ")
+      .width(barWidth)
+      .height(HP_BAR_HEIGHT)
+      .padding(0)
+      .fontSize(1)
+      .fillOpacity(0)
+      .backgroundColor("#1a1410")
+      .backgroundOpacity(0.42)
+      .cornerRadius(999)
+      .pointerWidth(0)
+      .pointerHeight(0)
+      .layer("ATTACHMENT")
+      .position({ x: 0, y: yOffset })
+      .attachedTo(tokenId)
+      .disableHit(true)
+      .build();
+
+    const fillBar = buildLabel()
+      .plainText(" ")
+      .width(fillWidth)
+      .height(HP_BAR_HEIGHT - 2)
+      .padding(0)
+      .fontSize(1)
+      .fillOpacity(0)
+      .backgroundColor("#8b1a1a")
+      .backgroundOpacity(0.72)
+      .cornerRadius(999)
+      .pointerWidth(0)
+      .pointerHeight(0)
+      .layer("ATTACHMENT")
+      .position({ x: -(barWidth - fillWidth) / 2, y: 0 })
+      .attachedTo(bgBar.id)
+      .disableHit(true)
+      .build();
+
+    await OBR.scene.items.addItems([bgBar, fillBar]);
+
+    setTokenLinkState({
+      linkedTokenId: tokenId,
+      linkedHpBarBgId: bgBar.id,
+      linkedHpBarFillId: fillBar.id,
+      linkedHpBarWidth: barWidth
+    });
+    scheduleSave();
+    await OBR.notification.show("Token linked to HP bar.", "SUCCESS");
+  } catch (e) {
+    await OBR.notification.show("Could not link HP bar. Check token selection/permissions.", "ERROR");
   }
-
-  const tokenId = selected[0];
-  const bounds = await OBR.scene.items.getItemBounds([tokenId]);
-  const barWidth = clamp(Math.round(bounds.width * 0.75), HP_BAR_MIN_WIDTH, HP_BAR_MAX_WIDTH);
-  const ratio = getHpFillRatio();
-  const fillWidth = clamp(Math.round(barWidth * ratio), 0, barWidth);
-
-  const basePosition = { x: bounds.center.x, y: bounds.max.y + HP_BAR_OFFSET_Y };
-
-  const bgBar = buildLabel()
-    .plainText("")
-    .width(barWidth)
-    .height(HP_BAR_HEIGHT)
-    .padding(0)
-    .fontSize(1)
-    .fillOpacity(0)
-    .backgroundColor("#1a1410")
-    .backgroundOpacity(0.38)
-    .cornerRadius(999)
-    .layer("ATTACHMENT")
-    .position(basePosition)
-    .attachedTo(tokenId)
-    .build();
-
-  const fillBar = buildLabel()
-    .plainText("")
-    .width(fillWidth)
-    .height(HP_BAR_HEIGHT - 2)
-    .padding(0)
-    .fontSize(1)
-    .fillOpacity(0)
-    .backgroundColor("#8b1a1a")
-    .backgroundOpacity(0.62)
-    .cornerRadius(999)
-    .layer("ATTACHMENT")
-    .position({ x: -(barWidth - fillWidth) / 2, y: 0 })
-    .attachedTo(bgBar.id)
-    .build();
-
-  await OBR.scene.items.addItems([bgBar, fillBar]);
-
-  setTokenLinkState({
-    linkedTokenId: tokenId,
-    linkedHpBarBgId: bgBar.id,
-    linkedHpBarFillId: fillBar.id,
-    linkedHpBarWidth: barWidth
-  });
-  scheduleSave();
-  await OBR.notification.show("Token linked to HP bar.", "SUCCESS");
 }
 
 async function toggleTokenHpBarLink() {
   if (!obrReady) {
     return;
   }
-  if (state.linkedTokenId) {
-    await unlinkTokenHpBar(true);
-    return;
+  try {
+    if (state.linkedTokenId) {
+      await unlinkTokenHpBar(true);
+      return;
+    }
+    await linkSelectedTokenHpBar();
+  } catch (e) {
+    await OBR.notification.show("Token link action failed.", "ERROR");
   }
-  await linkSelectedTokenHpBar();
 }
 
 async function validateTokenLinkStillExists() {
