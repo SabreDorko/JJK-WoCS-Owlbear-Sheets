@@ -172,6 +172,118 @@
     .meta-select option { background: #f0ebe0; }
     .meta-input:focus, .meta-select:focus { border-bottom-color: var(--ink); }
     .player-name-field { margin-top: 7px; }
+
+    /* ── INFO BUTTON ── */
+    .info-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      margin-top: 6px;
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: var(--ink-faint);
+      font-family: 'Cinzel', serif;
+      font-size: 8px;
+      letter-spacing: 1.2px;
+      text-transform: uppercase;
+      padding: 0;
+      opacity: 0.7;
+      transition: opacity 0.15s, color 0.15s;
+    }
+    .info-btn:hover { opacity: 1; color: var(--ink); }
+    .info-btn svg { flex-shrink: 0; }
+
+    /* ── INFO MODAL ── */
+    .info-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(26,20,16,0.55);
+      z-index: 9999;
+      align-items: center;
+      justify-content: center;
+    }
+    .info-overlay.open { display: flex; }
+    .info-modal {
+      background: var(--parchment);
+      border: 2px solid var(--ink);
+      padding: 20px 22px 18px;
+      max-width: 300px;
+      width: calc(100% - 32px);
+      position: relative;
+      box-shadow: 4px 4px 0 rgba(26,20,16,0.18);
+    }
+    .info-modal::after {
+      content: '';
+      position: absolute;
+      top: 3px; left: 3px; right: 3px; bottom: 3px;
+      border: 0.5px solid var(--border);
+      pointer-events: none;
+    }
+    .info-modal-title {
+      font-family: 'Cinzel', serif;
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: var(--ink);
+      margin-bottom: 4px;
+    }
+    .info-modal-sub {
+      font-family: 'Cinzel', serif;
+      font-size: 8px;
+      letter-spacing: 2px;
+      color: var(--ink-faint);
+      text-transform: uppercase;
+      margin-bottom: 14px;
+    }
+    .info-modal p {
+      font-family: 'Crimson Text', serif;
+      font-size: 13px;
+      line-height: 1.55;
+      color: var(--ink-light);
+      margin-bottom: 10px;
+    }
+    .info-modal .disclaimer {
+      font-size: 11.5px;
+      font-style: italic;
+      color: var(--ink-faint);
+      border-top: 1px dashed var(--border-strong);
+      padding-top: 9px;
+      margin-top: 4px;
+    }
+    .bmac-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 4px;
+      margin-bottom: 10px;
+      font-family: 'Cinzel', serif;
+      font-size: 9px;
+      letter-spacing: 1.2px;
+      text-transform: uppercase;
+      color: var(--accent);
+      text-decoration: none;
+      border: 1px solid var(--accent);
+      padding: 5px 10px;
+      transition: background 0.15s, color 0.15s;
+    }
+    .bmac-link:hover { background: var(--accent); color: var(--parchment); }
+    .info-close-btn {
+      position: absolute;
+      top: 8px;
+      right: 10px;
+      background: none;
+      border: none;
+      font-family: 'Cinzel', serif;
+      font-size: 14px;
+      color: var(--ink-faint);
+      cursor: pointer;
+      line-height: 1;
+      padding: 2px 4px;
+    }
+    .info-close-btn:hover { color: var(--ink); }
     .meta-toggle-btn {
       width: 100%;
       background: var(--parchment-dark);
@@ -809,6 +921,14 @@
             <div class="field-label">Player Name</div>
             <input class="meta-input" id="playerName" placeholder="—" />
           </div>
+          <button class="info-btn" id="infoBtn" aria-label="About this extension">
+            <svg width="11" height="11" viewBox="0 0 11 11" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="5.5" cy="5.5" r="5" stroke="currentColor" stroke-width="1"/>
+              <rect x="5" y="4.5" width="1" height="3.5" fill="currentColor"/>
+              <rect x="5" y="3" width="1" height="1" fill="currentColor"/>
+            </svg>
+            About
+          </button>
         </div>
         <div style="display:flex;align-items:center;justify-content:center;padding-top:4px;">
           <div class="crest"><div class="crest-inner">術</div></div>
@@ -1713,6 +1833,33 @@ async function init() {
 }
 
 init();
+
+  // ── INFO MODAL ──
+  document.getElementById('infoBtn').addEventListener('click', () => {
+    document.getElementById('infoOverlay').classList.add('open');
+  });
+  document.getElementById('infoCloseBtn').addEventListener('click', () => {
+    document.getElementById('infoOverlay').classList.remove('open');
+  });
+  document.getElementById('infoOverlay').addEventListener('click', (e) => {
+    if (e.target === e.currentTarget) e.currentTarget.classList.remove('open');
+  });
 </script>
+
+<!-- Info Modal -->
+<div class="info-overlay" id="infoOverlay" role="dialog" aria-modal="true" aria-labelledby="infoModalTitle">
+  <div class="info-modal">
+    <button class="info-close-btn" id="infoCloseBtn" aria-label="Close">&times;</button>
+    <div class="info-modal-title" id="infoModalTitle">JJK Character Sheet</div>
+    <div class="info-modal-sub">呪術廻戦 · Owlbear Rodeo Extension</div>
+    <p>A character sheet extension for Owlbear Rodeo built around the <em>Jujutsu Kaisen World of Cursed Sorcery</em> TTRPG system. Designed to keep your cursed energy, stats, and techniques at a glance during play.</p>
+    <p>Created by <strong>SabreDorko</strong>. If you enjoy the extension and want to support further development, consider buying me a coffee!</p>
+    <a class="bmac-link" href="https://buymeacoffee.com/sabredorko" target="_blank" rel="noopener noreferrer">
+      ☕ Buy Me a Coffee
+    </a>
+    <p class="disclaimer">Character data is saved directly to your Owlbear Rodeo room. It persists across sessions as long as the room exists. Clearing your browser's site data or cache will not affect it — but deleting the room will.</p>
+  </div>
+</div>
+
 </body>
 </html>
