@@ -490,6 +490,9 @@
       cursor: pointer;
     }
     .roll-history-btn:hover { background: var(--accent); border-color: var(--accent); }
+    .party-quick-btn {
+      right: 84px;
+    }
     .roll-history-panel {
       position: fixed;
       right: 12px;
@@ -984,6 +987,7 @@
 </div><!-- /sheet-wrapper -->
 
 <div id="rollToastContainer" class="roll-toast-container"></div>
+<button id="partyQuickBtn" class="roll-history-btn party-quick-btn" type="button">Party</button>
 <button id="rollHistoryBtn" class="roll-history-btn" type="button">Roll Log</button>
 <div id="rollHistoryPanel" class="roll-history-panel">
   <div class="roll-history-header">
@@ -1093,19 +1097,23 @@ function updateBlackFlashRangeDisplay() {
 }
 
 function getPartySnapshot() {
-  const fallbackPlayer = state.playerName || "Unknown Player";
-  const playerName = localPlayerName || fallbackPlayer;
+  const fallbackPlayer = (state.playerName || "Unknown Player").trim();
+  const playerName = (localPlayerName || fallbackPlayer || "Unknown Player").trim();
   const playerId = localPlayerId || playerName;
   return {
     playerId,
     playerName,
-    charName: state.charName || "Unnamed Character",
+    charName: (state.charName || "").trim(),
     hpCurrent: state.hpCurrent || "",
     hpMax: state.hpMax || "",
     ceCurrent: state.ceCurrent || "",
     ceMax: state.ceMax || "",
     ac: state.ac || ""
   };
+}
+
+function hasCharacterName(entry) {
+  return !!(entry && typeof entry.charName === "string" && entry.charName.trim());
 }
 
 function formatTrack(current, max) {
@@ -1119,8 +1127,11 @@ function renderPartyList() {
   if (!list) return;
 
   const self = getPartySnapshot();
-  const others = Array.from(partyRoster.values()).filter(entry => entry.playerId !== self.playerId);
-  const roster = [self, ...others].sort((a, b) => a.playerName.localeCompare(b.playerName));
+  const others = Array.from(partyRoster.values())
+    .filter(entry => entry.playerId !== self.playerId)
+    .filter(hasCharacterName)
+    .sort((a, b) => a.playerName.localeCompare(b.playerName));
+  const roster = hasCharacterName(self) ? [self, ...others] : others;
 
   if (!roster.length) {
     list.innerHTML = '<div class="party-empty">No party data yet.</div>';
@@ -1491,12 +1502,19 @@ function applyStateToUI() {
 }
 
 // ── TABS ──────────────────────────────────────────────────────────────────────
+function activateMainTab(tabName) {
+  const target = document.querySelector(`.tab[data-tab="${tabName}"]`);
+  const panel = document.getElementById("panel-" + tabName);
+  if (!target || !panel || target.classList.contains("disabled")) return;
+  document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+  document.querySelectorAll(".tab-panel").forEach(p => p.classList.remove("active"));
+  target.classList.add("active");
+  panel.classList.add("active");
+}
+
 document.querySelectorAll(".tab:not(.disabled)").forEach(tab => {
   tab.addEventListener("click", () => {
-    document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
-    document.querySelectorAll(".tab-panel").forEach(p => p.classList.remove("active"));
-    tab.classList.add("active");
-    document.getElementById("panel-" + tab.dataset.tab).classList.add("active");
+    activateMainTab(tab.dataset.tab);
   });
 });
 
@@ -1527,10 +1545,15 @@ async function init() {
   document.getElementById("removeSecondArchetypeBtn").addEventListener("click", toggleSecondArchetype);
   updateSecondArchetypeUI();
 
+  const partyQuickBtn = document.getElementById("partyQuickBtn");
   const rollHistoryBtn = document.getElementById("rollHistoryBtn");
   const rollHistoryPanel = document.getElementById("rollHistoryPanel");
   const closeRollHistoryBtn = document.getElementById("closeRollHistoryBtn");
   const clearRollHistoryBtn = document.getElementById("clearRollHistoryBtn");
+
+  partyQuickBtn.addEventListener("click", () => {
+    activateMainTab("party");
+  });
 
   rollHistoryBtn.addEventListener("click", () => {
     rollHistoryPanel.classList.toggle("open");
@@ -1573,6 +1596,11 @@ async function init() {
         const entry = event.data;
         if (!entry || !entry.playerId) return;
         if (entry.playerId === localPlayerId) return;
+        if (!hasCharacterName(entry)) {
+          partyRoster.delete(entry.playerId);
+          renderPartyList();
+          return;
+        }
         partyRoster.set(entry.playerId, entry);
         renderPartyList();
       });
