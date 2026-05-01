@@ -729,15 +729,26 @@
     }
     .party-stats {
       display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
+      grid-template-columns: repeat(3, minmax(0, 1fr));
       gap: 6px;
     }
     .party-meta {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 8px;
       font-family: 'Crimson Text', serif;
       font-size: 12px;
       color: var(--ink-light);
       margin-bottom: 5px;
       line-height: 1.3;
+    }
+    .party-meta-left { flex: 1; min-width: 0; }
+    .party-meta-player {
+      font-size: 11px;
+      color: var(--ink-faint);
+      white-space: nowrap;
+      flex-shrink: 0;
     }
     .party-stat-value { font-size: 12px; }
     .party-stat {
@@ -1172,18 +1183,16 @@ function renderPartyList() {
 
   list.innerHTML = roster.map(entry => {
     const arcDisplay = formatArchetypeDisplay(entry);
-    const metaLine = arcDisplay
-      ? `<em>${entry.playerName}</em> &bull; ${arcDisplay}`
-      : `<em>${entry.playerName}</em>`;
+    const gradeStr = entry.grade ? `Grade ${entry.grade}` : "";
+    const metaLeft = [gradeStr, arcDisplay].filter(Boolean).join(" \u2022 ");
     return `
     <div class="party-item">
       <div class="party-character">${entry.charName}</div>
-      <div class="party-meta">${metaLine}</div>
+      <div class="party-meta">
+        <span class="party-meta-left">${metaLeft}</span>
+        <span class="party-meta-player">${entry.playerName}</span>
+      </div>
       <div class="party-stats">
-        <div class="party-stat">
-          <div class="party-stat-label">Grade</div>
-          <div class="party-stat-value">${entry.grade || "—"}</div>
-        </div>
         <div class="party-stat">
           <div class="party-stat-label">HP</div>
           <div class="party-stat-value">${formatTrack(entry.hpCurrent, entry.hpMax)}</div>
