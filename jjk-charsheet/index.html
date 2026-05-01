@@ -172,6 +172,10 @@
     .meta-select option { background: #f0ebe0; }
     .meta-input:focus, .meta-select:focus { border-bottom-color: var(--ink); }
     .player-name-field { margin-top: 7px; }
+    .token-link-btn {
+      margin-top: 6px;
+      width: 100%;
+    }
     .meta-toggle-btn {
       width: 100%;
       background: var(--parchment-dark);
@@ -491,7 +495,7 @@
     }
     .roll-history-btn:hover { background: var(--accent); border-color: var(--accent); }
     .party-quick-btn {
-      right: 84px;
+      right: 96px;
     }
     .roll-history-panel {
       position: fixed;
@@ -789,6 +793,7 @@
           <div class="meta-field player-name-field">
             <div class="field-label">Player Name</div>
             <input class="meta-input" id="playerName" placeholder="—" />
+            <button class="meta-toggle-btn token-link-btn" id="linkTokenBtn" type="button">Link Token HP Bar</button>
           </div>
         </div>
         <div style="display:flex;align-items:center;justify-content:center;padding-top:4px;">
@@ -1006,12 +1011,16 @@
 
 <script type="module">
 // ── OBR SDK ──────────────────────────────────────────────────────────────────
-import OBR from "https://cdn.jsdelivr.net/npm/@owlbear-rodeo/sdk@3.1.0/+esm";
+import OBR, { buildLabel } from "https://cdn.jsdelivr.net/npm/@owlbear-rodeo/sdk@3.1.0/+esm";
 
 const STORAGE_KEY = "jjk-charsheet-v1";
 const ROLL_BROADCAST_CHANNEL = "jjk-roll-v1";
 const PARTY_BROADCAST_CHANNEL = "jjk-party-v1";
 const PARTY_SYNC_REQUEST_CHANNEL = "jjk-party-sync-v1";
+const HP_BAR_MIN_WIDTH = 32;
+const HP_BAR_MAX_WIDTH = 92;
+const HP_BAR_HEIGHT = 10;
+const HP_BAR_OFFSET_Y = 16;
 
 // ── ARCHETYPES ────────────────────────────────────────────────────────────────
 const ARCHETYPES = {
@@ -1056,6 +1065,7 @@ function defaultState() {
     archetype2: "", subArchetype2: "", hasSecondArchetype: false,
     ac: "", hpCurrent: "", hpMax: "",
     movement: "", ceCurrent: "", ceMax: "", ceNote: "",
+    linkedTokenId: "", linkedHpBarBgId: "", linkedHpBarFillId: "", linkedHpBarWidth: 0,
     rollHistory: [],
     stats
   };
@@ -1069,7 +1079,160 @@ let groupRollHistory = [];
 let activeRollTab = "mine";
 let localPlayerId = null;
 let localPlayerName = "";
+let obrReady = false;
 const partyRoster = new Map();
+
+function clamp(value, min, max) {
+  return Math.min(max, Math.max(min, value));
+}
+
+function getHpFillRatio() {
+  const cur = parseInt(state.hpCurrent, 10);
+  const max = parseInt(state.hpMax, 10);
+  if (!Number.isFinite(max) || max <= 0) return 0;
+  const safeCur = Number.isFinite(cur) ? cur : 0;
+  return clamp(safeCur / max, 0, 1);
+}
+
+function setTokenLinkState(updates) {
+  state.linkedTokenId = updates.linkedTokenId || "";
+  state.linkedHpBarBgId = updates.linkedHpBarBgId || "";
+  state.linkedHpBarFillId = updates.linkedHpBarFillId || "";
+  state.linkedHpBarWidth = updates.linkedHpBarWidth || 0;
+  updateTokenLinkButton();
+}
+
+function updateTokenLinkButton() {
+  const btn = document.getElementById("linkTokenBtn");
+  if (!btn) return;
+  btn.textContent = state.linkedTokenId ? "Unlink Token HP Bar" : "Link Token HP Bar";
+}
+
+async function syncLinkedHpBar() {
+  if (!obrReady) return;
+  if (!state.linkedTokenId || !state.linkedHpBarBgId || !state.linkedHpBarFillId) return;
+
+  const barWidth = Number(state.linkedHpBarWidth) || HP_BAR_MIN_WIDTH;
+  const ratio = getHpFillRatio();
+  const fillWidth = clamp(Math.round(barWidth * ratio), 0, barWidth);
+
+  try {
+    await OBR.scene.items.updateItems([state.linkedHpBarFillId], items => {
+      if (!items.length) return;
+      items[0].text.width = Math.max(fillWidth, 0);
+      items[0].position.x = -(barWidth - fillWidth) / 2;
+    });
+  } catch (e) {
+    setTokenLinkState({});
+  }
+}
+
+async function unlinkTokenHpBar(showToast = false) {
+  if (!obrReady) return;
+  const ids = [state.linkedHpBarBgId, state.linkedHpBarFillId].filter(Boolean);
+  if (ids.length) {
+    try {
+      await OBR.scene.items.deleteItems(ids);
+    } catch (e) {
+      // Ignore if already gone
+    }
+  }
+  setTokenLinkState({});
+  scheduleSave();
+  if (showToast) {
+    await OBR.notification.show("Token HP bar unlinked.", "INFO");
+  }
+}
+
+async function linkSelectedTokenHpBar() {
+  if (!obrReady) return;
+
+  const selected = await OBR.player.getSelection();
+  if (!selected || selected.length !== 1) {
+    await OBR.notification.show("Select exactly one token to link.", "WARNING");
+    return;
+  }
+
+  const tokenId = selected[0];
+  const bounds = await OBR.scene.items.getItemBounds([tokenId]);
+  const barWidth = clamp(Math.round(bounds.width * 0.75), HP_BAR_MIN_WIDTH, HP_BAR_MAX_WIDTH);
+  const ratio = getHpFillRatio();
+  const fillWidth = clamp(Math.round(barWidth * ratio), 0, barWidth);
+
+  const basePosition = { x: bounds.center.x, y: bounds.max.y + HP_BAR_OFFSET_Y };
+
+  const bgBar = buildLabel()
+    .plainText("")
+    .width(barWidth)
+    .height(HP_BAR_HEIGHT)
+    .padding(0)
+    .fontSize(1)
+    .fillOpacity(0)
+    .backgroundColor("#1a1410")
+    .backgroundOpacity(0.38)
+    .cornerRadius(999)
+    .layer("ATTACHMENT")
+    .position(basePosition)
+    .attachedTo(tokenId)
+    .build();
+
+  const fillBar = buildLabel()
+    .plainText("")
+    .width(fillWidth)
+    .height(HP_BAR_HEIGHT - 2)
+    .padding(0)
+    .fontSize(1)
+    .fillOpacity(0)
+    .backgroundColor("#8b1a1a")
+    .backgroundOpacity(0.62)
+    .cornerRadius(999)
+    .layer("ATTACHMENT")
+    .position({ x: -(barWidth - fillWidth) / 2, y: 0 })
+    .attachedTo(bgBar.id)
+    .build();
+
+  await OBR.scene.items.addItems([bgBar, fillBar]);
+
+  setTokenLinkState({
+    linkedTokenId: tokenId,
+    linkedHpBarBgId: bgBar.id,
+    linkedHpBarFillId: fillBar.id,
+    linkedHpBarWidth: barWidth
+  });
+  scheduleSave();
+  await OBR.notification.show("Token linked to HP bar.", "SUCCESS");
+}
+
+async function toggleTokenHpBarLink() {
+  if (!obrReady) {
+    return;
+  }
+  if (state.linkedTokenId) {
+    await unlinkTokenHpBar(true);
+    return;
+  }
+  await linkSelectedTokenHpBar();
+}
+
+async function validateTokenLinkStillExists() {
+  if (!obrReady || !state.linkedTokenId) return;
+  const watchIds = [state.linkedTokenId, state.linkedHpBarBgId, state.linkedHpBarFillId].filter(Boolean);
+  if (!watchIds.length) return;
+
+  try {
+    const items = await OBR.scene.items.getItems(watchIds);
+    const hasToken = items.some(item => item.id === state.linkedTokenId);
+    const hasBg = items.some(item => item.id === state.linkedHpBarBgId);
+    const hasFill = items.some(item => item.id === state.linkedHpBarFillId);
+    if (!hasToken || !hasBg || !hasFill) {
+      setTokenLinkState({});
+      scheduleSave();
+    }
+  } catch (e) {
+    setTokenLinkState({});
+    scheduleSave();
+  }
+}
 
 function getBlackFlashRange(techniqueScore) {
   if (!Number.isFinite(techniqueScore) || techniqueScore < 2) return null;
@@ -1441,6 +1604,7 @@ window.syncHP = syncHP;
 function scheduleSave() {
   clearTimeout(saveTimeout);
   renderPartyList();
+  void syncLinkedHpBar();
   saveTimeout = setTimeout(saveState, 600);
 }
 
@@ -1499,6 +1663,7 @@ function applyStateToUI() {
   renderRollHistory();
   updateBlackFlashRangeDisplay();
   renderPartyList();
+  updateTokenLinkButton();
 }
 
 // ── TABS ──────────────────────────────────────────────────────────────────────
@@ -1539,6 +1704,7 @@ async function init() {
   bindField("ceNote", "ceNote");
   bindField("subArchetypeSelect", "subArchetype");
   bindField("subArchetypeSelect2", "subArchetype2");
+  updateTokenLinkButton();
 
   const secondArcBtn = document.getElementById("addSecondArchetypeBtn");
   secondArcBtn.addEventListener("click", toggleSecondArchetype);
@@ -1546,6 +1712,7 @@ async function init() {
   updateSecondArchetypeUI();
 
   const partyQuickBtn = document.getElementById("partyQuickBtn");
+  const linkTokenBtn = document.getElementById("linkTokenBtn");
   const rollHistoryBtn = document.getElementById("rollHistoryBtn");
   const rollHistoryPanel = document.getElementById("rollHistoryPanel");
   const closeRollHistoryBtn = document.getElementById("closeRollHistoryBtn");
@@ -1553,6 +1720,9 @@ async function init() {
 
   partyQuickBtn.addEventListener("click", () => {
     activateMainTab("party");
+  });
+  linkTokenBtn.addEventListener("click", () => {
+    void toggleTokenHpBarLink();
   });
 
   rollHistoryBtn.addEventListener("click", () => {
@@ -1581,6 +1751,7 @@ async function init() {
   // Try OBR init
   try {
     await OBR.onReady(async () => {
+      obrReady = true;
       try {
         localPlayerName = await OBR.player.getName();
       } catch (e) {
@@ -1606,6 +1777,9 @@ async function init() {
       });
       OBR.broadcast.onMessage(PARTY_SYNC_REQUEST_CHANNEL, () => {
         broadcastPartySnapshot();
+      });
+      OBR.scene.items.onChange(() => {
+        void validateTokenLinkStillExists();
       });
 
       // Listen for group roll broadcasts from other players
@@ -1650,6 +1824,8 @@ async function init() {
       renderPartyList();
       broadcastPartySnapshot();
       OBR.broadcast.sendMessage(PARTY_SYNC_REQUEST_CHANNEL, { requesterId: localPlayerId || "unknown" }, { destination: "REMOTE" });
+      await validateTokenLinkStillExists();
+      await syncLinkedHpBar();
     });
   } catch (e) {
     // Dev fallback
