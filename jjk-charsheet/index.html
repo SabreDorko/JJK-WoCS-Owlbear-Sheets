@@ -172,10 +172,6 @@
     .meta-select option { background: #f0ebe0; }
     .meta-input:focus, .meta-select:focus { border-bottom-color: var(--ink); }
     .player-name-field { margin-top: 7px; }
-    .token-link-btn {
-      margin-top: 6px;
-      width: 100%;
-    }
     .meta-toggle-btn {
       width: 100%;
       background: var(--parchment-dark);
@@ -416,9 +412,9 @@
     .skill-roll-btn {
       width: 10px;
       height: 10px;
-      background: var(--ink-light);
-      color: var(--parchment-light);
-      border: 1px solid var(--ink-light);
+      background: var(--ink-faint);
+      color: var(--parchment-faint);
+      border: 1px solid var(--ink-faint);
       border-radius: 2px;
       cursor: pointer;
       padding: 0;
@@ -793,7 +789,6 @@
           <div class="meta-field player-name-field">
             <div class="field-label">Player Name</div>
             <input class="meta-input" id="playerName" placeholder="—" />
-            <button class="meta-toggle-btn token-link-btn" id="linkTokenBtn" type="button">Link Token HP Bar</button>
           </div>
         </div>
         <div style="display:flex;align-items:center;justify-content:center;padding-top:4px;">
@@ -1011,17 +1006,12 @@
 
 <script type="module">
 // ── OBR SDK ──────────────────────────────────────────────────────────────────
-import OBR, { buildPath } from "https://cdn.jsdelivr.net/npm/@owlbear-rodeo/sdk@3.1.0/+esm";
+import OBR from "https://cdn.jsdelivr.net/npm/@owlbear-rodeo/sdk@3.1.0/+esm";
 
 const STORAGE_KEY = "jjk-charsheet-v1";
 const ROLL_BROADCAST_CHANNEL = "jjk-roll-v1";
 const PARTY_BROADCAST_CHANNEL = "jjk-party-v1";
 const PARTY_SYNC_REQUEST_CHANNEL = "jjk-party-sync-v1";
-const HP_BAR_GAP_RATIO  = 0.12;  // gap below token = height * this
-const HP_BAR_WIDTH_RATIO = 0.75;  // bar width = token width * this
-const HP_BAR_HEIGHT_RATIO = 0.07; // bar height = token height * this
-const HP_BAR_HEIGHT_MIN = 10;
-
 // ── ARCHETYPES ────────────────────────────────────────────────────────────────
 const ARCHETYPES = {
   acrobat:       ["Untouchable", "Link"],
@@ -1065,8 +1055,6 @@ function defaultState() {
     archetype2: "", subArchetype2: "", hasSecondArchetype: false,
     ac: "", hpCurrent: "", hpMax: "",
     movement: "", ceCurrent: "", ceMax: "", ceNote: "",
-    linkedTokenId: "", linkedHpBarBgId: "", linkedHpBarFillId: "",
-    linkedHpBarWidth: 0, linkedHpBarHeight: 0,
     rollHistory: [],
     stats
   };
@@ -1085,191 +1073,6 @@ const partyRoster = new Map();
 
 function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
-}
-
-function getHpFillRatio() {
-  const cur = parseInt(state.hpCurrent, 10);
-  const max = parseInt(state.hpMax, 10);
-  if (!Number.isFinite(max) || max <= 0) return 0;
-  const safeCur = Number.isFinite(cur) ? cur : 0;
-  return clamp(safeCur / max, 0, 1);
-}
-
-function setTokenLinkState(updates) {
-  state.linkedTokenId    = updates.linkedTokenId    || "";
-  state.linkedHpBarBgId  = updates.linkedHpBarBgId  || "";
-  state.linkedHpBarFillId = updates.linkedHpBarFillId || "";
-  state.linkedHpBarWidth  = updates.linkedHpBarWidth  || 0;
-  state.linkedHpBarHeight = updates.linkedHpBarHeight || 0;
-  updateTokenLinkButton();
-}
-
-// Build a centered rectangle path of given w × h
-function rectCmds(w, h) {
-  const hw = w / 2, hh = h / 2;
-  return [
-    [0, -hw, -hh],   // MOVE
-    [1,  hw, -hh],   // LINE
-    [1,  hw,  hh],   // LINE
-    [1, -hw,  hh],   // LINE
-    [5]              // CLOSE
-  ];
-}
-
-function updateTokenLinkButton() {
-  const btn = document.getElementById("linkTokenBtn");
-  if (!btn) return;
-  btn.textContent = state.linkedTokenId ? "Unlink Token HP Bar" : "Link Token HP Bar";
-}
-
-async function syncLinkedHpBar() {
-  if (!obrReady) return;
-  if (!state.linkedTokenId || !state.linkedHpBarBgId || !state.linkedHpBarFillId) return;
-
-  const barWidth  = Number(state.linkedHpBarWidth)  || 100;
-  const barHeight = Number(state.linkedHpBarHeight) || 14;
-  const ratio = getHpFillRatio();
-  const fillWidth = clamp(Math.round(barWidth * ratio), 1, barWidth);
-
-  try {
-    // Fetch bg bar's current live position so we stay correct after token moves
-    await OBR.scene.items.updateItems(
-      [state.linkedHpBarBgId, state.linkedHpBarFillId],
-      items => {
-        const bg   = items.find(i => i.id === state.linkedHpBarBgId);
-        const fill = items.find(i => i.id === state.linkedHpBarFillId);
-        if (!bg || !fill) return;
-        fill.commands = rectCmds(fillWidth, barHeight - 2);
-        // Left-align fill within bg: offset from bg center
-        fill.position.x = bg.position.x - barWidth / 2 + fillWidth / 2;
-        fill.position.y = bg.position.y;
-        fill.visible = ratio > 0;
-      }
-    );
-  } catch (e) {
-    // Bar items gone — clear link state silently
-    setTokenLinkState({});
-  }
-}
-
-async function unlinkTokenHpBar(showToast = false) {
-  if (!obrReady) return;
-  const ids = [state.linkedHpBarBgId, state.linkedHpBarFillId].filter(Boolean);
-  if (ids.length) {
-    try {
-      await OBR.scene.items.deleteItems(ids);
-    } catch (e) {
-      // Ignore if already gone
-    }
-  }
-  setTokenLinkState({});
-  scheduleSave();
-  if (showToast) {
-    await OBR.notification.show("Token HP bar unlinked.", "INFO");
-  }
-}
-
-async function linkSelectedTokenHpBar() {
-  if (!obrReady) return;
-
-  try {
-    const selected = await OBR.player.getSelection();
-    if (!selected || selected.length !== 1) {
-      await OBR.notification.show("Select exactly one token to link.", "WARNING");
-      return;
-    }
-
-    const tokenId = selected[0];
-    const bounds  = await OBR.scene.items.getItemBounds([tokenId]);
-
-    const barWidth  = Math.round(bounds.width  * HP_BAR_WIDTH_RATIO);
-    const barHeight = Math.max(Math.round(bounds.height * HP_BAR_HEIGHT_RATIO), HP_BAR_HEIGHT_MIN);
-    const gapY      = Math.round(bounds.height * HP_BAR_GAP_RATIO);
-
-    // Attached items use world-space positions; they just follow the parent.
-    const bgCenterX = bounds.center.x;
-    const bgCenterY = bounds.max.y + gapY + barHeight / 2;
-
-    const ratio     = getHpFillRatio();
-    const fillWidth = clamp(Math.round(barWidth * ratio), 1, barWidth);
-    const fillCenterX = bgCenterX - barWidth / 2 + fillWidth / 2;
-
-    const bgBar = buildPath()
-      .commands(rectCmds(barWidth, barHeight))
-      .fillColor("#1a1410")
-      .fillOpacity(0.45)
-      .strokeColor("#1a1410")
-      .strokeOpacity(0)
-      .strokeWidth(0)
-      .layer("ATTACHMENT")
-      .position({ x: bgCenterX, y: bgCenterY })
-      .attachedTo(tokenId)
-      .disableHit(true)
-      .build();
-
-    const fillBar = buildPath()
-      .commands(rectCmds(fillWidth, barHeight - 2))
-      .fillColor("#8b1a1a")
-      .fillOpacity(0.85)
-      .strokeColor("#8b1a1a")
-      .strokeOpacity(0)
-      .strokeWidth(0)
-      .layer("ATTACHMENT")
-      .position({ x: fillCenterX, y: bgCenterY })
-      .attachedTo(tokenId)
-      .visible(ratio > 0)
-      .disableHit(true)
-      .build();
-
-    await OBR.scene.items.addItems([bgBar, fillBar]);
-
-    setTokenLinkState({
-      linkedTokenId:    tokenId,
-      linkedHpBarBgId:  bgBar.id,
-      linkedHpBarFillId: fillBar.id,
-      linkedHpBarWidth:  barWidth,
-      linkedHpBarHeight: barHeight
-    });
-    scheduleSave();
-    await OBR.notification.show("Token linked to HP bar.", "SUCCESS");
-  } catch (e) {
-    await OBR.notification.show("Could not link HP bar: " + (e?.message || "unknown error"), "ERROR");
-  }
-}
-
-async function toggleTokenHpBarLink() {
-  if (!obrReady) {
-    return;
-  }
-  try {
-    if (state.linkedTokenId) {
-      await unlinkTokenHpBar(true);
-      return;
-    }
-    await linkSelectedTokenHpBar();
-  } catch (e) {
-    await OBR.notification.show("Token link action failed.", "ERROR");
-  }
-}
-
-async function validateTokenLinkStillExists() {
-  if (!obrReady || !state.linkedTokenId) return;
-  const watchIds = [state.linkedTokenId, state.linkedHpBarBgId, state.linkedHpBarFillId].filter(Boolean);
-  if (!watchIds.length) return;
-
-  try {
-    const items = await OBR.scene.items.getItems(watchIds);
-    const hasToken = items.some(item => item.id === state.linkedTokenId);
-    const hasBg = items.some(item => item.id === state.linkedHpBarBgId);
-    const hasFill = items.some(item => item.id === state.linkedHpBarFillId);
-    if (!hasToken || !hasBg || !hasFill) {
-      setTokenLinkState({});
-      scheduleSave();
-    }
-  } catch (e) {
-    setTokenLinkState({});
-    scheduleSave();
-  }
 }
 
 function getBlackFlashRange(techniqueScore) {
@@ -1642,7 +1445,6 @@ window.syncHP = syncHP;
 function scheduleSave() {
   clearTimeout(saveTimeout);
   renderPartyList();
-  void syncLinkedHpBar();
   saveTimeout = setTimeout(saveState, 600);
 }
 
@@ -1701,7 +1503,6 @@ function applyStateToUI() {
   renderRollHistory();
   updateBlackFlashRangeDisplay();
   renderPartyList();
-  updateTokenLinkButton();
 }
 
 // ── TABS ──────────────────────────────────────────────────────────────────────
@@ -1742,7 +1543,6 @@ async function init() {
   bindField("ceNote", "ceNote");
   bindField("subArchetypeSelect", "subArchetype");
   bindField("subArchetypeSelect2", "subArchetype2");
-  updateTokenLinkButton();
 
   const secondArcBtn = document.getElementById("addSecondArchetypeBtn");
   secondArcBtn.addEventListener("click", toggleSecondArchetype);
@@ -1750,7 +1550,6 @@ async function init() {
   updateSecondArchetypeUI();
 
   const partyQuickBtn = document.getElementById("partyQuickBtn");
-  const linkTokenBtn = document.getElementById("linkTokenBtn");
   const rollHistoryBtn = document.getElementById("rollHistoryBtn");
   const rollHistoryPanel = document.getElementById("rollHistoryPanel");
   const closeRollHistoryBtn = document.getElementById("closeRollHistoryBtn");
@@ -1758,9 +1557,6 @@ async function init() {
 
   partyQuickBtn.addEventListener("click", () => {
     activateMainTab("party");
-  });
-  linkTokenBtn.addEventListener("click", () => {
-    void toggleTokenHpBarLink();
   });
 
   rollHistoryBtn.addEventListener("click", () => {
@@ -1816,10 +1612,6 @@ async function init() {
       OBR.broadcast.onMessage(PARTY_SYNC_REQUEST_CHANNEL, () => {
         broadcastPartySnapshot();
       });
-      OBR.scene.items.onChange(() => {
-        void validateTokenLinkStillExists();
-      });
-
       // Listen for group roll broadcasts from other players
       OBR.broadcast.onMessage(ROLL_BROADCAST_CHANNEL, (event) => {
         groupRollHistory = [...groupRollHistory, event.data].slice(-MAX_GROUP_ROLL_HISTORY);
@@ -1862,8 +1654,6 @@ async function init() {
       renderPartyList();
       broadcastPartySnapshot();
       OBR.broadcast.sendMessage(PARTY_SYNC_REQUEST_CHANNEL, { requesterId: localPlayerId || "unknown" }, { destination: "REMOTE" });
-      await validateTokenLinkStillExists();
-      await syncLinkedHpBar();
     });
   } catch (e) {
     // Dev fallback
