@@ -1011,16 +1011,16 @@
 
 <script type="module">
 // ── OBR SDK ──────────────────────────────────────────────────────────────────
-import OBR, { buildLabel } from "https://cdn.jsdelivr.net/npm/@owlbear-rodeo/sdk@3.1.0/+esm";
+import OBR, { buildPath } from "https://cdn.jsdelivr.net/npm/@owlbear-rodeo/sdk@3.1.0/+esm";
 
 const STORAGE_KEY = "jjk-charsheet-v1";
 const ROLL_BROADCAST_CHANNEL = "jjk-roll-v1";
 const PARTY_BROADCAST_CHANNEL = "jjk-party-v1";
 const PARTY_SYNC_REQUEST_CHANNEL = "jjk-party-sync-v1";
-const HP_BAR_MIN_WIDTH = 32;
-const HP_BAR_MAX_WIDTH = 92;
-const HP_BAR_HEIGHT = 10;
-const HP_BAR_OFFSET_Y = 16;
+const HP_BAR_GAP_RATIO  = 0.12;  // gap below token = height * this
+const HP_BAR_WIDTH_RATIO = 0.75;  // bar width = token width * this
+const HP_BAR_HEIGHT_RATIO = 0.07; // bar height = token height * this
+const HP_BAR_HEIGHT_MIN = 10;
 
 // ── ARCHETYPES ────────────────────────────────────────────────────────────────
 const ARCHETYPES = {
@@ -1065,7 +1065,8 @@ function defaultState() {
     archetype2: "", subArchetype2: "", hasSecondArchetype: false,
     ac: "", hpCurrent: "", hpMax: "",
     movement: "", ceCurrent: "", ceMax: "", ceNote: "",
-    linkedTokenId: "", linkedHpBarBgId: "", linkedHpBarFillId: "", linkedHpBarWidth: 0,
+    linkedTokenId: "", linkedHpBarBgId: "", linkedHpBarFillId: "",
+    linkedHpBarWidth: 0, linkedHpBarHeight: 0,
     rollHistory: [],
     stats
   };
@@ -1095,11 +1096,24 @@ function getHpFillRatio() {
 }
 
 function setTokenLinkState(updates) {
-  state.linkedTokenId = updates.linkedTokenId || "";
-  state.linkedHpBarBgId = updates.linkedHpBarBgId || "";
+  state.linkedTokenId    = updates.linkedTokenId    || "";
+  state.linkedHpBarBgId  = updates.linkedHpBarBgId  || "";
   state.linkedHpBarFillId = updates.linkedHpBarFillId || "";
-  state.linkedHpBarWidth = updates.linkedHpBarWidth || 0;
+  state.linkedHpBarWidth  = updates.linkedHpBarWidth  || 0;
+  state.linkedHpBarHeight = updates.linkedHpBarHeight || 0;
   updateTokenLinkButton();
+}
+
+// Build a centered rectangle path of given w × h
+function rectCmds(w, h) {
+  const hw = w / 2, hh = h / 2;
+  return [
+    [0, -hw, -hh],   // MOVE
+    [1,  hw, -hh],   // LINE
+    [1,  hw,  hh],   // LINE
+    [1, -hw,  hh],   // LINE
+    [5]              // CLOSE
+  ];
 }
 
 function updateTokenLinkButton() {
@@ -1112,17 +1126,28 @@ async function syncLinkedHpBar() {
   if (!obrReady) return;
   if (!state.linkedTokenId || !state.linkedHpBarBgId || !state.linkedHpBarFillId) return;
 
-  const barWidth = Number(state.linkedHpBarWidth) || HP_BAR_MIN_WIDTH;
+  const barWidth  = Number(state.linkedHpBarWidth)  || 100;
+  const barHeight = Number(state.linkedHpBarHeight) || 14;
   const ratio = getHpFillRatio();
-  const fillWidth = clamp(Math.round(barWidth * ratio), 0, barWidth);
+  const fillWidth = clamp(Math.round(barWidth * ratio), 1, barWidth);
 
   try {
-    await OBR.scene.items.updateItems([state.linkedHpBarFillId], items => {
-      if (!items.length) return;
-      items[0].text.width = Math.max(fillWidth, 0);
-      items[0].position.x = -(barWidth - fillWidth) / 2;
-    });
+    // Fetch bg bar's current live position so we stay correct after token moves
+    await OBR.scene.items.updateItems(
+      [state.linkedHpBarBgId, state.linkedHpBarFillId],
+      items => {
+        const bg   = items.find(i => i.id === state.linkedHpBarBgId);
+        const fill = items.find(i => i.id === state.linkedHpBarFillId);
+        if (!bg || !fill) return;
+        fill.commands = rectCmds(fillWidth, barHeight - 2);
+        // Left-align fill within bg: offset from bg center
+        fill.position.x = bg.position.x - barWidth / 2 + fillWidth / 2;
+        fill.position.y = bg.position.y;
+        fill.visible = ratio > 0;
+      }
+    );
   } catch (e) {
+    // Bar items gone — clear link state silently
     setTokenLinkState({});
   }
 }
@@ -1155,61 +1180,60 @@ async function linkSelectedTokenHpBar() {
     }
 
     const tokenId = selected[0];
-    const bounds = await OBR.scene.items.getItemBounds([tokenId]);
-    const barWidth = clamp(Math.round(bounds.width * 0.75), HP_BAR_MIN_WIDTH, HP_BAR_MAX_WIDTH);
-    const ratio = getHpFillRatio();
-    const fillWidth = clamp(Math.round(barWidth * ratio), 0, barWidth);
-    const yOffset = Math.round((bounds.height / 2) + HP_BAR_OFFSET_Y);
+    const bounds  = await OBR.scene.items.getItemBounds([tokenId]);
 
-    // For attached items, position is relative to the parent item.
-    const bgBar = buildLabel()
-      .plainText(" ")
-      .width(barWidth)
-      .height(HP_BAR_HEIGHT)
-      .padding(0)
-      .fontSize(1)
-      .fillOpacity(0)
-      .backgroundColor("#1a1410")
-      .backgroundOpacity(0.42)
-      .cornerRadius(999)
-      .pointerWidth(0)
-      .pointerHeight(0)
+    const barWidth  = Math.round(bounds.width  * HP_BAR_WIDTH_RATIO);
+    const barHeight = Math.max(Math.round(bounds.height * HP_BAR_HEIGHT_RATIO), HP_BAR_HEIGHT_MIN);
+    const gapY      = Math.round(bounds.height * HP_BAR_GAP_RATIO);
+
+    // Attached items use world-space positions; they just follow the parent.
+    const bgCenterX = bounds.center.x;
+    const bgCenterY = bounds.max.y + gapY + barHeight / 2;
+
+    const ratio     = getHpFillRatio();
+    const fillWidth = clamp(Math.round(barWidth * ratio), 1, barWidth);
+    const fillCenterX = bgCenterX - barWidth / 2 + fillWidth / 2;
+
+    const bgBar = buildPath()
+      .commands(rectCmds(barWidth, barHeight))
+      .fillColor("#1a1410")
+      .fillOpacity(0.45)
+      .strokeColor("#1a1410")
+      .strokeOpacity(0)
+      .strokeWidth(0)
       .layer("ATTACHMENT")
-      .position({ x: 0, y: yOffset })
+      .position({ x: bgCenterX, y: bgCenterY })
       .attachedTo(tokenId)
       .disableHit(true)
       .build();
 
-    const fillBar = buildLabel()
-      .plainText(" ")
-      .width(fillWidth)
-      .height(HP_BAR_HEIGHT - 2)
-      .padding(0)
-      .fontSize(1)
-      .fillOpacity(0)
-      .backgroundColor("#8b1a1a")
-      .backgroundOpacity(0.72)
-      .cornerRadius(999)
-      .pointerWidth(0)
-      .pointerHeight(0)
+    const fillBar = buildPath()
+      .commands(rectCmds(fillWidth, barHeight - 2))
+      .fillColor("#8b1a1a")
+      .fillOpacity(0.85)
+      .strokeColor("#8b1a1a")
+      .strokeOpacity(0)
+      .strokeWidth(0)
       .layer("ATTACHMENT")
-      .position({ x: -(barWidth - fillWidth) / 2, y: 0 })
-      .attachedTo(bgBar.id)
+      .position({ x: fillCenterX, y: bgCenterY })
+      .attachedTo(tokenId)
+      .visible(ratio > 0)
       .disableHit(true)
       .build();
 
     await OBR.scene.items.addItems([bgBar, fillBar]);
 
     setTokenLinkState({
-      linkedTokenId: tokenId,
-      linkedHpBarBgId: bgBar.id,
+      linkedTokenId:    tokenId,
+      linkedHpBarBgId:  bgBar.id,
       linkedHpBarFillId: fillBar.id,
-      linkedHpBarWidth: barWidth
+      linkedHpBarWidth:  barWidth,
+      linkedHpBarHeight: barHeight
     });
     scheduleSave();
     await OBR.notification.show("Token linked to HP bar.", "SUCCESS");
   } catch (e) {
-    await OBR.notification.show("Could not link HP bar. Check token selection/permissions.", "ERROR");
+    await OBR.notification.show("Could not link HP bar: " + (e?.message || "unknown error"), "ERROR");
   }
 }
 
