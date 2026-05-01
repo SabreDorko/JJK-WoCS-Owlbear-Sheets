@@ -410,17 +410,28 @@
     }
     .roll-btn:hover { background: var(--accent); color: var(--parchment); }
     .skill-roll-btn {
-      font-size: 11px;
-      line-height: 1;
-      background: transparent;
-      border: none;
-      color: var(--ink-faint);
+      width: 13px;
+      height: 13px;
+      background: var(--ink);
+      color: var(--parchment);
+      border: 1px solid var(--ink);
       cursor: pointer;
-      padding: 0 1px;
+      padding: 0;
       flex-shrink: 0;
-      transition: color 0.12s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transform: rotate(45deg);
+      transition: background 0.12s, border-color 0.12s;
     }
-    .skill-roll-btn:hover { color: var(--accent); }
+    .skill-roll-btn:hover { background: var(--accent); border-color: var(--accent); }
+    .skill-roll-btn span {
+      display: block;
+      transform: rotate(-45deg);
+      font-size: 9px;
+      line-height: 1;
+      pointer-events: none;
+    }
     .roll-toast.crit-success {
       border-color: #2a6e2a;
       background: #f0f7f0;
@@ -1140,7 +1151,7 @@ function buildStatBlocks(defs, container) {
         <input class="skill-bonus-input" type="text"
                id="bonus_${def.key}_${i}" value="${sk.bonus}" placeholder="+0" maxlength="4" />
         <span class="skill-name">${skill}</span>
-        <button class="skill-roll-btn" type="button" title="Roll ${skill}">⚄</button>
+        <button class="skill-roll-btn" type="button" title="Roll ${skill}"><span>⚄</span></button>
       `;
       skillsSide.appendChild(row);
 
