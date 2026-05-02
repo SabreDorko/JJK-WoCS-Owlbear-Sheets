@@ -1120,11 +1120,13 @@ function renderEquippedSlots() {
     const isDescriptionExpanded = expandedDescriptionIds.has(item.id);
     return `
       <div class="equipped-slot-card" data-item-id="${item.id}" data-slot-key="${slot}" data-drop-zone="equipped-slot" draggable="true">
-        <div class="equipped-slot-label">${BODY_SLOT_LABELS[slot]}</div>
+        <div class="equipped-slot-header">
+          <div class="equipped-slot-label">${BODY_SLOT_LABELS[slot]}</div>
+          ${hasDescription ? renderDescriptionToggleButton(isDescriptionExpanded) : ""}
+        </div>
         <div class="equipped-slot-item">${escapeHtml(item.name)}</div>
         ${weaponHandedness ? `<div class="equipped-slot-meta">${weaponHandedness}</div>` : ""}
         ${quantityText}
-        ${hasDescription ? renderDescriptionToggleButton(isDescriptionExpanded) : ""}
         ${hasDescription ? `<div class="equipped-slot-desc${isDescriptionExpanded ? "" : " collapsed"}">${escapeHtml(item.description)}</div>` : ""}
         ${item.modifier ? `<div class="equipped-slot-mod">${escapeHtml(item.modifier)}</div>` : ""}
         <div class="equipped-slot-actions">

@@ -1218,6 +1218,22 @@
       font-size: 9px;
       letter-spacing: 1.1px;
     }
+    .equipped-slot-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 4px;
+      margin-bottom: 2px;
+    }
+    .equipped-slot-header .equipped-slot-label {
+      margin-bottom: 0;
+    }
+    .equipped-slot-header .inventory-desc-toggle-btn {
+      width: 18px;
+      height: 16px;
+      font-size: 14px;
+      margin-top: 0;
+    }
     .equipped-slot-item,
     .inventory-item-name {
       font-family: 'Crimson Text', serif;
