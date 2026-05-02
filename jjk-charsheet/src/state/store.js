@@ -71,6 +71,7 @@ export function defaultState() {
     archetype2: "", subArchetype2: "", hasSecondArchetype: false,
     ac: "", hpCurrent: "", hpMax: "",
     movement: "", ceCurrent: "", ceMax: "", ceNote: "",
+    yen: "",
     rollHistory: [],
     inventoryItems: [],
     inventorySlots: [null, null, null, null, null],

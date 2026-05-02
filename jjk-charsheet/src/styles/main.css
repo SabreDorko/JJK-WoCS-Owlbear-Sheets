@@ -777,12 +777,12 @@
     /* ── INVENTORY TAB ── */
     .inventory-layout {
       display: grid;
-      grid-template-columns: 320px 1fr;
+      grid-template-columns: minmax(320px, 1fr) minmax(340px, 1fr);
       gap: 10px;
       align-items: start;
     }
-    .inventory-builder,
-    .inventory-zones {
+    .inventory-main-col,
+    .inventory-body-col {
       display: flex;
       flex-direction: column;
       gap: 9px;
@@ -806,19 +806,43 @@
       color: var(--ink-faint);
       margin-bottom: 8px;
     }
+    .inventory-yen-row {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .inventory-yen-input {
+      font-family: 'Cinzel', serif;
+      font-size: 18px;
+      font-weight: 600;
+      width: 120px;
+    }
+    .inventory-creator-wrap {
+      display: flex;
+      justify-content: flex-end;
+      margin-top: -2px;
+    }
+    .inventory-plus-btn {
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      border: 1.5px solid var(--ink);
+      background: var(--parchment-dark);
+      color: var(--ink);
+      font-family: 'Cinzel', serif;
+      font-size: 18px;
+      line-height: 1;
+      cursor: pointer;
+    }
+    .inventory-plus-btn:hover { border-color: var(--accent); color: var(--accent); }
+    .inventory-editor-panel.collapsed { display: none; }
     .inventory-form-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 6px 10px;
     }
-    .inventory-field {
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
-    }
-    .inventory-field-full {
-      grid-column: 1 / -1;
-    }
+    .inventory-field { display: flex; flex-direction: column; gap: 2px; }
+    .inventory-field-full { grid-column: 1 / -1; }
     .inventory-textarea {
       font-family: 'Crimson Text', Georgia, serif;
       font-size: 12px;
@@ -831,9 +855,7 @@
       padding: 5px 6px;
       outline: none;
     }
-    .inventory-textarea:focus {
-      border-color: var(--ink);
-    }
+    .inventory-textarea:focus { border-color: var(--ink); }
     .slot-option-grid {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -850,11 +872,7 @@
       align-items: center;
       gap: 5px;
     }
-    .inventory-form-actions {
-      display: flex;
-      gap: 6px;
-      align-items: center;
-    }
+    .inventory-form-actions { display: flex; gap: 6px; align-items: center; }
     .inventory-secondary-btn {
       flex: 1;
       background: transparent;
@@ -867,9 +885,7 @@
       padding: 5px 6px;
       cursor: pointer;
     }
-    .inventory-secondary-btn:hover {
-      border-color: var(--ink);
-    }
+    .inventory-secondary-btn:hover { border-color: var(--ink); }
     .inventory-error {
       grid-column: 1 / -1;
       min-height: 14px;
@@ -878,6 +894,26 @@
       color: var(--accent);
       font-style: italic;
     }
+    .inventory-collapse-btn {
+      width: 100%;
+      text-align: left;
+      background: transparent;
+      border: none;
+      color: var(--ink);
+      font-family: 'Cinzel', serif;
+      font-size: 10px;
+      letter-spacing: 1.2px;
+      text-transform: uppercase;
+      cursor: pointer;
+      padding: 0;
+      margin-bottom: 6px;
+    }
+    .inventory-collapse-btn::after {
+      content: " ▼";
+      font-size: 8px;
+    }
+    .inventory-collapse-btn[aria-expanded="false"]::after { content: " ►"; }
+    .inventory-collapsible.collapsed { display: none; }
     .equipped-slots-grid {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -889,6 +925,9 @@
       border: 1px solid var(--border-strong);
       background: rgba(240, 235, 224, 0.75);
       padding: 6px;
+    }
+    .equipped-slot-card {
+      min-height: 96px;
     }
     .equipped-slot-label,
     .inventory-slot-label {
@@ -918,10 +957,7 @@
       margin-top: 3px;
       line-height: 1.25;
     }
-    .equipped-slot-mod {
-      color: var(--accent);
-      font-style: italic;
-    }
+    .equipped-slot-mod { color: var(--accent); font-style: italic; }
     .equipped-slot-empty,
     .inventory-slot-empty {
       font-family: 'Crimson Text', serif;
@@ -930,11 +966,7 @@
       font-style: italic;
       min-height: 16px;
     }
-    .inventory-slot-list {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
+    .inventory-slot-list { display: flex; flex-direction: column; gap: 6px; min-height: 26px; }
     .inventory-item-top {
       display: flex;
       justify-content: space-between;
@@ -967,16 +999,9 @@
       padding: 2px 6px;
       cursor: pointer;
     }
-    .inventory-mini-btn:hover {
-      border-color: var(--ink);
-    }
-    .inventory-mini-btn.danger {
-      color: var(--accent);
-      border-color: rgba(139, 26, 26, 0.55);
-    }
-    .inventory-mini-btn.danger:hover {
-      border-color: var(--accent);
-    }
+    .inventory-mini-btn:hover { border-color: var(--ink); }
+    .inventory-mini-btn.danger { color: var(--accent); border-color: rgba(139, 26, 26, 0.55); }
+    .inventory-mini-btn.danger:hover { border-color: var(--accent); }
     .inventory-inline-select {
       font-family: 'Crimson Text', serif;
       font-size: 12px;
@@ -987,26 +1012,59 @@
       min-width: 100px;
       outline: none;
     }
-    .inventory-inline-select:focus {
-      border-color: var(--ink);
+    .inventory-inline-select:focus { border-color: var(--ink); }
+    .inventory-item-card[draggable="true"] { cursor: grab; }
+    .inventory-item-card[draggable="true"]:active { cursor: grabbing; }
+    .inventory-drop-target {
+      outline: 1.5px dashed var(--accent);
+      outline-offset: 2px;
+      background: rgba(253, 240, 240, 0.85);
+    }
+    .inventory-drop-forbidden {
+      outline: 1.5px dashed rgba(122, 106, 90, 0.85);
+      outline-offset: 2px;
+      background: rgba(226, 217, 200, 0.72);
+      cursor: not-allowed;
+    }
+    .inventory-drop-invalid {
+      animation: inventoryInvalidDrop 0.22s ease;
+    }
+    .inventory-drag-ghost {
+      position: fixed;
+      left: 0;
+      top: 0;
+      z-index: 9999;
+      pointer-events: none;
+      border: 1.2px solid var(--ink);
+      background: rgba(240, 235, 224, 0.95);
+      box-shadow: 1px 2px 0 rgba(26, 20, 16, 0.25);
+      color: var(--ink);
+      font-family: 'Cinzel', serif;
+      font-size: 10px;
+      letter-spacing: 0.9px;
+      text-transform: uppercase;
+      padding: 4px 8px;
+      max-width: 220px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    @keyframes inventoryInvalidDrop {
+      0% { transform: translateX(0); }
+      30% { transform: translateX(-4px); }
+      60% { transform: translateX(4px); }
+      100% { transform: translateX(0); }
     }
 
     @media (max-width: 980px) {
-      .inventory-layout {
-        grid-template-columns: 1fr;
-      }
-      .equipped-slots-grid {
-        grid-template-columns: 1fr;
-      }
+      .inventory-layout { grid-template-columns: 1fr; }
+      .equipped-slots-grid { grid-template-columns: 1fr; }
     }
 
     @media (max-width: 700px) {
-      .inventory-form-grid {
-        grid-template-columns: 1fr;
-      }
-      .slot-option-grid {
-        grid-template-columns: 1fr;
-      }
+      .inventory-form-grid { grid-template-columns: 1fr; }
+      .slot-option-grid { grid-template-columns: 1fr; }
     }
 
     /* ── PARTY TAB ── */
