@@ -776,18 +776,16 @@
 
     /* ── INVENTORY TAB ── */
     .inventory-layout {
-      display: block;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      gap: 10px;
+      align-items: start;
     }
-    .inventory-main-col {
+    .inventory-main-col,
+    .inventory-body-col {
       display: flex;
       flex-direction: column;
       gap: 9px;
-    }
-    .inventory-top-grid {
-      display: grid;
-      grid-template-columns: minmax(360px, 1fr) minmax(340px, 1fr);
-      gap: 10px;
-      align-items: start;
     }
     .inventory-card {
       border: 1.5px solid var(--ink);
@@ -960,7 +958,19 @@
       padding: 6px;
     }
     .equipped-slot-card {
-      min-height: 96px;
+      min-height: 84px;
+      padding: 5px;
+    }
+    .inventory-body-col .equipped-slot-item,
+    .inventory-body-col .inventory-item-name {
+      font-size: 13px;
+    }
+    .inventory-body-col .equipped-slot-meta,
+    .inventory-body-col .equipped-slot-mod,
+    .inventory-body-col .inventory-item-modifier,
+    .inventory-body-col .inventory-item-desc,
+    .inventory-body-col .inventory-item-slots {
+      font-size: 11px;
     }
     .equipped-slot-label,
     .inventory-slot-label {
@@ -1102,8 +1112,8 @@
       100% { transform: translateX(0); }
     }
 
-    @media (max-width: 980px) {
-      .inventory-top-grid { grid-template-columns: 1fr; }
+    @media (max-width: 860px) {
+      .inventory-layout { grid-template-columns: 1fr; }
       .equipped-slots-grid { grid-template-columns: 1fr; }
     }
 
