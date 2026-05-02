@@ -265,6 +265,25 @@ function restoreInventoryPlacementState(snapshot) {
 function moveItemToEquippedSlot(item, slotKey, options = {}) {
   const { dryRun = false } = options;
   const state = getState();
+
+  // Generic accessory target should try both concrete accessory slots.
+  if (slotKey === "accessory") {
+    const candidates = ["accessory1", "accessory2"];
+    for (const candidate of candidates) {
+      if (!state.equippedSlots[candidate]) {
+        return moveItemToEquippedSlot(item, candidate, options);
+      }
+    }
+
+    let lastFailure = { ok: false, message: "No accessory slot available." };
+    for (const candidate of candidates) {
+      const attempt = moveItemToEquippedSlot(item, candidate, options);
+      if (attempt.ok) return attempt;
+      lastFailure = attempt;
+    }
+    return lastFailure;
+  }
+
   const snapshot = snapshotInventoryPlacementState();
 
   const finalize = (result) => {
@@ -319,6 +338,20 @@ function moveItemToEquippedSlot(item, slotKey, options = {}) {
       };
     } else {
       displacedPlacementResult = { ok: false, message: "Swapped item cannot be moved from target slot." };
+    }
+  }
+
+  if (!displacedPlacementResult.ok) {
+    if (placeItemInFirstFreeInventorySlot(displacedItem)) {
+      displacedPlacementResult = {
+        ok: true,
+        message: `${displacedItem.name} moved to Inventory Slot ${displacedItem.inventorySlot + 1}.`,
+      };
+    } else if (placeItemInDorm(displacedItem)) {
+      displacedPlacementResult = {
+        ok: true,
+        message: `${displacedItem.name} moved to Dorm.`,
+      };
     }
   }
 
