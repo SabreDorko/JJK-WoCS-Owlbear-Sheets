@@ -877,9 +877,10 @@
       justify-content: center;
     }
     .inventory-yen-adjust-icon {
-      width: 13px;
-      height: 13px;
+      width: 15px;
+      height: 15px;
       display: block;
+      margin: 0 auto;
     }
     .inventory-item-amount-row {
       display: inline-flex;
@@ -1387,6 +1388,9 @@
       min-width: 16px;
       border-radius: 50%;
       padding: 0;
+      border-width: 1px;
+      font-size: 0;
+      line-height: 0;
       display: inline-flex;
       align-items: center;
       justify-content: center;
@@ -1394,6 +1398,8 @@
     .inventory-amount-adjust-btn .inventory-yen-adjust-icon {
       width: 11px;
       height: 11px;
+      margin: 0;
+      flex: 0 0 auto;
     }
     .equipped-slot-card .inventory-amount-adjust-btn .inventory-yen-adjust-icon {
       width: 12px;
@@ -1413,6 +1419,21 @@
       box-shadow: 1px 2px 0 rgba(26, 20, 16, 0.2);
       animation: inventorySurfaceSlideIn 180ms ease;
       transform-origin: top left;
+    }
+    .inventory-overflow-picker {
+      display: inline-flex;
+      flex-direction: column;
+      align-items: stretch;
+      min-width: 220px;
+      max-width: 290px;
+      gap: 5px;
+    }
+    .inventory-overflow-text {
+      font-family: 'Crimson Text', serif;
+      font-size: 12px;
+      line-height: 1.25;
+      color: var(--ink);
+      margin-bottom: 2px;
     }
     @keyframes inventorySurfaceSlideIn {
       from {

@@ -10,6 +10,7 @@ const expandedDescriptionIds = new Set();
 let openEquipPickerItemId = null;
 let openMovePickerItemId = null;
 let openYenAdjustMode = null;
+let openOverflowChoice = null;
 
 function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
@@ -385,6 +386,49 @@ function getEquipSlotsForItem(item, preferredPrimarySlot) {
   return { ok: false, message: "No valid free body slot combination available for this item." };
 }
 
+function chooseEquipSlotsIgnoringOccupancy(item, preferredPrimarySlot) {
+  const allowed = getInternalAllowedSlots(item);
+  if (!allowed.length) return null;
+
+  const slotsNeeded = clamp(parseInt(item.slotsNeeded, 10) || 1, 1, 3);
+  if (slotsNeeded > allowed.length) return null;
+
+  if (slotsNeeded === allowed.length) return allowed;
+
+  const tryPrimary = (primary) => {
+    if (primary && !allowed.includes(primary)) return null;
+
+    const chosen = [];
+    if (primary) chosen.push(primary);
+    if (chosen.length === slotsNeeded) return chosen;
+
+    for (const slot of allowed) {
+      if (chosen.includes(slot)) continue;
+      chosen.push(slot);
+      if (chosen.length === slotsNeeded) break;
+    }
+
+    return chosen.length === slotsNeeded ? chosen : null;
+  };
+
+  if (preferredPrimarySlot) {
+    const preferredCandidates = preferredPrimarySlot === "accessory"
+      ? ["accessory1", "accessory2"]
+      : [preferredPrimarySlot];
+    for (const candidate of preferredCandidates) {
+      const preferred = tryPrimary(candidate);
+      if (preferred) return preferred;
+    }
+  }
+
+  for (const slot of allowed) {
+    const result = tryPrimary(slot);
+    if (result) return result;
+  }
+
+  return null;
+}
+
 function placeItemEquipped(item, preferredPrimarySlot) {
   const state = getState();
   const snapshot = {
@@ -450,7 +494,12 @@ function restoreInventoryPlacementState(snapshot) {
 }
 
 function moveItemToEquippedSlot(item, slotKey, options = {}) {
-  const { dryRun = false, strictTarget = false } = options;
+  const {
+    dryRun = false,
+    strictTarget = false,
+    allowOverflowToStorage = false,
+    forcedTargetSlots = null,
+  } = options;
   const state = getState();
 
   // Generic accessory target should try both concrete accessory slots.
@@ -479,6 +528,68 @@ function moveItemToEquippedSlot(item, slotKey, options = {}) {
   };
 
   const targetOccupantId = slotKey ? state.equippedSlots[slotKey] : null;
+  const slotsNeeded = clamp(parseInt(item.slotsNeeded, 10) || 1, 1, 3);
+
+  if (slotsNeeded > 1) {
+    const plannedSlots = Array.isArray(forcedTargetSlots) && forcedTargetSlots.length
+      ? [...forcedTargetSlots]
+      : chooseEquipSlotsIgnoringOccupancy(item, slotKey || null);
+
+    if (plannedSlots?.length === slotsNeeded) {
+      const displacedIds = [...new Set(plannedSlots
+        .map(targetSlot => state.equippedSlots[targetSlot])
+        .filter(targetId => targetId && targetId !== item.id))];
+
+      if (displacedIds.length) {
+        if (dryRun) return finalize({ ok: true });
+
+        const displacedItems = displacedIds.map(getInventoryItemById).filter(Boolean);
+        if (displacedItems.length !== displacedIds.length) {
+          return finalize({ ok: false, message: "Target slot item was not found." });
+        }
+
+        displacedItems.forEach(displacedItem => removeItemFromContainers(displacedItem));
+        removeItemFromContainers(item);
+
+        plannedSlots.forEach(targetSlot => {
+          state.equippedSlots[targetSlot] = item.id;
+        });
+        item.location = "equipped";
+        item.inventorySlot = null;
+        item.equippedSlots = [...plannedSlots];
+
+        const overflowItems = [];
+        displacedItems.forEach(displacedItem => {
+          if (!placeItemInFirstFreeInventorySlot(displacedItem)) overflowItems.push(displacedItem);
+        });
+
+        if (overflowItems.length) {
+          if (!allowOverflowToStorage) {
+            const overflowNames = overflowItems.map(entry => entry.name).join(", ");
+            return finalize({
+              ok: false,
+              requiresOverflowChoice: true,
+              message: `Inventory is full for: ${overflowNames}. Move overflow items to storage?`,
+              targetSlots: [...plannedSlots],
+              targetSlotKey: slotKey || plannedSlots[0],
+            });
+          }
+
+          for (const overflowItem of overflowItems) {
+            if (!placeItemInDorm(overflowItem)) {
+              return finalize({ ok: false, message: `${overflowItem.name} could not be moved to storage.` });
+            }
+          }
+        }
+
+        if (strictTarget && slotKey && !plannedSlots.includes(slotKey)) {
+          return finalize({ ok: false, message: `Cannot equip to ${BODY_SLOT_LABELS[slotKey] || slotKey}.` });
+        }
+
+        return finalize({ ok: true });
+      }
+    }
+  }
 
   // Normal equip when target slot is empty (or already occupied by this item).
   if (!slotKey || !targetOccupantId || targetOccupantId === item.id) {
@@ -671,6 +782,18 @@ function renderMovePickerMenu(item, anchorSlotKey = null) {
   `;
 }
 
+function renderOverflowChoiceMenu(item) {
+  if (!openOverflowChoice || openOverflowChoice.itemId !== item.id) return "";
+
+  return `
+    <div class="inventory-equip-picker inventory-overflow-picker" role="menu" aria-label="Inventory overflow options">
+      <div class="inventory-overflow-text">${escapeHtml(openOverflowChoice.message || "Inventory is full. Move overflow to storage?")}</div>
+      <button type="button" class="inventory-mini-btn" data-action="confirmOverflowToStorage">Move Overflow to Storage</button>
+      <button type="button" class="inventory-mini-btn" data-action="cancelOverflowChoice">Cancel</button>
+    </div>
+  `;
+}
+
 function closeEquipPicker() {
   if (!openEquipPickerItemId) return;
   openEquipPickerItemId = null;
@@ -680,6 +803,12 @@ function closeEquipPicker() {
 function closeMovePicker() {
   if (!openMovePickerItemId) return;
   openMovePickerItemId = null;
+  renderInventory();
+}
+
+function closeOverflowChoice() {
+  if (!openOverflowChoice) return;
+  openOverflowChoice = null;
   renderInventory();
 }
 
@@ -967,13 +1096,16 @@ function renderEquippedSlots() {
     const primarySlot = item.equippedSlots?.[0] || slot;
     const isSecondarySlot = item.equippedSlots.length > 1 && slot !== primarySlot;
     const occupyingSlotsText = item.equippedSlots.map(key => BODY_SLOT_LABELS[key]).join(", ");
+    const secondarySlotMetaText = normalizedType === "weapon" && normalizeWeaponGrip(item.weaponGrip, item.slotsNeeded) === "twoHanded"
+      ? "Two-Handed"
+      : `Equipped: ${occupyingSlotsText}`;
 
     if (isSecondarySlot) {
       return `
       <div class="equipped-slot-card is-secondary" data-item-id="${item.id}" data-slot-key="${slot}" data-drop-zone="equipped-slot">
         <div class="equipped-slot-label">${BODY_SLOT_LABELS[slot]}</div>
         <div class="equipped-slot-item">${escapeHtml(item.name)}</div>
-        <div class="equipped-slot-meta equipped-slot-link">Equipped: ${occupyingSlotsText}</div>
+        <div class="equipped-slot-meta equipped-slot-link">${secondarySlotMetaText}</div>
       </div>
     `;
     }
@@ -984,9 +1116,6 @@ function renderEquippedSlots() {
     const weaponHandedness = normalizedType === "weapon"
       ? (normalizeWeaponGrip(item.weaponGrip, item.slotsNeeded) === "twoHanded" ? "Two-Handed" : "One-Handed")
       : "";
-    const occupies = normalizedType !== "weapon" && item.equippedSlots.length > 1
-      ? `Occupying: ${item.equippedSlots.map(key => BODY_SLOT_LABELS[key]).join(", ")}`
-      : "";
     const hasDescription = Boolean(item.description);
     const isDescriptionExpanded = expandedDescriptionIds.has(item.id);
     return `
@@ -994,7 +1123,6 @@ function renderEquippedSlots() {
         <div class="equipped-slot-label">${BODY_SLOT_LABELS[slot]}</div>
         <div class="equipped-slot-item">${escapeHtml(item.name)}</div>
         ${weaponHandedness ? `<div class="equipped-slot-meta">${weaponHandedness}</div>` : ""}
-        ${occupies ? `<div class="equipped-slot-meta">${occupies}</div>` : ""}
         ${quantityText}
         ${hasDescription ? renderDescriptionToggleButton(isDescriptionExpanded) : ""}
         ${hasDescription ? `<div class="equipped-slot-desc${isDescriptionExpanded ? "" : " collapsed"}">${escapeHtml(item.description)}</div>` : ""}
@@ -1031,6 +1159,7 @@ function renderInventorySlots() {
     const controls = `
       <button type="button" class="inventory-mini-btn" data-action="equipItem">Equip</button>
       ${renderEquipPickerMenu(item)}
+      ${renderOverflowChoiceMenu(item)}
       ${renderMoveButton()}
       ${renderMovePickerMenu(item)}
       ${renderEditButton()}
@@ -1062,6 +1191,7 @@ function renderDormInventory() {
     const controls = `
       <button type="button" class="inventory-mini-btn" data-action="equipItem">Equip</button>
       ${renderEquipPickerMenu(item)}
+      ${renderOverflowChoiceMenu(item)}
       ${renderMoveButton()}
       ${renderMovePickerMenu(item)}
       ${renderEditButton()}
@@ -1086,6 +1216,7 @@ function handleInventoryActions(event) {
   if (action === "deleteItem") {
     openEquipPickerItemId = null;
     openMovePickerItemId = null;
+    openOverflowChoice = null;
     deleteInventoryItem(item.id);
     return;
   }
@@ -1093,6 +1224,7 @@ function handleInventoryActions(event) {
   if (action === "editItem") {
     openEquipPickerItemId = null;
     openMovePickerItemId = null;
+    openOverflowChoice = null;
     startItemEdit(item.id);
     return;
   }
@@ -1100,6 +1232,7 @@ function handleInventoryActions(event) {
   if (action === "toggleDescription") {
     openEquipPickerItemId = null;
     openMovePickerItemId = null;
+    openOverflowChoice = null;
     if (expandedDescriptionIds.has(item.id)) expandedDescriptionIds.delete(item.id);
     else expandedDescriptionIds.add(item.id);
     renderInventory();
@@ -1108,6 +1241,7 @@ function handleInventoryActions(event) {
 
   if (action === "equipItem") {
     openMovePickerItemId = null;
+    openOverflowChoice = null;
     if (shouldShowEquipTargetSelect(item)) {
       openEquipPickerItemId = openEquipPickerItemId === item.id ? null : item.id;
       renderInventory();
@@ -1116,6 +1250,16 @@ function handleInventoryActions(event) {
 
     openEquipPickerItemId = null;
     const result = moveItemToEquippedSlot(item, null);
+    if (result.requiresOverflowChoice) {
+      openOverflowChoice = {
+        itemId: item.id,
+        targetSlotKey: result.targetSlotKey || null,
+        targetSlots: result.targetSlots || null,
+        message: result.message,
+      };
+      renderInventory();
+      return;
+    }
     renderInventory();
     scheduleSave();
     setItemFormError(result.message || "");
@@ -1126,15 +1270,53 @@ function handleInventoryActions(event) {
     const selectedSlot = button.dataset.slotKey || null;
     openEquipPickerItemId = null;
     openMovePickerItemId = null;
+    openOverflowChoice = null;
     const result = moveItemToEquippedSlot(item, selectedSlot);
+    if (result.requiresOverflowChoice) {
+      openOverflowChoice = {
+        itemId: item.id,
+        targetSlotKey: result.targetSlotKey || selectedSlot,
+        targetSlots: result.targetSlots || null,
+        message: result.message,
+      };
+      renderInventory();
+      return;
+    }
     renderInventory();
     scheduleSave();
     setItemFormError(result.message || "");
     return;
   }
 
+  if (action === "confirmOverflowToStorage") {
+    const pending = openOverflowChoice;
+    if (!pending || pending.itemId !== item.id) return;
+    openEquipPickerItemId = null;
+    openMovePickerItemId = null;
+    openOverflowChoice = null;
+    const result = moveItemToEquippedSlot(item, pending.targetSlotKey || null, {
+      allowOverflowToStorage: true,
+      forcedTargetSlots: pending.targetSlots || null,
+    });
+    renderInventory();
+    if (result.ok) {
+      scheduleSave();
+      setItemFormError("");
+    } else {
+      setItemFormError(result.message || "Could not equip item.");
+    }
+    return;
+  }
+
+  if (action === "cancelOverflowChoice") {
+    openOverflowChoice = null;
+    renderInventory();
+    return;
+  }
+
   if (action === "moveItem") {
     openEquipPickerItemId = null;
+    openOverflowChoice = null;
     const options = getMoveDestinationOptions(item);
     if (!options.length) return;
     openMovePickerItemId = openMovePickerItemId === item.id ? null : item.id;
@@ -1146,6 +1328,7 @@ function handleInventoryActions(event) {
     const destination = button.dataset.destination || "";
     openEquipPickerItemId = null;
     openMovePickerItemId = null;
+    openOverflowChoice = null;
     const result = moveItemToDestination(item, destination);
     if (!result.ok) {
       setItemFormError(result.message || "Could not move item.");
@@ -1177,6 +1360,7 @@ function handleInventoryActions(event) {
   if (action === "toDorm" || action === "unequipToDorm") {
     openEquipPickerItemId = null;
     openMovePickerItemId = null;
+    openOverflowChoice = null;
     if (isItemTypeDormRestricted(item)) {
       setItemFormError("Items cannot be sent to storage.");
       return;
@@ -1190,6 +1374,7 @@ function handleInventoryActions(event) {
   if (action === "toInventory" || action === "unequipToInventory") {
     openEquipPickerItemId = null;
     openMovePickerItemId = null;
+    openOverflowChoice = null;
     if (!placeItemInFirstFreeInventorySlot(item)) {
       setItemFormError("Active inventory is full. Free a slot first.");
       return;
@@ -1355,6 +1540,18 @@ function handleInventoryDrop(event) {
   }
 
   clearDropHighlights();
+  if (result.requiresOverflowChoice) {
+    openOverflowChoice = {
+      itemId: item.id,
+      targetSlotKey: result.targetSlotKey || null,
+      targetSlots: result.targetSlots || null,
+      message: result.message,
+    };
+    hideDragGhost();
+    draggingItemId = null;
+    renderInventory();
+    return;
+  }
   if (!result.ok) {
     triggerInvalidDropFeedback(targetZoneEl);
     setItemFormError(result.message);
@@ -1587,6 +1784,12 @@ export function initInventory({ getState: getStateFn, scheduleSave: scheduleSave
       const clickedInsideMovePicker = event.target.closest(".inventory-move-picker");
       const clickedMoveBtn = event.target.closest("button[data-action='moveItem']");
       if (!clickedInsideMovePicker && !clickedMoveBtn) closeMovePicker();
+    }
+
+    if (openOverflowChoice) {
+      const clickedInsideOverflowPicker = event.target.closest(".inventory-overflow-picker");
+      const clickedEquipBtn = event.target.closest("button[data-action='equipItem'], button[data-action='equipToSlot']");
+      if (!clickedInsideOverflowPicker && !clickedEquipBtn) closeOverflowChoice();
     }
 
     if (openYenAdjustMode) {
