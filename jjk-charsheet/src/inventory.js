@@ -8,6 +8,7 @@ let draggingItemId = null;
 let dragGhostEl = null;
 const expandedDescriptionIds = new Set();
 let openEquipPickerItemId = null;
+let openMovePickerItemId = null;
 let openYenAdjustMode = null;
 
 function clamp(value, min, max) {
@@ -251,6 +252,27 @@ function placeItemInDorm(item) {
   item.location = "dorm";
   if (!state.dormItemIds.includes(item.id)) state.dormItemIds.push(item.id);
   return true;
+}
+
+function moveItemToDestination(item, destination) {
+  if (destination === "inventory") {
+    if (item.location === "inventory") return { ok: true };
+    return placeItemInFirstFreeInventorySlot(item)
+      ? { ok: true }
+      : { ok: false, message: "Active inventory is full. Free a slot first." };
+  }
+
+  if (destination === "dorm") {
+    if (item.location === "dorm") return { ok: true };
+    if (isItemTypeDormRestricted(item)) {
+      return { ok: false, message: "Items cannot be sent to storage." };
+    }
+    return placeItemInDorm(item)
+      ? { ok: true }
+      : { ok: false, message: "Could not move item to storage." };
+  }
+
+  return { ok: false, message: "Move target not recognized." };
 }
 
 function getEquipSlotsForItem(item, preferredPrimarySlot) {
@@ -510,6 +532,7 @@ function deleteInventoryItem(itemId) {
 
   expandedDescriptionIds.delete(itemId);
   if (openEquipPickerItemId === itemId) openEquipPickerItemId = null;
+  if (openMovePickerItemId === itemId) openMovePickerItemId = null;
   removeItemFromContainers(item);
   state.inventoryItems = state.inventoryItems.filter(entry => entry.id !== itemId);
   if (editingItemId === itemId) resetItemEditor();
@@ -535,7 +558,17 @@ function renderEditButton() {
 }
 
 function renderDeleteButton() {
-  return '<button type="button" class="inventory-mini-btn inventory-icon-btn danger" data-action="deleteItem" aria-label="Delete item" title="Delete item">&#128465;</button>';
+  return `
+    <button type="button" class="inventory-mini-btn inventory-icon-btn danger" data-action="deleteItem" aria-label="Delete item" title="Delete item">
+      <svg class="inventory-icon-trash" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <path fill="currentColor" d="M9 3h6l1 2h4v2H4V5h4l1-2zm1 6h2v9h-2V9zm4 0h2v9h-2V9zM7 9h2v9H7V9z"/>
+      </svg>
+    </button>
+  `;
+}
+
+function renderMoveButton() {
+  return '<button type="button" class="inventory-mini-btn inventory-icon-btn inventory-icon-btn-move" data-action="moveItem" aria-label="Move item" title="Move item">&#8644;</button>';
 }
 
 function renderEquipPickerMenu(item) {
@@ -552,9 +585,34 @@ function renderEquipPickerMenu(item) {
   `;
 }
 
+function getMoveDestinationOptions(item) {
+  const options = [];
+  if (item.location !== "inventory") options.push({ key: "inventory", label: "Inventory" });
+  if (!isItemTypeDormRestricted(item) && item.location !== "dorm") options.push({ key: "dorm", label: "Storage" });
+  return options;
+}
+
+function renderMovePickerMenu(item) {
+  if (openMovePickerItemId !== item.id) return "";
+  const options = getMoveDestinationOptions(item);
+  if (!options.length) return "";
+
+  return `
+    <div class="inventory-equip-picker inventory-move-picker" role="menu" aria-label="Choose destination">
+      ${options.map(option => `<button type="button" class="inventory-mini-btn" data-action="moveToDestination" data-destination="${option.key}">${option.label}</button>`).join("")}
+    </div>
+  `;
+}
+
 function closeEquipPicker() {
   if (!openEquipPickerItemId) return;
   openEquipPickerItemId = null;
+  renderInventory();
+}
+
+function closeMovePicker() {
+  if (!openMovePickerItemId) return;
+  openMovePickerItemId = null;
   renderInventory();
 }
 
@@ -834,8 +892,8 @@ function renderEquippedSlots() {
         ${hasDescription ? `<div class="equipped-slot-desc${isDescriptionExpanded ? "" : " collapsed"}">${escapeHtml(item.description)}</div>` : ""}
         ${item.modifier ? `<div class="equipped-slot-mod">${escapeHtml(item.modifier)}</div>` : ""}
         <div class="equipped-slot-actions">
-          <button type="button" class="inventory-mini-btn" data-action="unequipToInventory">To Inventory</button>
-          ${isItemTypeDormRestricted(item) ? "" : '<button type="button" class="inventory-mini-btn" data-action="unequipToDorm">To Storage</button>'}
+          ${renderMoveButton()}
+          ${renderMovePickerMenu(item)}
           ${renderEditButton()}
           ${renderDeleteButton()}
         </div>
@@ -865,7 +923,8 @@ function renderInventorySlots() {
     const controls = `
       <button type="button" class="inventory-mini-btn" data-action="equipItem">Equip</button>
       ${renderEquipPickerMenu(item)}
-      ${isItemTypeDormRestricted(item) ? "" : '<button type="button" class="inventory-mini-btn" data-action="toDorm">To Storage</button>'}
+      ${renderMoveButton()}
+      ${renderMovePickerMenu(item)}
       ${renderEditButton()}
       ${renderDeleteButton()}
     `;
@@ -893,9 +952,10 @@ function renderDormInventory() {
     if (!item) return "";
 
     const controls = `
-      <button type="button" class="inventory-mini-btn" data-action="toInventory">To Inventory</button>
       <button type="button" class="inventory-mini-btn" data-action="equipItem">Equip</button>
       ${renderEquipPickerMenu(item)}
+      ${renderMoveButton()}
+      ${renderMovePickerMenu(item)}
       ${renderEditButton()}
       ${renderDeleteButton()}
     `;
@@ -917,18 +977,21 @@ function handleInventoryActions(event) {
   const action = button.dataset.action;
   if (action === "deleteItem") {
     openEquipPickerItemId = null;
+    openMovePickerItemId = null;
     deleteInventoryItem(item.id);
     return;
   }
 
   if (action === "editItem") {
     openEquipPickerItemId = null;
+    openMovePickerItemId = null;
     startItemEdit(item.id);
     return;
   }
 
   if (action === "toggleDescription") {
     openEquipPickerItemId = null;
+    openMovePickerItemId = null;
     if (expandedDescriptionIds.has(item.id)) expandedDescriptionIds.delete(item.id);
     else expandedDescriptionIds.add(item.id);
     renderInventory();
@@ -936,6 +999,7 @@ function handleInventoryActions(event) {
   }
 
   if (action === "equipItem") {
+    openMovePickerItemId = null;
     if (shouldShowEquipTargetSelect(item)) {
       openEquipPickerItemId = openEquipPickerItemId === item.id ? null : item.id;
       renderInventory();
@@ -953,6 +1017,7 @@ function handleInventoryActions(event) {
   if (action === "equipToSlot") {
     const selectedSlot = button.dataset.slotKey || null;
     openEquipPickerItemId = null;
+    openMovePickerItemId = null;
     const result = moveItemToEquippedSlot(item, selectedSlot);
     renderInventory();
     scheduleSave();
@@ -960,8 +1025,34 @@ function handleInventoryActions(event) {
     return;
   }
 
+  if (action === "moveItem") {
+    openEquipPickerItemId = null;
+    const options = getMoveDestinationOptions(item);
+    if (!options.length) return;
+    openMovePickerItemId = openMovePickerItemId === item.id ? null : item.id;
+    renderInventory();
+    return;
+  }
+
+  if (action === "moveToDestination") {
+    const destination = button.dataset.destination || "";
+    openEquipPickerItemId = null;
+    openMovePickerItemId = null;
+    const result = moveItemToDestination(item, destination);
+    if (!result.ok) {
+      setItemFormError(result.message || "Could not move item.");
+      renderInventory();
+      return;
+    }
+    setItemFormError("");
+    renderInventory();
+    scheduleSave();
+    return;
+  }
+
   if (action === "toDorm" || action === "unequipToDorm") {
     openEquipPickerItemId = null;
+    openMovePickerItemId = null;
     if (isItemTypeDormRestricted(item)) {
       setItemFormError("Items cannot be sent to storage.");
       return;
@@ -974,6 +1065,7 @@ function handleInventoryActions(event) {
 
   if (action === "toInventory" || action === "unequipToInventory") {
     openEquipPickerItemId = null;
+    openMovePickerItemId = null;
     if (!placeItemInFirstFreeInventorySlot(item)) {
       setItemFormError("Active inventory is full. Free a slot first.");
       return;
@@ -1337,6 +1429,12 @@ export function initInventory({ getState: getStateFn, scheduleSave: scheduleSave
       const clickedInsidePicker = event.target.closest(".inventory-equip-picker");
       const clickedEquipBtn = event.target.closest("button[data-action='equipItem']");
       if (!clickedInsidePicker && !clickedEquipBtn) closeEquipPicker();
+    }
+
+    if (openMovePickerItemId) {
+      const clickedInsideMovePicker = event.target.closest(".inventory-move-picker");
+      const clickedMoveBtn = event.target.closest("button[data-action='moveItem']");
+      if (!clickedInsideMovePicker && !clickedMoveBtn) closeMovePicker();
     }
 
     if (openYenAdjustMode) {

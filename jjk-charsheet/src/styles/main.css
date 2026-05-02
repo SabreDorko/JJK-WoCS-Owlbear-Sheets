@@ -803,11 +803,13 @@
       max-width: 470px;
     }
     .inventory-body-col {
-      max-width: 560px;
-      justify-self: start;
+      max-width: none;
+      width: 100%;
+      justify-self: stretch;
     }
     .inventory-body-card {
-      max-width: 560px;
+      max-width: none;
+      width: 100%;
     }
     .inventory-card-title {
       font-family: 'Cinzel', serif;
@@ -848,10 +850,16 @@
       width: 120px;
     }
     .inventory-yen-adjust-btn {
-      min-width: 22px;
-      padding: 1px 6px;
-      font-size: 12px;
+      width: 30px;
+      height: 30px;
+      min-width: 30px;
+      border-radius: 50%;
+      padding: 0;
+      font-size: 16px;
       line-height: 1;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
     }
     .inventory-yen-popover {
       margin-top: 6px;
@@ -994,10 +1002,6 @@
         "accessory1 accessory2";
       gap: 7px;
       align-content: start;
-      min-height: 396px;
-    }
-    .inventory-body-card {
-      min-height: 430px;
     }
     .equipped-slot-card[data-slot-key="head"] { grid-area: head; }
     .equipped-slot-card[data-slot-key="chest"] { grid-area: chest; }
@@ -1169,11 +1173,24 @@
     .inventory-icon-btn-edit:hover {
       color: var(--ink);
     }
+    .inventory-icon-btn-move {
+      color: var(--ink-faint);
+      padding: 0 4px;
+      min-width: auto;
+    }
+    .inventory-icon-btn-move:hover {
+      color: var(--ink);
+    }
     .inventory-icon-btn.danger,
     .inventory-icon-btn.danger:hover {
       border: none;
       background: transparent;
       color: var(--accent);
+    }
+    .inventory-icon-trash {
+      width: 16px;
+      height: 16px;
+      display: block;
     }
     .inventory-body-col .inventory-icon-btn {
       font-size: 16px;
