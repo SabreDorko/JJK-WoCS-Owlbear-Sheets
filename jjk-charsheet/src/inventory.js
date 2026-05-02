@@ -35,16 +35,6 @@ function scheduleSave() {
 const HAND_SLOT_KEYS = ["rightHand", "leftHand"];
 const CLOTHING_SELECTABLE_SLOT_KEYS = ["head", "body", "legs", "feet", "accessory"];
 const ITEM_TYPES = ["clothing", "weapon", "item"];
-const CREATE_ITEM_PLUS_ICON = `
-  <svg class="inventory-plus-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-    <path fill="currentColor" d="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6V5z"/>
-  </svg>
-`;
-const CREATE_ITEM_MINUS_ICON = `
-  <svg class="inventory-plus-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-    <path fill="currentColor" d="M5 11h14v2H5z"/>
-  </svg>
-`;
 
 function normalizeItemType(rawType) {
   return ITEM_TYPES.includes(rawType) ? rawType : "clothing";
@@ -234,12 +224,17 @@ function setItemFormError(message) {
 function setItemEditorOpen(isOpen) {
   const panel = document.getElementById("itemEditorPanel");
   const toggleBtn = document.getElementById("toggleItemEditorBtn");
+  const toolbar = document.getElementById("itemEditorToolbar");
+  const typeToolbar = document.getElementById("itemTypeField");
   if (!panel || !toggleBtn) return;
   panel.classList.toggle("collapsed", !isOpen);
+  panel.setAttribute("aria-hidden", isOpen ? "false" : "true");
   toggleBtn.setAttribute("aria-expanded", isOpen ? "true" : "false");
   toggleBtn.setAttribute("aria-label", isOpen ? "Close item editor" : "Create item");
   toggleBtn.setAttribute("title", isOpen ? "Close item editor" : "Create item");
-  toggleBtn.innerHTML = isOpen ? CREATE_ITEM_MINUS_ICON : CREATE_ITEM_PLUS_ICON;
+  toggleBtn.classList.toggle("is-open", isOpen);
+  toolbar?.classList.toggle("is-open", isOpen);
+  typeToolbar?.setAttribute("aria-hidden", isOpen ? "false" : "true");
 }
 
 function setActiveItemType(itemType) {

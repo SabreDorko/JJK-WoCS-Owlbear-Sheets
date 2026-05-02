@@ -259,10 +259,19 @@
             <div id="equippedSlotsGrid" class="equipped-slots-grid"></div>
           </div>
 
-          <div class="inventory-creator-wrap">
+          <div id="itemEditorToolbar" class="inventory-creator-wrap">
+            <div id="itemTypeField" class="inventory-type-toolbar" aria-hidden="true">
+              <div class="inventory-type-tabs" role="tablist" aria-label="Item group">
+                <button type="button" class="inventory-type-tab active" data-item-type="clothing" role="tab" aria-selected="true">Clothing / Accessory</button>
+                <button type="button" class="inventory-type-tab" data-item-type="weapon" role="tab" aria-selected="false">Weapon</button>
+                <button type="button" class="inventory-type-tab" data-item-type="item" role="tab" aria-selected="false">Item</button>
+              </div>
+              <input id="itemTypeSelect" type="hidden" value="clothing" />
+            </div>
             <button id="toggleItemEditorBtn" class="inventory-plus-btn" type="button" aria-expanded="false" aria-controls="itemEditorPanel" aria-label="Create item" title="Create item">
               <svg class="inventory-plus-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                <path fill="currentColor" d="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6V5z"/>
+                <path class="inventory-plus-icon-line inventory-plus-icon-line-horizontal" fill="currentColor" d="M5 11h14v2H5z"/>
+                <path class="inventory-plus-icon-line inventory-plus-icon-line-vertical" fill="currentColor" d="M11 5h2v14h-2z"/>
               </svg>
             </button>
           </div>
@@ -278,15 +287,6 @@
                 <span class="field-label">Modifier</span>
                 <input id="itemModifierInput" class="meta-input" maxlength="60" placeholder="+1 Tempo, +2 AC, etc." />
               </label>
-              <div class="inventory-field inventory-field-full" id="itemTypeField">
-                <span class="field-label">Item Group</span>
-                <div class="inventory-type-tabs" role="tablist" aria-label="Item group">
-                  <button type="button" class="inventory-type-tab active" data-item-type="clothing" role="tab" aria-selected="true">Clothing / Accessory</button>
-                  <button type="button" class="inventory-type-tab" data-item-type="weapon" role="tab" aria-selected="false">Weapon</button>
-                  <button type="button" class="inventory-type-tab" data-item-type="item" role="tab" aria-selected="false">Item</button>
-                </div>
-                <input id="itemTypeSelect" type="hidden" value="clothing" />
-              </div>
               <label class="inventory-field" id="itemStackableField" hidden>
                 <span class="field-label">Stackable</span>
                 <input id="itemStackableToggle" class="inventory-stackable-toggle" type="checkbox" />
