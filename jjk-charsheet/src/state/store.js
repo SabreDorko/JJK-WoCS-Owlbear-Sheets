@@ -35,6 +35,28 @@ export const RIGHT_STATS = [
   { key: "cooperation",  label: "COOPERATION",  skills: ["Charisma", "Combo", "Deception", "Insight", "Persuasion"] },
 ];
 
+export const BODY_SLOT_KEYS = [
+  "head",
+  "chest",
+  "back",
+  "legs",
+  "feet",
+  "rightHand",
+  "leftHand",
+  "accessory",
+];
+
+export const BODY_SLOT_LABELS = {
+  head: "Head",
+  chest: "Chest",
+  back: "Back",
+  legs: "Legs",
+  feet: "Feet",
+  rightHand: "Right Hand",
+  leftHand: "Left Hand",
+  accessory: "Accessory",
+};
+
 // ── DEFAULT STATE ─────────────────────────────────────────────────────────────
 export function defaultState() {
   const stats = {};
@@ -48,6 +70,19 @@ export function defaultState() {
     ac: "", hpCurrent: "", hpMax: "",
     movement: "", ceCurrent: "", ceMax: "", ceNote: "",
     rollHistory: [],
+    inventoryItems: [],
+    inventorySlots: [null, null, null, null, null],
+    dormItemIds: [],
+    equippedSlots: {
+      head: null,
+      chest: null,
+      back: null,
+      legs: null,
+      feet: null,
+      rightHand: null,
+      leftHand: null,
+      accessory: null,
+    },
     stats,
   };
 }

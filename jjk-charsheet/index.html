@@ -13,7 +13,7 @@
 
   <div class="tab-bar">
     <div class="tab active" data-tab="character">Character</div>
-    <div class="tab disabled" data-tab="inventory">Inventory<span class="tab-soon">soon</span></div>
+    <div class="tab" data-tab="inventory">Inventory</div>
     <div class="tab disabled" data-tab="combat">Combat<span class="tab-soon">soon</span></div>
     <div class="tab disabled" data-tab="techniques">Techniques<span class="tab-soon">soon</span></div>
     <div class="tab" data-tab="party">Party</div>
@@ -208,9 +208,87 @@
 
     <!-- ══ PLACEHOLDER TABS ══ -->
     <div class="tab-panel" id="panel-inventory">
-      <div class="soon-panel">
-        <div class="soon-kanji">術</div>
-        <div class="soon-text">Inventory — Coming Soon</div>
+      <div class="inventory-layout">
+        <div class="inventory-builder">
+          <div class="inventory-card">
+            <div class="inventory-card-title" id="itemEditorTitle">Create Item</div>
+            <div class="inventory-form-grid">
+              <label class="inventory-field">
+                <span class="field-label">Item Name</span>
+                <input id="itemNameInput" class="meta-input" maxlength="60" placeholder="Kimono, Headphones, Bandages..." />
+              </label>
+
+              <label class="inventory-field">
+                <span class="field-label">Modifier</span>
+                <input id="itemModifierInput" class="meta-input" maxlength="60" placeholder="+1 Tempo, +2 AC, etc." />
+              </label>
+
+              <label class="inventory-field inventory-field-full">
+                <span class="field-label">Description</span>
+                <textarea id="itemDescriptionInput" class="inventory-textarea" rows="3" maxlength="280" placeholder="Short details, uses, limitations..."></textarea>
+              </label>
+
+              <label class="inventory-field">
+                <span class="field-label">Body Slots Needed</span>
+                <select id="itemSlotsNeededSelect" class="meta-select">
+                  <option value="1">1 slot</option>
+                  <option value="2">2 slots</option>
+                  <option value="3">3 slots</option>
+                </select>
+              </label>
+
+              <label class="inventory-field">
+                <span class="field-label">Preferred Location</span>
+                <select id="itemPreferredLocation" class="meta-select">
+                  <option value="inventory">Active Inventory</option>
+                  <option value="dorm">Dorm Storage</option>
+                  <option value="equipped">Equip Now</option>
+                </select>
+              </label>
+
+              <div class="inventory-field inventory-field-full">
+                <span class="field-label">Can Equip To</span>
+                <div id="itemAllowedSlots" class="slot-option-grid">
+                  <label><input type="checkbox" value="head" /> Head</label>
+                  <label><input type="checkbox" value="chest" /> Chest</label>
+                  <label><input type="checkbox" value="back" /> Back</label>
+                  <label><input type="checkbox" value="legs" /> Legs</label>
+                  <label><input type="checkbox" value="feet" /> Feet</label>
+                  <label><input type="checkbox" value="rightHand" /> Right Hand</label>
+                  <label><input type="checkbox" value="leftHand" /> Left Hand</label>
+                  <label><input type="checkbox" value="accessory" /> Accessory</label>
+                </div>
+              </div>
+
+              <div class="inventory-form-actions inventory-field-full">
+                <button id="saveItemBtn" class="meta-toggle-btn" type="button">Save Item</button>
+                <button id="cancelEditItemBtn" class="inventory-secondary-btn" type="button" style="display:none;">Cancel Edit</button>
+              </div>
+
+              <div id="itemFormError" class="inventory-error" aria-live="polite"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="inventory-zones">
+          <div class="inventory-card">
+            <div class="inventory-card-title">Equipped Body Slots</div>
+            <div class="inventory-card-note">Equipped item modifiers are active. One item per body slot.</div>
+            <div id="equippedSlotsGrid" class="equipped-slots-grid"></div>
+          </div>
+
+          <div class="inventory-card">
+            <div class="inventory-card-title">Active Inventory (5 Slots)</div>
+            <div class="inventory-card-note">Items here do not apply modifiers.</div>
+            <div id="inventorySlotsList" class="inventory-slot-list"></div>
+          </div>
+
+          <div class="inventory-card">
+            <div class="inventory-card-title">Dorm Storage</div>
+            <div class="inventory-card-note">Long-term storage. Modifiers are inactive.</div>
+            <div id="dormInventoryList" class="inventory-slot-list"></div>
+          </div>
+        </div>
       </div>
     </div>
     <div class="tab-panel" id="panel-combat">

@@ -774,6 +774,241 @@
       text-transform: uppercase;
     }
 
+    /* ── INVENTORY TAB ── */
+    .inventory-layout {
+      display: grid;
+      grid-template-columns: 320px 1fr;
+      gap: 10px;
+      align-items: start;
+    }
+    .inventory-builder,
+    .inventory-zones {
+      display: flex;
+      flex-direction: column;
+      gap: 9px;
+    }
+    .inventory-card {
+      border: 1.5px solid var(--ink);
+      background: var(--parchment);
+      padding: 8px 9px;
+    }
+    .inventory-card-title {
+      font-family: 'Cinzel', serif;
+      font-size: 10px;
+      letter-spacing: 1.2px;
+      text-transform: uppercase;
+      color: var(--ink);
+      margin-bottom: 3px;
+    }
+    .inventory-card-note {
+      font-family: 'Crimson Text', serif;
+      font-size: 12px;
+      color: var(--ink-faint);
+      margin-bottom: 8px;
+    }
+    .inventory-form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px 10px;
+    }
+    .inventory-field {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .inventory-field-full {
+      grid-column: 1 / -1;
+    }
+    .inventory-textarea {
+      font-family: 'Crimson Text', Georgia, serif;
+      font-size: 12px;
+      line-height: 1.35;
+      color: var(--ink);
+      border: 1px solid var(--border);
+      background: rgba(240, 235, 224, 0.7);
+      resize: vertical;
+      min-height: 58px;
+      padding: 5px 6px;
+      outline: none;
+    }
+    .inventory-textarea:focus {
+      border-color: var(--ink);
+    }
+    .slot-option-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 5px 8px;
+      padding: 7px;
+      border: 1px solid var(--border);
+      background: rgba(240, 235, 224, 0.7);
+    }
+    .slot-option-grid label {
+      font-family: 'Crimson Text', serif;
+      font-size: 12px;
+      color: var(--ink);
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .inventory-form-actions {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
+    .inventory-secondary-btn {
+      flex: 1;
+      background: transparent;
+      color: var(--ink);
+      border: 1px solid var(--border-strong);
+      font-family: 'Cinzel', serif;
+      font-size: 9px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      padding: 5px 6px;
+      cursor: pointer;
+    }
+    .inventory-secondary-btn:hover {
+      border-color: var(--ink);
+    }
+    .inventory-error {
+      grid-column: 1 / -1;
+      min-height: 14px;
+      font-family: 'Crimson Text', serif;
+      font-size: 12px;
+      color: var(--accent);
+      font-style: italic;
+    }
+    .equipped-slots-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 7px;
+    }
+    .equipped-slot-card,
+    .inventory-slot-card,
+    .inventory-item-card {
+      border: 1px solid var(--border-strong);
+      background: rgba(240, 235, 224, 0.75);
+      padding: 6px;
+    }
+    .equipped-slot-label,
+    .inventory-slot-label {
+      font-family: 'Cinzel', serif;
+      font-size: 8px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--ink-faint);
+      margin-bottom: 3px;
+    }
+    .equipped-slot-item,
+    .inventory-item-name {
+      font-family: 'Crimson Text', serif;
+      font-size: 14px;
+      color: var(--ink);
+      font-style: italic;
+      line-height: 1.2;
+    }
+    .equipped-slot-meta,
+    .equipped-slot-mod,
+    .inventory-item-modifier,
+    .inventory-item-desc,
+    .inventory-item-slots {
+      font-family: 'Crimson Text', serif;
+      font-size: 12px;
+      color: var(--ink-light);
+      margin-top: 3px;
+      line-height: 1.25;
+    }
+    .equipped-slot-mod {
+      color: var(--accent);
+      font-style: italic;
+    }
+    .equipped-slot-empty,
+    .inventory-slot-empty {
+      font-family: 'Crimson Text', serif;
+      font-size: 12px;
+      color: var(--ink-faint);
+      font-style: italic;
+      min-height: 16px;
+    }
+    .inventory-slot-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .inventory-item-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 6px;
+    }
+    .inventory-item-location {
+      font-family: 'Cinzel', serif;
+      font-size: 8px;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      color: var(--ink-faint);
+      white-space: nowrap;
+    }
+    .inventory-item-actions,
+    .equipped-slot-actions {
+      margin-top: 6px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+    }
+    .inventory-mini-btn {
+      background: var(--parchment);
+      color: var(--ink);
+      border: 1px solid var(--border-strong);
+      font-family: 'Cinzel', serif;
+      font-size: 8px;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      padding: 2px 6px;
+      cursor: pointer;
+    }
+    .inventory-mini-btn:hover {
+      border-color: var(--ink);
+    }
+    .inventory-mini-btn.danger {
+      color: var(--accent);
+      border-color: rgba(139, 26, 26, 0.55);
+    }
+    .inventory-mini-btn.danger:hover {
+      border-color: var(--accent);
+    }
+    .inventory-inline-select {
+      font-family: 'Crimson Text', serif;
+      font-size: 12px;
+      color: var(--ink);
+      border: 1px solid var(--border);
+      background: var(--parchment);
+      padding: 1px 4px;
+      min-width: 100px;
+      outline: none;
+    }
+    .inventory-inline-select:focus {
+      border-color: var(--ink);
+    }
+
+    @media (max-width: 980px) {
+      .inventory-layout {
+        grid-template-columns: 1fr;
+      }
+      .equipped-slots-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 700px) {
+      .inventory-form-grid {
+        grid-template-columns: 1fr;
+      }
+      .slot-option-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
     /* ── PARTY TAB ── */
     .party-panel {
       display: flex;
