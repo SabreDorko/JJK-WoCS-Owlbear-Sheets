@@ -877,8 +877,8 @@
       justify-content: center;
     }
     .inventory-yen-adjust-icon {
-      width: 15px;
-      height: 15px;
+      width: 16px;
+      height: 16px;
       display: block;
       margin: 0 auto;
     }
@@ -1048,6 +1048,68 @@
       color: var(--ink);
     }
     .inventory-field { display: flex; flex-direction: column; gap: 2px; }
+    .inventory-modifiers-header-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .inventory-modifiers-summary {
+      font-family: 'Crimson Text', serif;
+      font-size: 12px;
+      color: var(--ink-light);
+      min-height: 14px;
+      margin-top: 2px;
+    }
+    .inventory-modifiers-editor {
+      margin-top: 4px;
+      border: 1px solid var(--border);
+      background: rgba(240, 235, 224, 0.7);
+      padding: 6px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .inventory-modifiers-list {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .inventory-modifier-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+      border: 1px solid var(--border);
+      background: var(--parchment);
+      padding: 4px 5px;
+    }
+    .inventory-modifier-row-text {
+      font-family: 'Crimson Text', serif;
+      font-size: 12px;
+      color: var(--ink);
+      line-height: 1.2;
+      min-width: 0;
+    }
+    .inventory-modifier-row-actions {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      flex: 0 0 auto;
+    }
+    .inventory-modifier-form {
+      border-top: 1px solid var(--border);
+      padding-top: 6px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px 8px;
+    }
+    .inventory-modifier-empty {
+      font-family: 'Crimson Text', serif;
+      font-size: 12px;
+      color: var(--ink-faint);
+      font-style: italic;
+    }
     .inventory-stackable-toggle {
       align-self: flex-start;
       margin-top: 2px;
@@ -1229,9 +1291,9 @@
       margin-bottom: 0;
     }
     .equipped-slot-header .inventory-desc-toggle-btn {
-      width: 18px;
-      height: 16px;
-      font-size: 14px;
+      width: 20px;
+      height: 18px;
+      font-size: 16px;
       margin-top: 0;
     }
     .equipped-slot-item,
@@ -1410,6 +1472,14 @@
       display: inline-flex;
       align-items: center;
       justify-content: center;
+    }
+    .inventory-body-col .inventory-amount-adjust-btn {
+      width: 16px;
+      height: 16px;
+      min-width: 16px;
+      padding: 0;
+      letter-spacing: 0;
+      line-height: 0;
     }
     .inventory-amount-adjust-btn .inventory-yen-adjust-icon {
       width: 11px;

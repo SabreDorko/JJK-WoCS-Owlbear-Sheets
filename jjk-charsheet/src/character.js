@@ -1,4 +1,5 @@
 import { ARCHETYPES, CENTER_STATS, RIGHT_STATS } from "./state/store.js";
+import { computeActiveModifierEffects } from "./modifiers.js";
 
 let _getState = null;
 let _scheduleSave = null;
@@ -32,7 +33,8 @@ export function updateBlackFlashRangeDisplay() {
   if (!valueEl || !noteEl || !state) return;
 
   const techRaw = state?.stats?.technique?.score;
-  const tech = parseInt(techRaw, 10);
+  const effects = computeActiveModifierEffects(state);
+  const tech = (parseInt(techRaw, 10) || 0) + (effects.statBonuses.technique || 0);
   const range = getBlackFlashRange(tech);
 
   if (range === null) {
@@ -69,10 +71,14 @@ function buildStatBlocks(defs, container) {
       <button class="roll-btn" type="button" title="Roll ${def.label.charAt(0).toUpperCase() + def.label.slice(1).toLowerCase()}">Roll</button>
     `;
     scoreSide.querySelector(".roll-btn").addEventListener("click", () => {
-      const n = parseInt(document.getElementById("score_" + def.key).value, 10);
+      const base = parseInt(document.getElementById("score_" + def.key).value, 10) || 0;
+      const effects = computeActiveModifierEffects(state);
+      const n = base + (effects.statBonuses[def.key] || 0);
       if (!n || n < 1) return;
       const rolls = Array.from({ length: n }, () => Math.floor(Math.random() * 6) + 1);
-      showRollToast(def.label, n, rolls, rolls.reduce((a, b) => a + b, 0));
+      const rollBonus = effects.rollBonuses[def.key] || 0;
+      const total = rolls.reduce((a, b) => a + b, 0) + rollBonus;
+      showRollToast(def.label, n, rolls, total);
     });
 
     const skillsSide = document.createElement("div");
@@ -101,12 +107,16 @@ function buildStatBlocks(defs, container) {
         scheduleSave();
       });
       row.querySelector(".skill-roll-btn").addEventListener("click", () => {
-        const n = parseInt(state.stats[def.key].score, 10);
+        const effects = computeActiveModifierEffects(state);
+        const n = (parseInt(state.stats[def.key].score, 10) || 0) + (effects.statBonuses[def.key] || 0);
         if (!n || n < 1) return;
         const rolls = Array.from({ length: n }, () => Math.floor(Math.random() * 6) + 1);
         const rawTotal = rolls.reduce((a, b) => a + b, 0);
-        const bonusVal = parseInt(state.stats[def.key].skills[i].bonus, 10) || 0;
-        const total = rawTotal + bonusVal;
+        const baseSkillBonus = parseInt(state.stats[def.key].skills[i].bonus, 10) || 0;
+        const groupSkillBonus = effects.skillBonuses[def.key] || 0;
+        const statRollBonus = effects.rollBonuses[def.key] || 0;
+        const specificSkillBonus = effects.specificSkillBonuses[`${def.key}:${i}`] || 0;
+        const total = rawTotal + baseSkillBonus + groupSkillBonus + statRollBonus + specificSkillBonus;
         const maxPossible = n * 6;
         const allOnes = rolls.every(r => r === 1);
         const critStatus = allOnes ? "fail" : total >= maxPossible ? "success" : null;

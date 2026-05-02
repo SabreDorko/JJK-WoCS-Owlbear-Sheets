@@ -1,4 +1,12 @@
 import { BODY_SLOT_KEYS, BODY_SLOT_LABELS } from "./state/store.js";
+import {
+  computeActiveModifierEffects,
+  describeModifier,
+  getItemModifierSummary,
+  getSkillOptions,
+  getStatDefinitions,
+  normalizeModifierList,
+} from "./modifiers.js";
 
 let _getState = null;
 let _scheduleSave = null;
@@ -11,6 +19,8 @@ let openEquipPickerItemId = null;
 let openMovePickerItemId = null;
 let openYenAdjustMode = null;
 let openOverflowChoice = null;
+let draftItemModifiers = [];
+let editingModifierIndex = null;
 
 function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
@@ -222,6 +232,206 @@ function setItemFormError(message) {
   el.textContent = message || "";
 }
 
+function cloneDraftModifiers(modifiers) {
+  return normalizeModifierList(modifiers).map(entry => ({ ...entry }));
+}
+
+function getDraftModifierSummary() {
+  if (!draftItemModifiers.length) return "No modifiers added.";
+  return draftItemModifiers.map(describeModifier).filter(Boolean).join(" | ");
+}
+
+function refreshModifierSummary() {
+  const summaryEl = document.getElementById("itemModifiersSummary");
+  if (!summaryEl) return;
+  summaryEl.textContent = getDraftModifierSummary();
+}
+
+function renderDraftModifierList() {
+  const listEl = document.getElementById("itemModifiersList");
+  if (!listEl) return;
+
+  if (!draftItemModifiers.length) {
+    listEl.innerHTML = '<div class="inventory-modifier-empty">No modifiers yet.</div>';
+    return;
+  }
+
+  listEl.innerHTML = draftItemModifiers.map((modifier, index) => `
+    <div class="inventory-modifier-row" data-modifier-index="${index}">
+      <div class="inventory-modifier-row-text">${escapeHtml(describeModifier(modifier))}</div>
+      <div class="inventory-modifier-row-actions">
+        <button type="button" class="inventory-mini-btn" data-action="editDraftModifier" data-index="${index}">Edit</button>
+        <button type="button" class="inventory-mini-btn danger" data-action="removeDraftModifier" data-index="${index}">Remove</button>
+      </div>
+    </div>
+  `).join("");
+}
+
+function setModifierFormVisibility(isVisible) {
+  const form = document.getElementById("itemModifierForm");
+  if (!form) return;
+  form.hidden = !isVisible;
+}
+
+function syncModifierSkillOptions() {
+  const statSelect = document.getElementById("itemModifierStatSelect");
+  const skillSelect = document.getElementById("itemModifierSkillSelect");
+  if (!statSelect || !skillSelect) return;
+
+  const skills = getSkillOptions(statSelect.value);
+  skillSelect.innerHTML = skills.map((skill, index) => `<option value="${index}">${escapeHtml(skill)}</option>`).join("");
+}
+
+function syncModifierFieldVisibility() {
+  const kindSelect = document.getElementById("itemModifierKindSelect");
+  const statField = document.getElementById("itemModifierStatField");
+  const skillField = document.getElementById("itemModifierSkillField");
+  if (!kindSelect || !statField || !skillField) return;
+
+  const kind = kindSelect.value;
+  const needsStat = ["stat", "skills", "rolls", "skill"].includes(kind);
+  const needsSkill = kind === "skill";
+  statField.hidden = !needsStat;
+  skillField.hidden = !needsSkill;
+  syncModifierSkillOptions();
+}
+
+function resetModifierDraftForm() {
+  editingModifierIndex = null;
+  const kindSelect = document.getElementById("itemModifierKindSelect");
+  const statSelect = document.getElementById("itemModifierStatSelect");
+  const valueInput = document.getElementById("itemModifierValueInput");
+  if (kindSelect) kindSelect.value = "stat";
+  if (statSelect) statSelect.value = getStatDefinitions()[0]?.key || "power";
+  if (valueInput) valueInput.value = "1";
+  syncModifierSkillOptions();
+  const skillSelect = document.getElementById("itemModifierSkillSelect");
+  if (skillSelect) skillSelect.value = "0";
+  syncModifierFieldVisibility();
+}
+
+function getModifierDraftFromForm() {
+  const kind = document.getElementById("itemModifierKindSelect")?.value || "stat";
+  const statKey = document.getElementById("itemModifierStatSelect")?.value || "power";
+  const skillIndex = parseInt(document.getElementById("itemModifierSkillSelect")?.value, 10) || 0;
+  const value = parseInt(document.getElementById("itemModifierValueInput")?.value, 10) || 0;
+
+  const draft = {
+    id: `mod_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+    kind,
+    value,
+  };
+
+  if (["stat", "skills", "rolls", "skill"].includes(kind)) draft.statKey = statKey;
+  if (kind === "skill") draft.skillIndex = skillIndex;
+  return normalizeModifierList([draft])[0] || null;
+}
+
+function openModifierEditor() {
+  const editor = document.getElementById("itemModifiersEditor");
+  if (!editor) return;
+  editor.hidden = false;
+  renderDraftModifierList();
+  refreshModifierSummary();
+}
+
+function closeModifierEditor() {
+  const editor = document.getElementById("itemModifiersEditor");
+  if (!editor) return;
+  editor.hidden = true;
+  setModifierFormVisibility(false);
+  editingModifierIndex = null;
+}
+
+function handleDraftModifierListClick(event) {
+  const button = event.target.closest("button[data-action]");
+  if (!button) return;
+
+  const index = parseInt(button.dataset.index, 10);
+  if (!Number.isInteger(index) || !draftItemModifiers[index]) return;
+
+  if (button.dataset.action === "removeDraftModifier") {
+    draftItemModifiers.splice(index, 1);
+    editingModifierIndex = null;
+    renderDraftModifierList();
+    refreshModifierSummary();
+    setModifierFormVisibility(false);
+    return;
+  }
+
+  if (button.dataset.action === "editDraftModifier") {
+    const modifier = draftItemModifiers[index];
+    editingModifierIndex = index;
+    setModifierFormVisibility(true);
+    document.getElementById("itemModifierKindSelect").value = modifier.kind;
+    document.getElementById("itemModifierStatSelect").value = modifier.statKey || getStatDefinitions()[0]?.key || "power";
+    syncModifierSkillOptions();
+    document.getElementById("itemModifierSkillSelect").value = String(Number.isInteger(modifier.skillIndex) ? modifier.skillIndex : 0);
+    document.getElementById("itemModifierValueInput").value = String(modifier.value);
+    syncModifierFieldVisibility();
+  }
+}
+
+function initModifierEditorUI() {
+  const editBtn = document.getElementById("itemEditModifiersBtn");
+  const addBtn = document.getElementById("itemAddModifierBtn");
+  const list = document.getElementById("itemModifiersList");
+  const kindSelect = document.getElementById("itemModifierKindSelect");
+  const statSelect = document.getElementById("itemModifierStatSelect");
+  const saveBtn = document.getElementById("itemModifierSaveBtn");
+  const cancelBtn = document.getElementById("itemModifierCancelBtn");
+  if (!editBtn || !addBtn || !list || !kindSelect || !statSelect || !saveBtn || !cancelBtn) return;
+
+  const statDefinitions = getStatDefinitions();
+  statSelect.innerHTML = statDefinitions.map(def => `<option value="${def.key}">${escapeHtml(def.label)}</option>`).join("");
+  resetModifierDraftForm();
+  renderDraftModifierList();
+  refreshModifierSummary();
+
+  editBtn.addEventListener("click", () => {
+    const editor = document.getElementById("itemModifiersEditor");
+    if (!editor) return;
+    if (editor.hidden) openModifierEditor();
+    else closeModifierEditor();
+  });
+
+  addBtn.addEventListener("click", () => {
+    editingModifierIndex = null;
+    resetModifierDraftForm();
+    setModifierFormVisibility(true);
+  });
+
+  list.addEventListener("click", handleDraftModifierListClick);
+  kindSelect.addEventListener("change", syncModifierFieldVisibility);
+  statSelect.addEventListener("change", syncModifierSkillOptions);
+
+  saveBtn.addEventListener("click", () => {
+    const nextModifier = getModifierDraftFromForm();
+    if (!nextModifier) {
+      setItemFormError("Modifier value must be non-zero.");
+      return;
+    }
+    setItemFormError("");
+
+    if (Number.isInteger(editingModifierIndex) && draftItemModifiers[editingModifierIndex]) {
+      nextModifier.id = draftItemModifiers[editingModifierIndex].id;
+      draftItemModifiers[editingModifierIndex] = nextModifier;
+    } else {
+      draftItemModifiers.push(nextModifier);
+    }
+
+    editingModifierIndex = null;
+    setModifierFormVisibility(false);
+    renderDraftModifierList();
+    refreshModifierSummary();
+  });
+
+  cancelBtn.addEventListener("click", () => {
+    editingModifierIndex = null;
+    setModifierFormVisibility(false);
+  });
+}
+
 function setItemEditorOpen(isOpen) {
   const panel = document.getElementById("itemEditorPanel");
   const toggleBtn = document.getElementById("toggleItemEditorBtn");
@@ -274,7 +484,7 @@ function removeItemFromContainers(item) {
 
 function placeItemInInventorySlot(item, slotIndex) {
   const state = getState();
-  if (slotIndex < 0 || slotIndex > 4) return false;
+  if (slotIndex < 0 || slotIndex >= state.inventorySlots.length) return false;
   if (state.inventorySlots[slotIndex]) return false;
   removeItemFromContainers(item);
   state.inventorySlots[slotIndex] = item.id;
@@ -895,12 +1105,13 @@ function getItemConfigFromForm() {
 
 function resetItemEditor() {
   editingItemId = null;
+  draftItemModifiers = [];
+  editingModifierIndex = null;
   const title = document.getElementById("itemEditorTitle");
   if (!title) return;
 
   document.getElementById("itemEditorTitle").textContent = "Create Item";
   document.getElementById("itemNameInput").value = "";
-  document.getElementById("itemModifierInput").value = "";
   document.getElementById("itemDescriptionInput").value = "";
   setActiveItemType("clothing");
   document.getElementById("itemWeaponGripSelect").value = "oneHanded";
@@ -914,6 +1125,10 @@ function resetItemEditor() {
   setItemTypeFieldsVisibility("clothing");
   document.getElementById("saveItemBtn").textContent = "Save Item";
   document.getElementById("cancelEditItemBtn").style.display = "none";
+  document.getElementById("itemModifiersEditor").hidden = true;
+  resetModifierDraftForm();
+  renderDraftModifierList();
+  refreshModifierSummary();
   setItemFormError("");
   setItemEditorOpen(false);
 }
@@ -925,8 +1140,13 @@ function startItemEdit(itemId) {
 
   document.getElementById("itemEditorTitle").textContent = "Edit Item";
   document.getElementById("itemNameInput").value = item.name;
-  document.getElementById("itemModifierInput").value = item.modifier;
   document.getElementById("itemDescriptionInput").value = item.description;
+  draftItemModifiers = cloneDraftModifiers(item.modifiers);
+  editingModifierIndex = null;
+  document.getElementById("itemModifiersEditor").hidden = true;
+  resetModifierDraftForm();
+  renderDraftModifierList();
+  refreshModifierSummary();
   setActiveItemType(normalizeItemType(item.itemType));
   document.getElementById("itemWeaponGripSelect").value = normalizeWeaponGrip(item.weaponGrip, item.slotsNeeded);
   document.getElementById("itemSlotsNeededSelect").value = String(item.slotsNeeded || 1);
@@ -946,9 +1166,9 @@ function startItemEdit(itemId) {
 function saveItemFromForm() {
   const state = getState();
   const name = document.getElementById("itemNameInput").value.trim();
-  const modifier = document.getElementById("itemModifierInput").value.trim();
   const description = document.getElementById("itemDescriptionInput").value.trim();
   const itemConfig = getItemConfigFromForm();
+  const modifiers = cloneDraftModifiers(draftItemModifiers);
   const slotsNeeded = itemConfig.slotsNeeded;
   const preferredLocation = document.getElementById("itemPreferredLocation").value;
   const allowedSlots = itemConfig.allowedSlots;
@@ -967,7 +1187,8 @@ function saveItemFromForm() {
     item = {
       id: makeItemId(),
       name,
-      modifier,
+      modifier: "",
+      modifiers,
       description,
       itemType: itemConfig.itemType,
       weaponGrip: itemConfig.weaponGrip,
@@ -982,7 +1203,8 @@ function saveItemFromForm() {
     state.inventoryItems.push(item);
   } else {
     item.name = name;
-    item.modifier = modifier;
+    item.modifier = "";
+    item.modifiers = modifiers;
     item.description = description;
     item.itemType = itemConfig.itemType;
     item.weaponGrip = itemConfig.weaponGrip;
@@ -1026,8 +1248,9 @@ function saveItemFromForm() {
 
 function renderInventoryItemCard(item, controlsHtml, locationTag) {
   const modifierPrefix = locationTag === "Stored" ? "Inactive: " : "";
-  const modifier = item.modifier
-    ? `<div class="inventory-item-modifier">${modifierPrefix}${escapeHtml(item.modifier)}</div>`
+  const modifierSummary = getItemModifierSummary(item);
+  const modifier = modifierSummary
+    ? `<div class="inventory-item-modifier">${modifierPrefix}${escapeHtml(modifierSummary)}</div>`
     : "";
   const hasDescription = Boolean(item.description);
   const isDescriptionExpanded = expandedDescriptionIds.has(item.id);
@@ -1128,7 +1351,7 @@ function renderEquippedSlots() {
         ${weaponHandedness ? `<div class="equipped-slot-meta">${weaponHandedness}</div>` : ""}
         ${quantityText}
         ${hasDescription ? `<div class="equipped-slot-desc${isDescriptionExpanded ? "" : " collapsed"}">${escapeHtml(item.description)}</div>` : ""}
-        ${item.modifier ? `<div class="equipped-slot-mod">${escapeHtml(item.modifier)}</div>` : ""}
+        ${getItemModifierSummary(item) ? `<div class="equipped-slot-mod">${escapeHtml(getItemModifierSummary(item))}</div>` : ""}
         <div class="equipped-slot-actions">
           ${renderMoveButton()}
           ${renderMovePickerMenu(item, slot)}
@@ -1616,7 +1839,7 @@ function ensureInventoryStateShape() {
 
   if (!Array.isArray(state.inventoryItems)) state.inventoryItems = [];
   state.yen = parseYenValue(state.yen);
-  if (!Array.isArray(state.inventorySlots) || state.inventorySlots.length !== 5) {
+  if (!Array.isArray(state.inventorySlots)) {
     state.inventorySlots = [null, null, null, null, null];
   }
   if (!Array.isArray(state.dormItemIds)) state.dormItemIds = [];
@@ -1654,6 +1877,7 @@ function ensureInventoryStateShape() {
     name: String(item?.name || "").trim(),
     description: String(item?.description || ""),
     modifier: String(item?.modifier || ""),
+    modifiers: normalizeModifierList(item?.modifiers),
     itemType: normalizeItemType(item?.itemType || inferLegacyItemType(item)),
     weaponGrip: item?.weaponGrip || null,
     allowedSlots: normalizeAllowedSlots(item?.allowedSlots),
@@ -1711,6 +1935,21 @@ function ensureInventoryStateShape() {
     }
     placeItemInDorm(item);
   });
+
+  const effects = computeActiveModifierEffects(state);
+  const desiredSlotCount = Math.max(1, 5 + (effects.extraInventorySlots || 0));
+  if (state.inventorySlots.length > desiredSlotCount) {
+    const overflowIds = state.inventorySlots.slice(desiredSlotCount).filter(Boolean);
+    state.inventorySlots = state.inventorySlots.slice(0, desiredSlotCount);
+    overflowIds.forEach(id => {
+      const item = byId.get(id);
+      if (!item) return;
+      item.inventorySlot = null;
+      placeItemInDorm(item);
+    });
+  } else if (state.inventorySlots.length < desiredSlotCount) {
+    while (state.inventorySlots.length < desiredSlotCount) state.inventorySlots.push(null);
+  }
 }
 
 export function renderInventory() {
@@ -1748,8 +1987,9 @@ export function initInventory({ getState: getStateFn, scheduleSave: scheduleSave
   const itemTypeSelect = document.getElementById("itemTypeSelect");
   const itemTypeTabs = document.querySelectorAll(".inventory-type-tab");
   const itemStackableToggle = document.getElementById("itemStackableToggle");
+  const itemModifiersSummary = document.getElementById("itemModifiersSummary");
 
-  if (!saveBtn || !cancelBtn || !equippedGrid || !inventoryList || !dormList || !yenInput || !addYenBtn || !subtractYenBtn || !yenAdjustPopover || !yenAdjustAmountInput || !yenAdjustApplyBtn || !yenAdjustCancelBtn || !editorToggleBtn || !dormToggleBtn || !itemTypeSelect || !itemStackableToggle || !itemTypeTabs.length) return;
+  if (!saveBtn || !cancelBtn || !equippedGrid || !inventoryList || !dormList || !yenInput || !addYenBtn || !subtractYenBtn || !yenAdjustPopover || !yenAdjustAmountInput || !yenAdjustApplyBtn || !yenAdjustCancelBtn || !editorToggleBtn || !dormToggleBtn || !itemTypeSelect || !itemStackableToggle || !itemModifiersSummary || !itemTypeTabs.length) return;
 
   saveBtn.addEventListener("click", saveItemFromForm);
   cancelBtn.addEventListener("click", resetItemEditor);
@@ -1774,6 +2014,8 @@ export function initInventory({ getState: getStateFn, scheduleSave: scheduleSave
   itemStackableToggle.addEventListener("change", () => {
     setItemTypeFieldsVisibility(getItemTypeFromForm());
   });
+
+  initModifierEditorUI();
 
   document.addEventListener("click", event => {
     if (openEquipPickerItemId) {

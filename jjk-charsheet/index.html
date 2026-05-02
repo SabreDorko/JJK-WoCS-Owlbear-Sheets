@@ -283,10 +283,47 @@
                 <span class="field-label">Item Name</span>
                 <input id="itemNameInput" class="meta-input" maxlength="60" placeholder="Kimono, Headphones, Bandages..." />
               </label>
-              <label class="inventory-field">
-                <span class="field-label">Modifier</span>
-                <input id="itemModifierInput" class="meta-input" maxlength="60" placeholder="+1 Tempo, +2 AC, etc." />
-              </label>
+              <div class="inventory-field inventory-field-full" id="itemModifiersField">
+                <div class="inventory-modifiers-header-row">
+                  <span class="field-label">Modifiers</span>
+                  <button id="itemEditModifiersBtn" class="inventory-mini-btn" type="button">Edit</button>
+                </div>
+                <div id="itemModifiersSummary" class="inventory-modifiers-summary">No modifiers added.</div>
+                <div id="itemModifiersEditor" class="inventory-modifiers-editor" hidden>
+                  <div id="itemModifiersList" class="inventory-modifiers-list"></div>
+                  <button id="itemAddModifierBtn" class="inventory-mini-btn" type="button">Add Modifier</button>
+                  <div id="itemModifierForm" class="inventory-modifier-form" hidden>
+                    <label class="inventory-field">
+                      <span class="field-label">Type</span>
+                      <select id="itemModifierKindSelect" class="meta-select">
+                        <option value="stat">Stat</option>
+                        <option value="skills">Stat Skills</option>
+                        <option value="rolls">Stat Rolls</option>
+                        <option value="skill">Specific Skill</option>
+                        <option value="ac">Armor Class</option>
+                        <option value="movement">Movement</option>
+                        <option value="storage">Storage Slots</option>
+                      </select>
+                    </label>
+                    <label id="itemModifierStatField" class="inventory-field">
+                      <span class="field-label">Stat</span>
+                      <select id="itemModifierStatSelect" class="meta-select"></select>
+                    </label>
+                    <label id="itemModifierSkillField" class="inventory-field" hidden>
+                      <span class="field-label">Skill</span>
+                      <select id="itemModifierSkillSelect" class="meta-select"></select>
+                    </label>
+                    <label class="inventory-field">
+                      <span class="field-label">Value</span>
+                      <input id="itemModifierValueInput" class="meta-input" type="number" step="1" value="1" />
+                    </label>
+                    <div class="inventory-form-actions inventory-field-full">
+                      <button id="itemModifierSaveBtn" class="meta-toggle-btn" type="button">Save Modifier</button>
+                      <button id="itemModifierCancelBtn" class="inventory-secondary-btn" type="button">Cancel</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
               <label class="inventory-field" id="itemStackableField" hidden>
                 <span class="field-label">Stackable</span>
                 <input id="itemStackableToggle" class="inventory-stackable-toggle" type="checkbox" />
