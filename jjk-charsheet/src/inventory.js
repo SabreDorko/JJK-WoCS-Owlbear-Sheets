@@ -231,6 +231,90 @@ function placeItemEquipped(item, preferredPrimarySlot) {
   return { ok: true };
 }
 
+function snapshotInventoryPlacementState() {
+  const state = getState();
+  return {
+    inventorySlots: [...state.inventorySlots],
+    dormItemIds: [...state.dormItemIds],
+    equippedSlots: { ...state.equippedSlots },
+    itemPlacements: new Map(state.inventoryItems.map(item => [
+      item.id,
+      {
+        location: item.location,
+        inventorySlot: item.inventorySlot,
+        equippedSlots: [...item.equippedSlots],
+      },
+    ])),
+  };
+}
+
+function restoreInventoryPlacementState(snapshot) {
+  const state = getState();
+  state.inventorySlots = [...snapshot.inventorySlots];
+  state.dormItemIds = [...snapshot.dormItemIds];
+  state.equippedSlots = { ...snapshot.equippedSlots };
+
+  state.inventoryItems.forEach(item => {
+    const placement = snapshot.itemPlacements.get(item.id);
+    if (!placement) return;
+    item.location = placement.location;
+    item.inventorySlot = placement.inventorySlot;
+    item.equippedSlots = [...placement.equippedSlots];
+  });
+}
+
+function moveItemToEquippedSlot(item, slotKey, options = {}) {
+  const { dryRun = false } = options;
+  const state = getState();
+  const snapshot = snapshotInventoryPlacementState();
+
+  const finalize = (result) => {
+    if (!result.ok || dryRun) restoreInventoryPlacementState(snapshot);
+    return result;
+  };
+
+  const targetOccupantId = slotKey ? state.equippedSlots[slotKey] : null;
+
+  // Normal equip when target slot is empty (or already occupied by this item).
+  if (!slotKey || !targetOccupantId || targetOccupantId === item.id) {
+    return finalize(placeItemEquipped(item, slotKey || null));
+  }
+
+  const displacedItem = getInventoryItemById(targetOccupantId);
+  if (!displacedItem) {
+    return finalize({ ok: false, message: "Target slot item was not found." });
+  }
+
+  const sourcePlacement = {
+    location: item.location,
+    inventorySlot: item.inventorySlot,
+    preferredSlot: item.equippedSlots?.[0] || null,
+  };
+
+  removeItemFromContainers(displacedItem);
+
+  const equipResult = placeItemEquipped(item, slotKey);
+  if (!equipResult.ok) return finalize(equipResult);
+
+  let displacedPlacementResult = { ok: false, message: "Could not place swapped item." };
+  if (sourcePlacement.location === "inventory" && Number.isInteger(sourcePlacement.inventorySlot)) {
+    displacedPlacementResult = placeItemInInventorySlot(displacedItem, sourcePlacement.inventorySlot)
+      ? { ok: true }
+      : { ok: false, message: "Could not place swapped item into original inventory slot." };
+  } else if (sourcePlacement.location === "dorm") {
+    displacedPlacementResult = placeItemInDorm(displacedItem)
+      ? { ok: true }
+      : { ok: false, message: "Could not place swapped item into dorm." };
+  } else if (sourcePlacement.location === "equipped") {
+    const reEquipResult = placeItemEquipped(displacedItem, sourcePlacement.preferredSlot);
+    displacedPlacementResult = reEquipResult.ok
+      ? { ok: true }
+      : { ok: false, message: reEquipResult.message || "Swapped item cannot be equipped into the original slot." };
+  }
+
+  return finalize(displacedPlacementResult.ok ? { ok: true } : displacedPlacementResult);
+}
+
 function deleteInventoryItem(itemId) {
   const state = getState();
   const item = getInventoryItemById(itemId);
@@ -510,7 +594,7 @@ function handleInventoryActions(event) {
 
   if (action === "equipItem") {
     const preferredSlot = getItemEquipTarget(button, item.id);
-    const result = placeItemEquipped(item, preferredSlot);
+    const result = moveItemToEquippedSlot(item, preferredSlot || null);
     renderInventory();
     scheduleSave();
     if (!result.ok) setItemFormError(result.message);
@@ -613,8 +697,7 @@ function evaluateDropTarget(item, zoneEl, currentTarget) {
 
   if (zoneType === "equipped-slot") {
     const slotKey = zoneEl?.dataset?.slotKey ?? currentTarget?.dataset?.slotKey;
-    const plan = getEquipSlotsForItem(item, slotKey || null);
-    return plan.ok ? { ok: true } : { ok: false, message: plan.message };
+    return moveItemToEquippedSlot(item, slotKey || null, { dryRun: true });
   }
 
   return { ok: false, message: "Drop target not recognized." };
@@ -674,7 +757,7 @@ function handleInventoryDrop(event) {
       : { ok: false, message: "Active inventory is full. Drop onto a specific slot to swap." };
   } else if (zoneType === "equipped-slot") {
     const slotKey = zone?.dataset?.slotKey ?? event.currentTarget?.dataset?.slotKey;
-    result = placeItemEquipped(item, slotKey || null);
+    result = moveItemToEquippedSlot(item, slotKey || null);
   } else if (zoneType === "dorm-list") {
     result = placeItemInDorm(item) ? { ok: true } : { ok: false, message: "Could not move item to dorm." };
   }
