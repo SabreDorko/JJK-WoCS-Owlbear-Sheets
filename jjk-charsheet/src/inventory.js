@@ -65,6 +65,12 @@ function getInventoryItemById(itemId) {
   return state?.inventoryItems?.find(item => item.id === itemId) || null;
 }
 
+function parseYenValue(rawValue) {
+  const parsed = parseInt(rawValue, 10);
+  if (!Number.isFinite(parsed)) return 0;
+  return Math.max(0, parsed);
+}
+
 function makeItemId() {
   return `item_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
@@ -442,8 +448,6 @@ function renderInventorySlots() {
       ${buildEquipSelectOptions(item.id, item.allowedSlots)}
       <button type="button" class="inventory-mini-btn" data-action="equipItem">Equip</button>
       <button type="button" class="inventory-mini-btn" data-action="toDorm">To Dorm</button>
-      <button type="button" class="inventory-mini-btn" data-action="shiftLeft">Shift Left</button>
-      <button type="button" class="inventory-mini-btn" data-action="shiftRight">Shift Right</button>
       <button type="button" class="inventory-mini-btn" data-action="editItem">Edit</button>
       <button type="button" class="inventory-mini-btn danger" data-action="deleteItem">Delete</button>
     `;
@@ -530,27 +534,6 @@ function handleInventoryActions(event) {
     return;
   }
 
-  if (action === "shiftLeft" || action === "shiftRight") {
-    if (!Number.isInteger(item.inventorySlot)) return;
-
-    const direction = action === "shiftLeft" ? -1 : 1;
-    const nextSlot = item.inventorySlot + direction;
-    if (nextSlot < 0 || nextSlot > 4) return;
-
-    const swapItemId = state.inventorySlots[nextSlot];
-    state.inventorySlots[nextSlot] = item.id;
-    state.inventorySlots[item.inventorySlot] = swapItemId || null;
-
-    const oldSlot = item.inventorySlot;
-    item.inventorySlot = nextSlot;
-    if (swapItemId) {
-      const swapItem = getInventoryItemById(swapItemId);
-      if (swapItem) swapItem.inventorySlot = oldSlot;
-    }
-
-    renderInventory();
-    scheduleSave();
-  }
 }
 
 function findDropZoneElement(target) {
@@ -575,7 +558,14 @@ function ensureDragGhost() {
 function showDragGhost(text) {
   const ghost = ensureDragGhost();
   ghost.textContent = text || "Item";
+  ghost.classList.remove("is-valid", "is-forbidden");
   ghost.style.display = "block";
+}
+
+function setDragGhostValidity(isValid) {
+  if (!dragGhostEl || dragGhostEl.style.display === "none") return;
+  dragGhostEl.classList.toggle("is-valid", Boolean(isValid));
+  dragGhostEl.classList.toggle("is-forbidden", !isValid);
 }
 
 function moveDragGhost(x, y) {
@@ -586,6 +576,7 @@ function moveDragGhost(x, y) {
 
 function hideDragGhost() {
   if (!dragGhostEl) return;
+  dragGhostEl.classList.remove("is-valid", "is-forbidden");
   dragGhostEl.style.display = "none";
 }
 
@@ -730,9 +721,11 @@ function handleInventoryDragOver(event) {
   clearDropHighlights();
   if (validity.ok) {
     zone.classList.add("inventory-drop-target");
+    setDragGhostValidity(true);
     event.dataTransfer.dropEffect = "move";
   } else {
     zone.classList.add("inventory-drop-forbidden");
+    setDragGhostValidity(false);
     event.dataTransfer.dropEffect = "none";
   }
 }
@@ -748,7 +741,7 @@ function ensureInventoryStateShape() {
   if (!state) return;
 
   if (!Array.isArray(state.inventoryItems)) state.inventoryItems = [];
-  if (state.yen === undefined || state.yen === null) state.yen = "";
+  state.yen = parseYenValue(state.yen);
   if (!Array.isArray(state.inventorySlots) || state.inventorySlots.length !== 5) {
     state.inventorySlots = [null, null, null, null, null];
   }
@@ -830,7 +823,7 @@ export function renderInventory() {
   ensureInventoryStateShape();
   const state = getState();
   const yenInput = document.getElementById("yenInput");
-  if (yenInput) yenInput.value = state?.yen || "";
+  if (yenInput) yenInput.value = parseYenValue(state?.yen);
   renderEquippedSlots();
   renderInventorySlots();
   renderDormInventory();
@@ -851,10 +844,13 @@ export function initInventory({ getState: getStateFn, scheduleSave: scheduleSave
   const inventoryList = document.getElementById("inventorySlotsList");
   const dormList = document.getElementById("dormInventoryList");
   const yenInput = document.getElementById("yenInput");
+  const yenAdjustAmountInput = document.getElementById("yenAdjustAmount");
+  const addYenBtn = document.getElementById("addYenBtn");
+  const subtractYenBtn = document.getElementById("subtractYenBtn");
   const editorToggleBtn = document.getElementById("toggleItemEditorBtn");
   const dormToggleBtn = document.getElementById("dormToggleBtn");
 
-  if (!saveBtn || !cancelBtn || !equippedGrid || !inventoryList || !dormList || !yenInput || !editorToggleBtn || !dormToggleBtn) return;
+  if (!saveBtn || !cancelBtn || !equippedGrid || !inventoryList || !dormList || !yenInput || !yenAdjustAmountInput || !addYenBtn || !subtractYenBtn || !editorToggleBtn || !dormToggleBtn) return;
 
   saveBtn.addEventListener("click", saveItemFromForm);
   cancelBtn.addEventListener("click", resetItemEditor);
@@ -873,9 +869,22 @@ export function initInventory({ getState: getStateFn, scheduleSave: scheduleSave
 
   yenInput.addEventListener("input", e => {
     const state = getState();
-    state.yen = e.target.value;
+    state.yen = parseYenValue(e.target.value);
     scheduleSave();
   });
+
+  const applyYenDelta = (direction) => {
+    const state = getState();
+    const base = parseYenValue(yenInput.value);
+    const amount = parseYenValue(yenAdjustAmountInput.value || "1") || 1;
+    const next = Math.max(0, base + (direction * amount));
+    state.yen = next;
+    yenInput.value = next;
+    scheduleSave();
+  };
+
+  addYenBtn.addEventListener("click", () => applyYenDelta(1));
+  subtractYenBtn.addEventListener("click", () => applyYenDelta(-1));
 
   [equippedGrid, inventoryList, dormList].forEach(el => {
     el.addEventListener("dragstart", handleInventoryDragStart);

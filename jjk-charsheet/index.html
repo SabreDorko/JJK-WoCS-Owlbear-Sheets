@@ -214,14 +214,35 @@
             <div class="inventory-card-title">Wallet</div>
             <label class="inventory-yen-row" for="yenInput">
               <span class="field-label">Yen</span>
-              <input id="yenInput" class="meta-input inventory-yen-input" type="number" min="0" step="1" placeholder="0" />
+              <div class="inventory-yen-input-wrap">
+                <span class="inventory-yen-symbol" aria-hidden="true">¥</span>
+                <input id="yenInput" class="meta-input inventory-yen-input" type="number" min="0" step="1" placeholder="0" />
+              </div>
             </label>
+            <div class="inventory-yen-tools">
+              <label class="inventory-field" for="yenAdjustAmount">
+                <span class="field-label">Adjust By</span>
+                <input id="yenAdjustAmount" class="meta-input inventory-yen-adjust-input" type="number" min="1" step="1" value="100" />
+              </label>
+              <div class="inventory-yen-actions">
+                <button id="subtractYenBtn" type="button" class="inventory-mini-btn">- Amount</button>
+                <button id="addYenBtn" type="button" class="inventory-mini-btn">+ Amount</button>
+              </div>
+            </div>
           </div>
 
-          <div class="inventory-card">
-            <div class="inventory-card-title">Active Inventory (5 Slots)</div>
-            <div class="inventory-card-note">Drag and drop items into slots. Modifiers are inactive here.</div>
-            <div id="inventorySlotsList" class="inventory-slot-list" data-drop-zone="inventory-list"></div>
+          <div class="inventory-top-grid">
+            <div class="inventory-card">
+              <div class="inventory-card-title">Active Inventory (5 Slots)</div>
+              <div class="inventory-card-note">Drag and drop items into slots. Modifiers are inactive here.</div>
+              <div id="inventorySlotsList" class="inventory-slot-list" data-drop-zone="inventory-list"></div>
+            </div>
+
+            <div class="inventory-card">
+              <div class="inventory-card-title">Equipped Body Slots</div>
+              <div class="inventory-card-note">Drop items on body boxes to equip. Equipped modifiers are active.</div>
+              <div id="equippedSlotsGrid" class="equipped-slots-grid"></div>
+            </div>
           </div>
 
           <div class="inventory-card">
@@ -286,14 +307,6 @@
               </div>
               <div id="itemFormError" class="inventory-error" aria-live="polite"></div>
             </div>
-          </div>
-        </div>
-
-        <div class="inventory-body-col">
-          <div class="inventory-card">
-            <div class="inventory-card-title">Equipped Body Slots</div>
-            <div class="inventory-card-note">Drop items on body boxes to equip. Equipped modifiers are active.</div>
-            <div id="equippedSlotsGrid" class="equipped-slots-grid"></div>
           </div>
         </div>
       </div>
