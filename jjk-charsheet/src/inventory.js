@@ -461,12 +461,10 @@ function collectAllowedSlotsFromForm() {
 function setItemTypeFieldsVisibility(itemType) {
   const slotsNeededField = document.getElementById("itemSlotsNeededField");
   const slotsNeededLabel = document.getElementById("itemSlotsNeededLabel");
-  const slotsNeededSelect = document.getElementById("itemSlotsNeededSelect");
   const allowedSlotsField = document.getElementById("itemAllowedSlotsField");
   const weaponGripField = document.getElementById("itemWeaponGripField");
-  const weaponGripSelect = document.getElementById("itemWeaponGripSelect");
   const preferredLocation = document.getElementById("itemPreferredLocation");
-  if (!slotsNeededField || !slotsNeededLabel || !slotsNeededSelect || !allowedSlotsField || !weaponGripField || !weaponGripSelect || !preferredLocation) return;
+  if (!slotsNeededField || !slotsNeededLabel || !allowedSlotsField || !weaponGripField || !preferredLocation) return;
 
   const isClothing = itemType === "clothing";
   const isWeapon = itemType === "weapon";
@@ -474,10 +472,8 @@ function setItemTypeFieldsVisibility(itemType) {
 
   slotsNeededLabel.textContent = "Body Slots Needed";
   slotsNeededField.hidden = !isClothing;
-  slotsNeededSelect.disabled = !isClothing;
   allowedSlotsField.hidden = !isClothing;
   weaponGripField.hidden = !isWeapon;
-  weaponGripSelect.disabled = !isWeapon;
 
   const dormOption = preferredLocation.querySelector("option[value='dorm']");
   if (dormOption) {
