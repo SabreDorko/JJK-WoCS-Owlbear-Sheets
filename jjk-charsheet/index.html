@@ -278,14 +278,15 @@
                 <span class="field-label">Modifier</span>
                 <input id="itemModifierInput" class="meta-input" maxlength="60" placeholder="+1 Tempo, +2 AC, etc." />
               </label>
-              <label class="inventory-field" id="itemTypeField">
+              <div class="inventory-field inventory-field-full" id="itemTypeField">
                 <span class="field-label">Item Group</span>
-                <select id="itemTypeSelect" class="meta-select">
-                  <option value="clothing">Clothing / Accessory</option>
-                  <option value="weapon">Weapon</option>
-                  <option value="item">Item</option>
-                </select>
-              </label>
+                <div class="inventory-type-tabs" role="tablist" aria-label="Item group">
+                  <button type="button" class="inventory-type-tab active" data-item-type="clothing" role="tab" aria-selected="true">Clothing / Accessory</button>
+                  <button type="button" class="inventory-type-tab" data-item-type="weapon" role="tab" aria-selected="false">Weapon</button>
+                  <button type="button" class="inventory-type-tab" data-item-type="item" role="tab" aria-selected="false">Item</button>
+                </div>
+                <input id="itemTypeSelect" type="hidden" value="clothing" />
+              </div>
               <label class="inventory-field" id="itemStackableField" hidden>
                 <span class="field-label">Stackable</span>
                 <input id="itemStackableToggle" class="inventory-stackable-toggle" type="checkbox" />
@@ -325,8 +326,7 @@
                 <span class="field-label">Can Equip To</span>
                 <div id="itemAllowedSlots" class="slot-option-grid">
                   <label><input type="checkbox" value="head" /> Head</label>
-                  <label><input type="checkbox" value="chest" /> Chest</label>
-                  <label><input type="checkbox" value="back" /> Back</label>
+                  <label><input type="checkbox" value="body" /> Body</label>
                   <label><input type="checkbox" value="legs" /> Legs</label>
                   <label><input type="checkbox" value="feet" /> Feet</label>
                   <label><input type="checkbox" value="accessory" /> Accessory</label>

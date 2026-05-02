@@ -33,8 +33,18 @@ function scheduleSave() {
 }
 
 const HAND_SLOT_KEYS = ["rightHand", "leftHand"];
-const CLOTHING_SELECTABLE_SLOT_KEYS = ["head", "chest", "back", "legs", "feet", "accessory"];
+const CLOTHING_SELECTABLE_SLOT_KEYS = ["head", "body", "legs", "feet", "accessory"];
 const ITEM_TYPES = ["clothing", "weapon", "item"];
+const CREATE_ITEM_PLUS_ICON = `
+  <svg class="inventory-plus-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+    <path fill="currentColor" d="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6V5z"/>
+  </svg>
+`;
+const CREATE_ITEM_MINUS_ICON = `
+  <svg class="inventory-plus-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+    <path fill="currentColor" d="M5 11h14v2H5z"/>
+  </svg>
+`;
 
 function normalizeItemType(rawType) {
   return ITEM_TYPES.includes(rawType) ? rawType : "clothing";
@@ -97,6 +107,7 @@ function inferLegacyItemType(item) {
 
 function toInternalEquipSlots(slot) {
   if (slot === "accessory") return ["accessory1", "accessory2"];
+  if (slot === "chest" || slot === "back") return ["body"];
   return BODY_SLOT_KEYS.includes(slot) ? [slot] : [];
 }
 
@@ -108,6 +119,10 @@ function normalizeAllowedSlots(rawSlots) {
     // Legacy support: accessory/accessory1/accessory2 all map to one selectable key.
     if (slot === "accessory" || slot === "accessory1" || slot === "accessory2") {
       normalized.push("accessory");
+      return;
+    }
+    if (slot === "chest" || slot === "back") {
+      normalized.push("body");
       return;
     }
     if (BODY_SLOT_KEYS.includes(slot)) normalized.push(slot);
@@ -222,6 +237,24 @@ function setItemEditorOpen(isOpen) {
   if (!panel || !toggleBtn) return;
   panel.classList.toggle("collapsed", !isOpen);
   toggleBtn.setAttribute("aria-expanded", isOpen ? "true" : "false");
+  toggleBtn.setAttribute("aria-label", isOpen ? "Close item editor" : "Create item");
+  toggleBtn.setAttribute("title", isOpen ? "Close item editor" : "Create item");
+  toggleBtn.innerHTML = isOpen ? CREATE_ITEM_MINUS_ICON : CREATE_ITEM_PLUS_ICON;
+}
+
+function setActiveItemType(itemType) {
+  const normalizedType = normalizeItemType(itemType);
+  const input = document.getElementById("itemTypeSelect");
+  if (!input) return normalizedType;
+
+  input.value = normalizedType;
+  document.querySelectorAll(".inventory-type-tab").forEach(button => {
+    const isActive = button.dataset.itemType === normalizedType;
+    button.classList.toggle("active", isActive);
+    button.setAttribute("aria-selected", isActive ? "true" : "false");
+    button.setAttribute("tabindex", isActive ? "0" : "-1");
+  });
+  return normalizedType;
 }
 
 function setDormOpen(isOpen) {
@@ -697,8 +730,8 @@ function setItemTypeFieldsVisibility(itemType) {
 }
 
 function getItemTypeFromForm() {
-  const select = document.getElementById("itemTypeSelect");
-  return normalizeItemType(select?.value);
+  const input = document.getElementById("itemTypeSelect");
+  return normalizeItemType(input?.value);
 }
 
 function getItemConfigFromForm() {
@@ -745,7 +778,7 @@ function resetItemEditor() {
   document.getElementById("itemNameInput").value = "";
   document.getElementById("itemModifierInput").value = "";
   document.getElementById("itemDescriptionInput").value = "";
-  document.getElementById("itemTypeSelect").value = "clothing";
+  setActiveItemType("clothing");
   document.getElementById("itemWeaponGripSelect").value = "oneHanded";
   document.getElementById("itemSlotsNeededSelect").value = "1";
   document.getElementById("itemStackableToggle").checked = false;
@@ -770,7 +803,7 @@ function startItemEdit(itemId) {
   document.getElementById("itemNameInput").value = item.name;
   document.getElementById("itemModifierInput").value = item.modifier;
   document.getElementById("itemDescriptionInput").value = item.description;
-  document.getElementById("itemTypeSelect").value = normalizeItemType(item.itemType);
+  setActiveItemType(normalizeItemType(item.itemType));
   document.getElementById("itemWeaponGripSelect").value = normalizeWeaponGrip(item.weaponGrip, item.slotsNeeded);
   document.getElementById("itemSlotsNeededSelect").value = String(item.slotsNeeded || 1);
   document.getElementById("itemStackableToggle").checked = parseStackableValue(item.stackable);
@@ -1394,6 +1427,16 @@ function ensureInventoryStateShape() {
     delete state.equippedSlots.accessory;
   }
 
+  // Legacy migration: chest/back collapsed into one body slot.
+  if ("chest" in state.equippedSlots || "back" in state.equippedSlots) {
+    const legacyBodyIds = [state.equippedSlots.chest, state.equippedSlots.back].filter(Boolean);
+    if (!("body" in state.equippedSlots) || !state.equippedSlots.body) {
+      state.equippedSlots.body = legacyBodyIds[0] || null;
+    }
+    delete state.equippedSlots.chest;
+    delete state.equippedSlots.back;
+  }
+
   BODY_SLOT_KEYS.forEach(slot => {
     if (!(slot in state.equippedSlots)) state.equippedSlots[slot] = null;
   });
@@ -1495,9 +1538,10 @@ export function initInventory({ getState: getStateFn, scheduleSave: scheduleSave
   const editorToggleBtn = document.getElementById("toggleItemEditorBtn");
   const dormToggleBtn = document.getElementById("dormToggleBtn");
   const itemTypeSelect = document.getElementById("itemTypeSelect");
+  const itemTypeTabs = document.querySelectorAll(".inventory-type-tab");
   const itemStackableToggle = document.getElementById("itemStackableToggle");
 
-  if (!saveBtn || !cancelBtn || !equippedGrid || !inventoryList || !dormList || !yenInput || !addYenBtn || !subtractYenBtn || !yenAdjustPopover || !yenAdjustAmountInput || !yenAdjustApplyBtn || !yenAdjustCancelBtn || !editorToggleBtn || !dormToggleBtn || !itemTypeSelect || !itemStackableToggle) return;
+  if (!saveBtn || !cancelBtn || !equippedGrid || !inventoryList || !dormList || !yenInput || !addYenBtn || !subtractYenBtn || !yenAdjustPopover || !yenAdjustAmountInput || !yenAdjustApplyBtn || !yenAdjustCancelBtn || !editorToggleBtn || !dormToggleBtn || !itemTypeSelect || !itemStackableToggle || !itemTypeTabs.length) return;
 
   saveBtn.addEventListener("click", saveItemFromForm);
   cancelBtn.addEventListener("click", resetItemEditor);
@@ -1513,8 +1557,11 @@ export function initInventory({ getState: getStateFn, scheduleSave: scheduleSave
     const isOpen = dormToggleBtn.getAttribute("aria-expanded") === "true";
     setDormOpen(!isOpen);
   });
-  itemTypeSelect.addEventListener("change", () => {
-    setItemTypeFieldsVisibility(getItemTypeFromForm());
+  itemTypeTabs.forEach(button => {
+    button.addEventListener("click", () => {
+      const nextType = setActiveItemType(button.dataset.itemType || "clothing");
+      setItemTypeFieldsVisibility(nextType);
+    });
   });
   itemStackableToggle.addEventListener("change", () => {
     setItemTypeFieldsVisibility(getItemTypeFromForm());
@@ -1583,6 +1630,8 @@ export function initInventory({ getState: getStateFn, scheduleSave: scheduleSave
       closeYenAdjustPopover();
     }
   });
+
+  setActiveItemType(getItemTypeFromForm());
 
   [equippedGrid, inventoryList, dormList].forEach(el => {
     el.addEventListener("dragstart", handleInventoryDragStart);

@@ -37,8 +37,7 @@ export const RIGHT_STATS = [
 
 export const BODY_SLOT_KEYS = [
   "head",
-  "chest",
-  "back",
+  "body",
   "legs",
   "feet",
   "rightHand",
@@ -49,8 +48,7 @@ export const BODY_SLOT_KEYS = [
 
 export const BODY_SLOT_LABELS = {
   head: "Head",
-  chest: "Chest",
-  back: "Back",
+  body: "Body",
   legs: "Legs",
   feet: "Feet",
   rightHand: "Right Hand",
@@ -78,8 +76,7 @@ export function defaultState() {
     dormItemIds: [],
     equippedSlots: {
       head: null,
-      chest: null,
-      back: null,
+      body: null,
       legs: null,
       feet: null,
       rightHand: null,
