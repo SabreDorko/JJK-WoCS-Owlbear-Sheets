@@ -470,10 +470,15 @@ function setItemTypeFieldsVisibility(itemType) {
   const isWeapon = itemType === "weapon";
   const isItem = itemType === "item";
 
+  const setVisible = (el, visible) => {
+    el.hidden = !visible;
+    el.style.display = visible ? "" : "none";
+  };
+
   slotsNeededLabel.textContent = "Body Slots Needed";
-  slotsNeededField.hidden = !isClothing;
-  allowedSlotsField.hidden = !isClothing;
-  weaponGripField.hidden = !isWeapon;
+  setVisible(slotsNeededField, isClothing);
+  setVisible(allowedSlotsField, isClothing);
+  setVisible(weaponGripField, isWeapon);
 
   const dormOption = preferredLocation.querySelector("option[value='dorm']");
   if (dormOption) {
