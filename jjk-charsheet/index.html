@@ -260,7 +260,11 @@
           </div>
 
           <div class="inventory-creator-wrap">
-            <button id="toggleItemEditorBtn" class="inventory-plus-btn" type="button" aria-expanded="false" aria-controls="itemEditorPanel">+</button>
+            <button id="toggleItemEditorBtn" class="inventory-plus-btn" type="button" aria-expanded="false" aria-controls="itemEditorPanel" aria-label="Create item" title="Create item">
+              <svg class="inventory-plus-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path fill="currentColor" d="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6V5z"/>
+              </svg>
+            </button>
           </div>
 
           <div id="itemEditorPanel" class="inventory-card inventory-editor-panel collapsed">
@@ -284,7 +288,7 @@
               </label>
               <label class="inventory-field" id="itemStackableField" hidden>
                 <span class="field-label">Stackable</span>
-                <input id="itemStackableToggle" type="checkbox" />
+                <input id="itemStackableToggle" class="inventory-stackable-toggle" type="checkbox" />
               </label>
               <label class="inventory-field" id="itemQuantityField" hidden>
                 <span class="field-label">Amount</span>

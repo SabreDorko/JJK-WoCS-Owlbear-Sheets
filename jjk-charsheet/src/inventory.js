@@ -936,6 +936,9 @@ function renderEquippedSlots() {
     }
 
     const normalizedType = normalizeItemType(item.itemType);
+    const quantityText = normalizedType === "item" && parseStackableValue(item.stackable)
+      ? `<div class="inventory-item-amount-row"><div class="inventory-item-amount">Amount: ${parseItemQuantity(item.quantity)}</div>${renderQuantityControls(item)}</div>`
+      : "";
     const weaponHandedness = normalizedType === "weapon"
       ? (normalizeWeaponGrip(item.weaponGrip, item.slotsNeeded) === "twoHanded" ? "Two-Handed" : "One-Handed")
       : "";
@@ -950,6 +953,7 @@ function renderEquippedSlots() {
         <div class="equipped-slot-item">${escapeHtml(item.name)}</div>
         ${weaponHandedness ? `<div class="equipped-slot-meta">${weaponHandedness}</div>` : ""}
         ${occupies ? `<div class="equipped-slot-meta">${occupies}</div>` : ""}
+        ${quantityText}
         ${hasDescription ? renderDescriptionToggleButton(isDescriptionExpanded) : ""}
         ${hasDescription ? `<div class="equipped-slot-desc${isDescriptionExpanded ? "" : " collapsed"}">${escapeHtml(item.description)}</div>` : ""}
         ${item.modifier ? `<div class="equipped-slot-mod">${escapeHtml(item.modifier)}</div>` : ""}
@@ -1216,7 +1220,7 @@ function evaluateDropTarget(item, zoneEl, currentTarget) {
     if (!Number.isInteger(slotIndex)) return { ok: false, message: "Invalid slot." };
     const existingId = state.inventorySlots[slotIndex];
     if (!existingId || existingId === item.id) return { ok: true };
-    if (Number.isInteger(item.inventorySlot)) return { ok: true }; // swap within inventory
+    if (Number.isInteger(item.inventorySlot) || item.location === "dorm") return { ok: true }; // swap from inventory or storage
     return { ok: false, message: "Target slot is occupied." };
   }
 
