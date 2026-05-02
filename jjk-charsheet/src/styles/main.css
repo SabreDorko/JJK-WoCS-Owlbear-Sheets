@@ -864,6 +864,9 @@
       box-shadow: 1px 2px 0 rgba(26, 20, 16, 0.2);
       max-width: 300px;
     }
+    .inventory-yen-popover[hidden] {
+      display: none !important;
+    }
     .inventory-yen-popover-title {
       font-family: 'Cinzel', serif;
       font-size: 8px;
@@ -990,6 +993,11 @@
         "leftHand rightHand"
         "accessory1 accessory2";
       gap: 7px;
+      align-content: start;
+      min-height: 396px;
+    }
+    .inventory-body-card {
+      min-height: 430px;
     }
     .equipped-slot-card[data-slot-key="head"] { grid-area: head; }
     .equipped-slot-card[data-slot-key="chest"] { grid-area: chest; }
