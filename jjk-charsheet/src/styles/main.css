@@ -162,6 +162,9 @@
     .meta-select { cursor: pointer; }
     .meta-select option { background: #f0ebe0; }
     .meta-input:focus, .meta-select:focus { border-bottom-color: var(--ink); }
+    .stat-derived-pulse {
+      animation: statDerivedPulse 260ms ease;
+    }
     .player-name-field { margin-top: 7px; }
 
     /* ── INFO BUTTON ── */
@@ -184,6 +187,10 @@
     }
     .info-btn:hover { opacity: 1; color: var(--ink); }
     .info-btn svg { flex-shrink: 0; }
+    #overrideModeBtn {
+      display: flex;
+      margin-top: 4px;
+    }
 
     /* ── INFO MODAL ── */
     .info-overlay {
@@ -307,6 +314,17 @@
 
     /* ── VITALS ── */
     .vitals-col { display: flex; flex-direction: column; gap: 8px; }
+
+    @keyframes statDerivedPulse {
+      0% {
+        background-color: rgba(163, 89, 43, 0.22);
+        box-shadow: 0 0 0 0 rgba(163, 89, 43, 0.35);
+      }
+      100% {
+        background-color: transparent;
+        box-shadow: 0 0 0 6px rgba(163, 89, 43, 0);
+      }
+    }
 
     .vital-box {
       border: 1.5px solid var(--ink);
@@ -736,6 +754,13 @@
       position: relative;
     }
     .skill-dot.filled { background: var(--ink); }
+    .skill-dot.permanent {
+      border: none;
+      border-radius: 0;
+      background: transparent;
+      width: 12px;
+      height: 12px;
+    }
     .skill-dot.permanent::after {
       content: "✦";
       position: absolute;
@@ -743,10 +768,10 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      color: var(--parchment);
-      font-size: 8px;
+      color: var(--ink);
+      font-size: 12px;
       line-height: 1;
-      transform: translateY(-0.2px);
+      transform: translateY(-0.7px);
     }
     .skill-bonus {
       font-family: 'Cinzel', serif;
@@ -769,7 +794,38 @@
       width: 28px;
       text-align: center;
       flex-shrink: 0;
+    }
+    .skill-bonus-input[readonly] {
       pointer-events: none;
+    }
+    .override-marker-btn {
+      border: none;
+      background: transparent;
+      color: var(--accent);
+      font-family: 'Cinzel', serif;
+      font-size: 12px;
+      line-height: 1;
+      padding: 0;
+      min-width: 10px;
+      visibility: hidden;
+      opacity: 0;
+      cursor: default;
+      transition: opacity 120ms ease;
+      flex: 0 0 auto;
+    }
+    .override-marker-btn.visible {
+      visibility: visible;
+      opacity: 0.95;
+    }
+    .override-marker-btn.visible:hover {
+      opacity: 1;
+    }
+    .override-mode .override-marker-btn.visible {
+      cursor: pointer;
+    }
+    .info-btn.active {
+      color: var(--accent);
+      opacity: 1;
     }
     .skill-bonus-input::placeholder { color: var(--parchment-darker); }
     .skill-name {

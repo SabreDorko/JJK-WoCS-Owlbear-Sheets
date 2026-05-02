@@ -5,6 +5,7 @@ let _getState = null;
 let _scheduleSave = null;
 let _showRollToast = null;
 let _initialized = false;
+let _isOverrideMode = false;
 
 function getState() {
   return _getState ? _getState() : null;
@@ -12,6 +13,54 @@ function getState() {
 
 function scheduleSave() {
   if (_scheduleSave) _scheduleSave();
+}
+
+function ensureOverrideState(state) {
+  if (!state.overrides || typeof state.overrides !== "object") state.overrides = {};
+  if (!state.overrides.derived || typeof state.overrides.derived !== "object") state.overrides.derived = {};
+  if (!state.overrides.subskills || typeof state.overrides.subskills !== "object") state.overrides.subskills = {};
+}
+
+function parseOptionalInt(rawValue) {
+  const parsed = parseInt(rawValue, 10);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function getSubskillKey(statKey, skillIndex) {
+  return `${statKey}:${skillIndex}`;
+}
+
+function getSubskillOverride(state, statKey, skillIndex) {
+  ensureOverrideState(state);
+  const value = parseOptionalInt(state.overrides.subskills[getSubskillKey(statKey, skillIndex)]);
+  return Number.isFinite(value) ? value : null;
+}
+
+function setSubskillOverride(state, statKey, skillIndex, value) {
+  ensureOverrideState(state);
+  const key = getSubskillKey(statKey, skillIndex);
+  const parsed = parseOptionalInt(value);
+  if (!Number.isFinite(parsed)) delete state.overrides.subskills[key];
+  else state.overrides.subskills[key] = parsed;
+}
+
+function getDerivedOverride(state, fieldKey) {
+  ensureOverrideState(state);
+  const value = parseOptionalInt(state.overrides.derived[fieldKey]);
+  return Number.isFinite(value) ? value : null;
+}
+
+function setDerivedOverride(state, fieldKey, value) {
+  ensureOverrideState(state);
+  const parsed = parseOptionalInt(value);
+  if (!Number.isFinite(parsed)) delete state.overrides.derived[fieldKey];
+  else state.overrides.derived[fieldKey] = parsed;
+}
+
+function getNextAptitudeActionLabel(currentAptitude) {
+  if (currentAptitude <= 0) return "Set as Aptitude";
+  if (currentAptitude === 1) return "Set as Permanent Aptitude";
+  return "Clear Aptitude";
 }
 
 function showRollToast(statLabel, diceCount, rolls, total, critStatus, skillName) {
@@ -42,11 +91,26 @@ function formatSignedValue(value) {
   return value >= 0 ? `+${value}` : `${value}`;
 }
 
+function setInputValueWithPulse(inputEl, nextValue) {
+  if (!inputEl) return;
+  const next = String(nextValue ?? "");
+  if (inputEl.value === next) {
+    inputEl.value = next;
+    return;
+  }
+  inputEl.value = next;
+  inputEl.classList.remove("stat-derived-pulse");
+  void inputEl.offsetWidth;
+  inputEl.classList.add("stat-derived-pulse");
+}
+
 function getEffectiveStatLevel(state, effects, statKey) {
   return parseStatScore(state?.stats?.[statKey]?.score) + (effects?.statBonuses?.[statKey] || 0);
 }
 
 function getSubskillValue(state, effects, statKey, skillIndex) {
+  const overridden = getSubskillOverride(state, statKey, skillIndex);
+  if (Number.isFinite(overridden)) return overridden;
   const statLevel = getEffectiveStatLevel(state, effects, statKey);
   const skillState = state?.stats?.[statKey]?.skills?.[skillIndex] || {};
   const aptitudeBonus = getAptitudeState(skillState) > 0 ? 2 : 0;
@@ -69,26 +133,31 @@ function applyDerivedCharacterFields({ preserveCurrent = true } = {}) {
   const nextAc = Math.max(0, techniqueLevel + speedLevel + (effects.acBonus || 0));
   const nextMovement = Math.max(0, 30 + (speedLevel * 5) + (effects.movementBonus || 0));
 
+  const finalHpMax = Math.max(1, getDerivedOverride(state, "hpMax") ?? nextHpMax);
+  const finalCeMax = Math.max(1, getDerivedOverride(state, "ceMax") ?? nextCeMax);
+  const finalAc = Math.max(0, getDerivedOverride(state, "ac") ?? nextAc);
+  const finalMovement = Math.max(0, getDerivedOverride(state, "movement") ?? nextMovement);
+
   const previousHpMax = parseInt(state.hpMax, 10);
   const previousCeMax = parseInt(state.ceMax, 10);
   const currentHp = parseInt(state.hpCurrent, 10);
   const currentCe = parseInt(state.ceCurrent, 10);
 
-  state.hpMax = String(nextHpMax);
-  state.ceMax = String(nextCeMax);
-  state.ac = String(nextAc);
-  state.movement = String(nextMovement);
+  state.hpMax = String(finalHpMax);
+  state.ceMax = String(finalCeMax);
+  state.ac = String(finalAc);
+  state.movement = String(finalMovement);
 
   if (!preserveCurrent || !Number.isFinite(currentHp) || !Number.isFinite(previousHpMax) || currentHp === previousHpMax) {
-    state.hpCurrent = String(nextHpMax);
+    state.hpCurrent = String(finalHpMax);
   } else {
-    state.hpCurrent = String(Math.max(0, Math.min(currentHp, nextHpMax)));
+    state.hpCurrent = String(Math.max(0, Math.min(currentHp, finalHpMax)));
   }
 
   if (!preserveCurrent || !Number.isFinite(currentCe) || !Number.isFinite(previousCeMax) || currentCe === previousCeMax) {
-    state.ceCurrent = String(nextCeMax);
+    state.ceCurrent = String(finalCeMax);
   } else {
-    state.ceCurrent = String(Math.max(0, Math.min(currentCe, nextCeMax)));
+    state.ceCurrent = String(Math.max(0, Math.min(currentCe, finalCeMax)));
   }
 }
 
@@ -154,13 +223,16 @@ function buildStatBlocks(defs, container) {
       const aptitudeState = getAptitudeState(sk);
       const subskillValue = getSubskillValue(state, effects, def.key, i);
       const aptitudeLabel = aptitudeState === 2 ? "Permanent Aptitude" : aptitudeState === 1 ? "Aptitude" : "No Aptitude";
+      const nextAptitudeAction = getNextAptitudeActionLabel(aptitudeState);
+      const hasOverride = Number.isFinite(getSubskillOverride(state, def.key, i));
       const row = document.createElement("div");
       row.className = "skill-row";
       row.innerHTML = `
         <div class="skill-dot${aptitudeState > 0 ? " filled" : ""}${aptitudeState === 2 ? " permanent" : ""}"
-             id="dot_${def.key}_${i}" role="checkbox" aria-label="${skill} ${aptitudeLabel}"></div>
+             id="dot_${def.key}_${i}" role="checkbox" aria-label="${skill} ${aptitudeLabel}" title="${nextAptitudeAction}"></div>
         <input class="skill-bonus-input" type="text"
-               id="bonus_${def.key}_${i}" value="${formatSignedValue(subskillValue)}" readonly tabindex="-1" />
+               id="bonus_${def.key}_${i}" value="${formatSignedValue(subskillValue)}" ${_isOverrideMode ? "" : "readonly tabindex=\"-1\""} title="${hasOverride ? "Overridden" : "Auto-calculated"}" />
+        <button type="button" class="override-marker-btn${hasOverride ? " visible" : ""}" data-subskill-override-clear="${def.key}:${i}" title="${_isOverrideMode ? "Click to clear override" : "Overridden"}" ${_isOverrideMode ? "" : "tabindex=\"-1\""}>*</button>
         <span class="skill-name">${skill}</span>
         <button class="skill-roll-btn" type="button" title="Roll ${skill}"></button>
       `;
@@ -174,10 +246,23 @@ function buildStatBlocks(defs, container) {
         dot.classList.toggle("filled", nextAptitude > 0);
         dot.classList.toggle("permanent", nextAptitude === 2);
         const nextLabel = nextAptitude === 2 ? "Permanent Aptitude" : nextAptitude === 1 ? "Aptitude" : "No Aptitude";
+        dot.setAttribute("title", getNextAptitudeActionLabel(nextAptitude));
         dot.setAttribute("aria-label", `${skill} ${nextLabel}`);
         const valueEl = row.querySelector(".skill-bonus-input");
         const nextValue = getSubskillValue(state, computeActiveModifierEffects(state), def.key, i);
         valueEl.value = formatSignedValue(nextValue);
+        scheduleSave();
+      });
+      row.querySelector(".skill-bonus-input").addEventListener("input", e => {
+        if (!_isOverrideMode) return;
+        setSubskillOverride(state, def.key, i, e.target.value);
+        applyCharacterStateToUI();
+        scheduleSave();
+      });
+      row.querySelector("button[data-subskill-override-clear]").addEventListener("click", () => {
+        if (!_isOverrideMode) return;
+        setSubskillOverride(state, def.key, i, null);
+        applyCharacterStateToUI();
         scheduleSave();
       });
       row.querySelector(".skill-roll-btn").addEventListener("click", () => {
@@ -203,7 +288,15 @@ function buildStatBlocks(defs, container) {
     block.querySelector(`#score_${def.key}`).addEventListener("input", e => {
       state.stats[def.key].score = e.target.value;
       applyDerivedCharacterFields({ preserveCurrent: true });
-      renderStats();
+      const currentEffects = computeActiveModifierEffects(state);
+      const valueInputs = block.querySelectorAll(".skill-bonus-input");
+      valueInputs.forEach((inputEl, idx) => {
+        setInputValueWithPulse(inputEl, formatSignedValue(getSubskillValue(state, currentEffects, def.key, idx)));
+      });
+      setInputValueWithPulse(document.getElementById("acInput"), state.ac || "");
+      setInputValueWithPulse(document.getElementById("hpMax"), state.hpMax || "");
+      setInputValueWithPulse(document.getElementById("ceMax"), state.ceMax || "");
+      setInputValueWithPulse(document.getElementById("moveInput"), state.movement || "");
       if (def.key === "technique") updateBlackFlashRangeDisplay();
       scheduleSave();
     });
@@ -280,22 +373,85 @@ function syncHP() {
   scheduleSave();
 }
 
+function updateOverrideButtonUI() {
+  const btn = document.getElementById("overrideModeBtn");
+  if (!btn) return;
+  btn.classList.toggle("active", _isOverrideMode);
+  btn.textContent = _isOverrideMode ? "Exit Override" : "Edit / Override";
+  btn.title = _isOverrideMode ? "Disable manual overrides" : "Enable manual overrides";
+}
+
+function ensureDerivedOverrideMarker(inputId, fieldKey) {
+  const input = document.getElementById(inputId);
+  if (!input || !input.parentElement) return;
+
+  let marker = input.parentElement.querySelector(`.override-marker-btn[data-derived-override-clear='${fieldKey}']`);
+  if (!marker) {
+    marker = document.createElement("button");
+    marker.type = "button";
+    marker.className = "override-marker-btn";
+    marker.dataset.derivedOverrideClear = fieldKey;
+    marker.textContent = "*";
+    marker.addEventListener("click", () => {
+      if (!_isOverrideMode) return;
+      const state = getState();
+      if (!state) return;
+      setDerivedOverride(state, fieldKey, null);
+      applyCharacterStateToUI();
+      scheduleSave();
+    });
+    input.parentElement.appendChild(marker);
+  }
+
+  const state = getState();
+  const hasOverride = state ? Number.isFinite(getDerivedOverride(state, fieldKey)) : false;
+  marker.classList.toggle("visible", hasOverride);
+  marker.title = _isOverrideMode ? "Click to clear override" : "Overridden";
+  marker.tabIndex = _isOverrideMode && hasOverride ? 0 : -1;
+}
+
+function wireDerivedOverrideInput(inputId, fieldKey) {
+  const input = document.getElementById(inputId);
+  if (!input) return;
+
+  input.addEventListener("input", e => {
+    if (!_isOverrideMode) return;
+    const state = getState();
+    if (!state) return;
+    setDerivedOverride(state, fieldKey, e.target.value);
+    applyCharacterStateToUI();
+    scheduleSave();
+  });
+}
+
+function applyOverrideFieldReadOnlyState() {
+  document.body.classList.toggle("override-mode", _isOverrideMode);
+  const editableWhenOverride = ["acInput", "hpMax", "ceMax", "moveInput"];
+  editableWhenOverride.forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.readOnly = !_isOverrideMode;
+    el.title = _isOverrideMode ? "Manual override enabled" : "Auto-calculated";
+  });
+}
+
 export function applyCharacterStateToUI() {
   const state = getState();
   if (!state) return;
 
+  ensureOverrideState(state);
   applyDerivedCharacterFields({ preserveCurrent: true });
 
   document.getElementById("charName").value = state.charName || "";
   document.getElementById("ageInput").value = state.age || "";
   document.getElementById("ctInput").value = state.ct || "";
   document.getElementById("playerName").value = state.playerName || "";
-  document.getElementById("acInput").value = state.ac || "";
-  document.getElementById("hpCurrent").value = state.hpCurrent || "";
-  document.getElementById("hpMax").value = state.hpMax || "";
-  document.getElementById("moveInput").value = state.movement || "";
-  document.getElementById("ceCurrent").value = state.ceCurrent || "";
-  document.getElementById("ceMax").value = state.ceMax || "";
+  setInputValueWithPulse(document.getElementById("acInput"), state.ac || "");
+  setInputValueWithPulse(document.getElementById("hpCurrent"), state.hpCurrent || "");
+  setInputValueWithPulse(document.getElementById("hpMax"), state.hpMax || "");
+  setInputValueWithPulse(document.getElementById("moveInput"), state.movement || "");
+  setInputValueWithPulse(document.getElementById("ceCurrent"), state.ceCurrent || "");
+  setInputValueWithPulse(document.getElementById("ceMax"), state.ceMax || "");
   document.getElementById("ceNote").value = state.ceNote || "";
 
   const arcSel = document.getElementById("archetypeSelect");
@@ -313,6 +469,12 @@ export function applyCharacterStateToUI() {
 
   renderStats();
   updateBlackFlashRangeDisplay();
+  applyOverrideFieldReadOnlyState();
+  updateOverrideButtonUI();
+  ensureDerivedOverrideMarker("acInput", "ac");
+  ensureDerivedOverrideMarker("hpMax", "hpMax");
+  ensureDerivedOverrideMarker("ceMax", "ceMax");
+  ensureDerivedOverrideMarker("moveInput", "movement");
 }
 
 export function initCharacter({ getState: getStateFn, scheduleSave: scheduleSaveFn, showRollToast: showRollToastFn }) {
@@ -348,11 +510,18 @@ export function initCharacter({ getState: getStateFn, scheduleSave: scheduleSave
   bindField("subArchetypeSelect", "subArchetype");
   bindField("subArchetypeSelect2", "subArchetype2");
 
-  const derivedFieldIds = ["acInput", "hpMax", "moveInput", "ceMax"];
-  derivedFieldIds.forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.readOnly = true;
-  });
+  wireDerivedOverrideInput("acInput", "ac");
+  wireDerivedOverrideInput("hpMax", "hpMax");
+  wireDerivedOverrideInput("ceMax", "ceMax");
+  wireDerivedOverrideInput("moveInput", "movement");
+
+  const overrideBtn = document.getElementById("overrideModeBtn");
+  if (overrideBtn) {
+    overrideBtn.addEventListener("click", () => {
+      _isOverrideMode = !_isOverrideMode;
+      applyCharacterStateToUI();
+    });
+  }
 
   document.getElementById("addSecondArchetypeBtn").addEventListener("click", toggleSecondArchetype);
   document.getElementById("removeSecondArchetypeBtn").addEventListener("click", toggleSecondArchetype);

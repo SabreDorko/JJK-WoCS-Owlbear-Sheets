@@ -84,6 +84,10 @@ export function defaultState() {
       accessory1: null,
       accessory2: null,
     },
+    overrides: {
+      derived: {},
+      subskills: {},
+    },
     stats,
   };
 }

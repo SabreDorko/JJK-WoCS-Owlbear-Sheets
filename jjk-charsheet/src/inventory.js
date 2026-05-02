@@ -10,6 +10,7 @@ import {
 
 let _getState = null;
 let _scheduleSave = null;
+let _refreshCharacterStats = null;
 let editingItemId = null;
 let isInitialized = false;
 let draggingItemId = null;
@@ -1959,11 +1960,13 @@ export function renderInventory() {
   renderEquippedSlots();
   renderInventorySlots();
   renderDormInventory();
+  if (_refreshCharacterStats) _refreshCharacterStats();
 }
 
-export function initInventory({ getState: getStateFn, scheduleSave: scheduleSaveFn }) {
+export function initInventory({ getState: getStateFn, scheduleSave: scheduleSaveFn, refreshCharacterStats: refreshCharacterStatsFn = null }) {
   _getState = getStateFn;
   _scheduleSave = scheduleSaveFn;
+  _refreshCharacterStats = refreshCharacterStatsFn;
 
   if (isInitialized) {
     renderInventory();

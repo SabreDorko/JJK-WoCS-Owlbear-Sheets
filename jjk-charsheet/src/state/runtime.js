@@ -3,6 +3,10 @@ import OBR from "https://cdn.jsdelivr.net/npm/@owlbear-rodeo/sdk@3.1.0/+esm";
 export function mergeLoadedState({ saved, defaultState, centerStats, rightStats }) {
   const next = { ...defaultState(), ...saved };
 
+  if (!next.overrides || typeof next.overrides !== "object") next.overrides = { derived: {}, subskills: {} };
+  if (!next.overrides.derived || typeof next.overrides.derived !== "object") next.overrides.derived = {};
+  if (!next.overrides.subskills || typeof next.overrides.subskills !== "object") next.overrides.subskills = {};
+
   if (next.archetype2 || next.subArchetype2) {
     next.hasSecondArchetype = true;
   }

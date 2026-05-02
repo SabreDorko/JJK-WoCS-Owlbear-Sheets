@@ -115,6 +115,7 @@ async function init() {
   initInventory({
     getState: () => state,
     scheduleSave,
+    refreshCharacterStats: applyCharacterStateToUI,
   });
 
   initUiShell({
