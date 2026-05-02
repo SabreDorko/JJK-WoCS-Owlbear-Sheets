@@ -217,8 +217,16 @@
               <div class="inventory-yen-input-wrap">
                 <span class="inventory-yen-symbol" aria-hidden="true">¥</span>
                 <input id="yenInput" class="meta-input inventory-yen-input" type="text" inputmode="numeric" placeholder="0" />
-                <button type="button" class="inventory-mini-btn inventory-yen-adjust-btn" data-yen-adjust="add" aria-label="Add yen" title="Add yen">+</button>
-                <button type="button" class="inventory-mini-btn inventory-yen-adjust-btn" data-yen-adjust="subtract" aria-label="Deduct yen" title="Deduct yen">-</button>
+                <button type="button" class="inventory-mini-btn inventory-yen-adjust-btn" data-yen-adjust="add" aria-label="Add yen" title="Add yen">
+                  <svg class="inventory-yen-adjust-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                    <path fill="currentColor" d="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6V5z"/>
+                  </svg>
+                </button>
+                <button type="button" class="inventory-mini-btn inventory-yen-adjust-btn" data-yen-adjust="subtract" aria-label="Deduct yen" title="Deduct yen">
+                  <svg class="inventory-yen-adjust-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                    <path fill="currentColor" d="M5 11h14v2H5z"/>
+                  </svg>
+                </button>
               </div>
               <div id="yenAdjustPopover" class="inventory-yen-popover" hidden>
                 <div id="yenAdjustTitle" class="inventory-yen-popover-title">Adjust Yen</div>
@@ -243,6 +251,13 @@
               <div id="dormInventoryList" class="inventory-slot-list" data-drop-zone="dorm-list"></div>
             </div>
           </div>
+        </div>
+
+        <div class="inventory-body-col">
+          <div class="inventory-card inventory-body-card">
+            <div class="inventory-card-title">Equipment</div>
+            <div id="equippedSlotsGrid" class="equipped-slots-grid"></div>
+          </div>
 
           <div class="inventory-creator-wrap">
             <button id="toggleItemEditorBtn" class="inventory-plus-btn" type="button" aria-expanded="false" aria-controls="itemEditorPanel">+</button>
@@ -266,6 +281,10 @@
                   <option value="weapon">Weapon</option>
                   <option value="item">Item</option>
                 </select>
+              </label>
+              <label class="inventory-field" id="itemQuantityField" hidden>
+                <span class="field-label">Amount</span>
+                <input id="itemQuantityInput" class="meta-input" type="number" min="1" step="1" value="1" />
               </label>
               <label class="inventory-field inventory-field-full">
                 <span class="field-label">Description</span>
@@ -311,13 +330,6 @@
               </div>
               <div id="itemFormError" class="inventory-error" aria-live="polite"></div>
             </div>
-          </div>
-        </div>
-
-        <div class="inventory-body-col">
-          <div class="inventory-card inventory-body-card">
-            <div class="inventory-card-title">Equipment</div>
-            <div id="equippedSlotsGrid" class="equipped-slots-grid"></div>
           </div>
         </div>
       </div>

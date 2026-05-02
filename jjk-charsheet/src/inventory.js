@@ -67,6 +67,7 @@ function applyItemTypeDefaults(item) {
     item.weaponGrip = normalizeWeaponGrip(item.weaponGrip, item.slotsNeeded);
     item.allowedSlots = ["rightHand", "leftHand"];
     item.slotsNeeded = item.weaponGrip === "twoHanded" ? 2 : 1;
+    item.quantity = 1;
     return;
   }
 
@@ -74,12 +75,14 @@ function applyItemTypeDefaults(item) {
     item.weaponGrip = null;
     item.allowedSlots = ["rightHand", "leftHand"];
     item.slotsNeeded = 1;
+    item.quantity = parseItemQuantity(item.quantity);
     return;
   }
 
   item.weaponGrip = null;
   item.allowedSlots = normalizeAllowedSlots(item.allowedSlots).filter(slot => CLOTHING_SELECTABLE_SLOT_KEYS.includes(slot));
   item.slotsNeeded = clamp(parseInt(item.slotsNeeded, 10) || 1, 1, 3);
+  item.quantity = 1;
 }
 
 function inferLegacyItemType(item) {
@@ -128,6 +131,12 @@ function parseYenValue(rawValue) {
   const parsed = parseInt(rawValue, 10);
   if (!Number.isFinite(parsed)) return 0;
   return Math.max(0, parsed);
+}
+
+function parseItemQuantity(rawValue) {
+  const parsed = parseInt(rawValue, 10);
+  if (!Number.isFinite(parsed)) return 1;
+  return clamp(parsed, 1, 999);
 }
 
 function parseYenInputText(rawValue) {
@@ -561,7 +570,7 @@ function renderDeleteButton() {
   return `
     <button type="button" class="inventory-mini-btn inventory-icon-btn danger" data-action="deleteItem" aria-label="Delete item" title="Delete item">
       <svg class="inventory-icon-trash" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-        <path fill="currentColor" d="M9 3h6l1 2h4v2H4V5h4l1-2zm1 6h2v9h-2V9zm4 0h2v9h-2V9zM7 9h2v9H7V9z"/>
+        <path fill="currentColor" d="M9 3h6a1 1 0 0 1 1 1v1h4v2h-1l-1 12a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 7H4V5h4V4a1 1 0 0 1 1-1Zm1 2v0h4V5h-4Zm-1 4h2v9H9V9Zm4 0h2v9h-2V9Z"/>
       </svg>
     </button>
   `;
@@ -569,6 +578,14 @@ function renderDeleteButton() {
 
 function renderMoveButton() {
   return '<button type="button" class="inventory-mini-btn inventory-icon-btn inventory-icon-btn-move" data-action="moveItem" aria-label="Move item" title="Move item">&#8644;</button>';
+}
+
+function renderQuantityControls(item) {
+  if (normalizeItemType(item.itemType) !== "item") return "";
+  return `
+    <button type="button" class="inventory-mini-btn inventory-qty-btn" data-action="decreaseQuantity" aria-label="Decrease amount" title="Decrease amount">-</button>
+    <button type="button" class="inventory-mini-btn inventory-qty-btn" data-action="increaseQuantity" aria-label="Increase amount" title="Increase amount">+</button>
+  `;
 }
 
 function renderEquipPickerMenu(item) {
@@ -592,8 +609,14 @@ function getMoveDestinationOptions(item) {
   return options;
 }
 
-function renderMovePickerMenu(item) {
+function renderMovePickerMenu(item, anchorSlotKey = null) {
   if (openMovePickerItemId !== item.id) return "";
+
+  if (item.location === "equipped" && anchorSlotKey) {
+    const primarySlot = item.equippedSlots?.[0] || null;
+    if (primarySlot && primarySlot !== anchorSlotKey) return "";
+  }
+
   const options = getMoveDestinationOptions(item);
   if (!options.length) return "";
 
@@ -627,8 +650,9 @@ function setItemTypeFieldsVisibility(itemType) {
   const slotsNeededLabel = document.getElementById("itemSlotsNeededLabel");
   const allowedSlotsField = document.getElementById("itemAllowedSlotsField");
   const weaponGripField = document.getElementById("itemWeaponGripField");
+  const quantityField = document.getElementById("itemQuantityField");
   const preferredLocation = document.getElementById("itemPreferredLocation");
-  if (!slotsNeededField || !slotsNeededLabel || !allowedSlotsField || !weaponGripField || !preferredLocation) return;
+  if (!slotsNeededField || !slotsNeededLabel || !allowedSlotsField || !weaponGripField || !quantityField || !preferredLocation) return;
 
   const isClothing = itemType === "clothing";
   const isWeapon = itemType === "weapon";
@@ -643,6 +667,7 @@ function setItemTypeFieldsVisibility(itemType) {
   setVisible(slotsNeededField, isClothing);
   setVisible(allowedSlotsField, isClothing);
   setVisible(weaponGripField, isWeapon);
+  setVisible(quantityField, isItem);
 
   const dormOption = preferredLocation.querySelector("option[value='dorm']");
   if (dormOption) {
@@ -675,6 +700,7 @@ function getItemConfigFromForm() {
       weaponGrip: null,
       allowedSlots: ["rightHand", "leftHand"],
       slotsNeeded: 1,
+      quantity: parseItemQuantity(document.getElementById("itemQuantityInput")?.value),
     };
   }
 
@@ -683,6 +709,7 @@ function getItemConfigFromForm() {
     weaponGrip: null,
     allowedSlots: collectAllowedSlotsFromForm(),
     slotsNeeded: clamp(parseInt(document.getElementById("itemSlotsNeededSelect")?.value, 10) || 1, 1, 3),
+    quantity: 1,
   };
 }
 
@@ -698,6 +725,7 @@ function resetItemEditor() {
   document.getElementById("itemTypeSelect").value = "clothing";
   document.getElementById("itemWeaponGripSelect").value = "oneHanded";
   document.getElementById("itemSlotsNeededSelect").value = "1";
+  document.getElementById("itemQuantityInput").value = "1";
   document.getElementById("itemPreferredLocation").value = "inventory";
   document.querySelectorAll("#itemAllowedSlots input[type='checkbox']").forEach(input => {
     input.checked = false;
@@ -721,6 +749,7 @@ function startItemEdit(itemId) {
   document.getElementById("itemTypeSelect").value = normalizeItemType(item.itemType);
   document.getElementById("itemWeaponGripSelect").value = normalizeWeaponGrip(item.weaponGrip, item.slotsNeeded);
   document.getElementById("itemSlotsNeededSelect").value = String(item.slotsNeeded || 1);
+  document.getElementById("itemQuantityInput").value = String(parseItemQuantity(item.quantity));
   document.getElementById("itemPreferredLocation").value = item.location === "equipped" ? "equipped" : item.location;
   document.querySelectorAll("#itemAllowedSlots input[type='checkbox']").forEach(input => {
     input.checked = item.allowedSlots.includes(input.value);
@@ -747,7 +776,7 @@ function saveItemFromForm() {
     return;
   }
   if (slotsNeeded > countInternalAllowedSlots(allowedSlots)) {
-    setItemFormError("Body slots needed cannot be greater than selected allowed slots.");
+          <path fill="currentColor" d="M9 3a1 1 0 0 0-1 1v1H5a1 1 0 1 0 0 2h.293l.853 12.789A2 2 0 0 0 8.14 22h7.72a2 2 0 0 0 1.994-2.211L18.707 7H19a1 1 0 1 0 0-2h-3V4a1 1 0 0 0-1-1H9Zm2 4a1 1 0 0 1 1 1v10a1 1 0 1 1-2 0V8a1 1 0 0 1 1-1Zm4 1a1 1 0 1 0-2 0v10a1 1 0 1 0 2 0V8Z"/>
     return;
   }
 
@@ -762,6 +791,7 @@ function saveItemFromForm() {
       weaponGrip: itemConfig.weaponGrip,
       allowedSlots,
       slotsNeeded,
+      quantity: itemConfig.quantity,
       location: "dorm",
       inventorySlot: null,
       equippedSlots: [],
@@ -775,6 +805,7 @@ function saveItemFromForm() {
     item.weaponGrip = itemConfig.weaponGrip;
     item.allowedSlots = allowedSlots;
     item.slotsNeeded = slotsNeeded;
+    item.quantity = itemConfig.quantity;
   }
 
   applyItemTypeDefaults(item);
@@ -824,6 +855,7 @@ function renderInventoryItemCard(item, controlsHtml, locationTag) {
     : "";
   const normalizedType = normalizeItemType(item.itemType);
   const typeLabel = getItemTypeLabel(normalizedType);
+  const quantityText = normalizedType === "item" ? `<div class="inventory-item-amount">Amount: ${parseItemQuantity(item.quantity)}</div>` : "";
   const equipText = item.allowedSlots.map(slot => getAllowedSlotLabel(slot)).join(", ");
   const details = [];
 
@@ -848,6 +880,7 @@ function renderInventoryItemCard(item, controlsHtml, locationTag) {
         <div class="inventory-item-location">${escapeHtml(locationTag)}</div>
       </div>
       ${modifier}
+      ${quantityText}
       ${description}
       <div class="inventory-item-slots">${slotsMeta}</div>
       <div class="inventory-item-actions">${controlsHtml}</div>
@@ -893,7 +926,8 @@ function renderEquippedSlots() {
         ${item.modifier ? `<div class="equipped-slot-mod">${escapeHtml(item.modifier)}</div>` : ""}
         <div class="equipped-slot-actions">
           ${renderMoveButton()}
-          ${renderMovePickerMenu(item)}
+          ${renderMovePickerMenu(item, slot)}
+          ${renderQuantityControls(item)}
           ${renderEditButton()}
           ${renderDeleteButton()}
         </div>
@@ -925,6 +959,7 @@ function renderInventorySlots() {
       ${renderEquipPickerMenu(item)}
       ${renderMoveButton()}
       ${renderMovePickerMenu(item)}
+      ${renderQuantityControls(item)}
       ${renderEditButton()}
       ${renderDeleteButton()}
     `;
@@ -956,6 +991,7 @@ function renderDormInventory() {
       ${renderEquipPickerMenu(item)}
       ${renderMoveButton()}
       ${renderMovePickerMenu(item)}
+      ${renderQuantityControls(item)}
       ${renderEditButton()}
       ${renderDeleteButton()}
     `;
@@ -1045,6 +1081,22 @@ function handleInventoryActions(event) {
       return;
     }
     setItemFormError("");
+    renderInventory();
+    scheduleSave();
+    return;
+  }
+
+  if (action === "increaseQuantity") {
+    if (normalizeItemType(item.itemType) !== "item") return;
+    item.quantity = parseItemQuantity((item.quantity || 1) + 1);
+    renderInventory();
+    scheduleSave();
+    return;
+  }
+
+  if (action === "decreaseQuantity") {
+    if (normalizeItemType(item.itemType) !== "item") return;
+    item.quantity = parseItemQuantity((item.quantity || 1) - 1);
     renderInventory();
     scheduleSave();
     return;
@@ -1317,6 +1369,7 @@ function ensureInventoryStateShape() {
     weaponGrip: item?.weaponGrip || null,
     allowedSlots: normalizeAllowedSlots(item?.allowedSlots),
     slotsNeeded: clamp(parseInt(item?.slotsNeeded, 10) || 1, 1, 3),
+    quantity: parseItemQuantity(item?.quantity),
     location: ["inventory", "dorm", "equipped"].includes(item?.location) ? item.location : "dorm",
     inventorySlot: Number.isInteger(item?.inventorySlot) ? item.inventorySlot : null,
     equippedSlots: Array.isArray(item?.equippedSlots)
