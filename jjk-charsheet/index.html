@@ -1244,9 +1244,14 @@ function updateBlackFlashRangeDisplay() {
   noteEl.textContent = `Technique ${tech}`;
 }
 
+function getPreferredPlayerName() {
+  const sheetPlayerName = (state.playerName || "").trim();
+  const owlbearPlayerName = (localPlayerName || "").trim();
+  return sheetPlayerName || owlbearPlayerName || "Unknown Player";
+}
+
 function getPartySnapshot() {
-  const fallbackPlayer = (state.playerName || "Unknown Player").trim();
-  const playerName = (localPlayerName || fallbackPlayer || "Unknown Player").trim();
+  const playerName = getPreferredPlayerName();
   const playerId = localPlayerId || playerName;
   return {
     playerId,
@@ -1384,12 +1389,13 @@ function renderGroupRollHistory() {
       : item.critStatus === "fail"
       ? `<span style="color:#8b1a1a;font-family:'Cinzel',serif;font-size:8px;"> ✦ CRIT FAIL</span>`
       : "";
-    const charDisplay = item.charName
-      ? `<span style="font-weight:600;color:var(--ink);">${item.charName}</span> • `
+    const whoParts = [item.charName, item.playerName].filter(v => typeof v === "string" && v.trim());
+    const whoDisplay = whoParts.length
+      ? `<span style="font-weight:600;color:var(--ink);">${whoParts.join(" • ")}</span> • `
       : "";
     return `
       <div class="roll-history-item">
-        <div class="roll-history-item-title">${item.time} • ${charDisplay}${label}${critBadge}</div>
+        <div class="roll-history-item-title">${item.time} • ${whoDisplay}${label}${critBadge}</div>
         <div class="roll-history-item-body">${item.diceCount}d6: [${item.rolls.join(", ")}] = <strong>${item.total}</strong></div>
       </div>
     `;
@@ -1415,8 +1421,9 @@ function pushRollHistory(statLabel, diceCount, rolls, total, critStatus, skillNa
   scheduleSave();
 
   // Add to group log and broadcast to other players
-  const charName = state.charName || state.playerName || "Unknown";
-  const groupEntry = { charName, statLabel, diceCount, rolls, total, time, critStatus: critStatus || null, skillName: skillName || null };
+  const charName = (state.charName || "").trim();
+  const playerName = getPreferredPlayerName();
+  const groupEntry = { charName, playerName, statLabel, diceCount, rolls, total, time, critStatus: critStatus || null, skillName: skillName || null };
   groupRollHistory = [...groupRollHistory, groupEntry].slice(-MAX_GROUP_ROLL_HISTORY);
   if (activeRollTab === "group") renderGroupRollHistory();
   try {
