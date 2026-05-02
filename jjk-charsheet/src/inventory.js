@@ -674,11 +674,21 @@ function buildEquipSelectOptions(itemId, allowedSlots) {
 function renderInventoryItemCard(item, controlsHtml, locationTag) {
   const modifier = item.modifier ? `<div class="inventory-item-modifier">${escapeHtml(item.modifier)}</div>` : "";
   const description = item.description ? `<div class="inventory-item-desc">${escapeHtml(item.description)}</div>` : "";
-  const typeLabel = getItemTypeLabel(normalizeItemType(item.itemType));
-  const equipText = item.allowedSlots.map(slot => getAllowedSlotLabel(slot)).join(", ") || "None";
-  const needsText = item.slotsNeeded === 2 && normalizeItemType(item.itemType) === "weapon"
-    ? "Two-Handed"
-    : `Needs ${item.slotsNeeded} slot${item.slotsNeeded > 1 ? "s" : ""}`;
+  const normalizedType = normalizeItemType(item.itemType);
+  const typeLabel = getItemTypeLabel(normalizedType);
+  const equipText = item.allowedSlots.map(slot => getAllowedSlotLabel(slot)).join(", ");
+  const details = [];
+
+  if (normalizedType === "weapon") {
+    if (normalizeWeaponGrip(item.weaponGrip, item.slotsNeeded) === "twoHanded") details.push("Two-Handed");
+  } else {
+    if (normalizedType === "clothing" && equipText) details.push(`Equip: ${equipText}`);
+    if ((parseInt(item.slotsNeeded, 10) || 1) > 1) {
+      details.push(`Needs ${item.slotsNeeded} slots`);
+    }
+  }
+
+  const slotsMeta = [`Type: ${typeLabel}`, ...details].join(" | ");
 
   return `
     <div class="inventory-item-card" data-item-id="${item.id}" draggable="true">
@@ -688,7 +698,7 @@ function renderInventoryItemCard(item, controlsHtml, locationTag) {
       </div>
       ${modifier}
       ${description}
-      <div class="inventory-item-slots">Type: ${typeLabel} | Equip: ${equipText} | ${needsText}</div>
+      <div class="inventory-item-slots">${slotsMeta}</div>
       <div class="inventory-item-actions">${controlsHtml}</div>
     </div>
   `;
@@ -713,7 +723,7 @@ function renderEquippedSlots() {
     }
 
     const occupies = item.equippedSlots.map(key => BODY_SLOT_LABELS[key]).join(", ");
-    const shouldShowOccupiesMeta = !(item.equippedSlots.length === 1 && countInternalAllowedSlots(item.allowedSlots) === 1);
+    const shouldShowOccupiesMeta = normalizeItemType(item.itemType) !== "weapon" && item.equippedSlots.length > 1;
     return `
       <div class="equipped-slot-card" data-item-id="${item.id}" data-slot-key="${slot}" data-drop-zone="equipped-slot" draggable="true">
         <div class="equipped-slot-label">${BODY_SLOT_LABELS[slot]}</div>
