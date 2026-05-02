@@ -71,6 +71,17 @@ function parseYenValue(rawValue) {
   return Math.max(0, parsed);
 }
 
+function askYenAdjustmentAmount(direction) {
+  const promptText = direction > 0
+    ? "Add how much yen?"
+    : "Subtract how much yen?";
+  const response = window.prompt(promptText, "100");
+  if (response === null) return null;
+  const amount = parseYenValue(response);
+  if (amount <= 0) return null;
+  return amount;
+}
+
 function makeItemId() {
   return `item_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
@@ -844,13 +855,12 @@ export function initInventory({ getState: getStateFn, scheduleSave: scheduleSave
   const inventoryList = document.getElementById("inventorySlotsList");
   const dormList = document.getElementById("dormInventoryList");
   const yenInput = document.getElementById("yenInput");
-  const yenAdjustAmountInput = document.getElementById("yenAdjustAmount");
   const addYenBtn = document.getElementById("addYenBtn");
   const subtractYenBtn = document.getElementById("subtractYenBtn");
   const editorToggleBtn = document.getElementById("toggleItemEditorBtn");
   const dormToggleBtn = document.getElementById("dormToggleBtn");
 
-  if (!saveBtn || !cancelBtn || !equippedGrid || !inventoryList || !dormList || !yenInput || !yenAdjustAmountInput || !addYenBtn || !subtractYenBtn || !editorToggleBtn || !dormToggleBtn) return;
+  if (!saveBtn || !cancelBtn || !equippedGrid || !inventoryList || !dormList || !yenInput || !addYenBtn || !subtractYenBtn || !editorToggleBtn || !dormToggleBtn) return;
 
   saveBtn.addEventListener("click", saveItemFromForm);
   cancelBtn.addEventListener("click", resetItemEditor);
@@ -876,7 +886,8 @@ export function initInventory({ getState: getStateFn, scheduleSave: scheduleSave
   const applyYenDelta = (direction) => {
     const state = getState();
     const base = parseYenValue(yenInput.value);
-    const amount = parseYenValue(yenAdjustAmountInput.value || "1") || 1;
+    const amount = askYenAdjustmentAmount(direction);
+    if (!amount) return;
     const next = Math.max(0, base + (direction * amount));
     state.yen = next;
     yenInput.value = next;

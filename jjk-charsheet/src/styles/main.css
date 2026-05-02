@@ -777,7 +777,7 @@
     /* ── INVENTORY TAB ── */
     .inventory-layout {
       display: grid;
-      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      grid-template-columns: minmax(0, 0.98fr) minmax(0, 1.02fr);
       gap: 10px;
       align-items: start;
     }
@@ -791,6 +791,16 @@
       border: 1.5px solid var(--ink);
       background: var(--parchment);
       padding: 8px 9px;
+      min-width: 0;
+    }
+    .inventory-wallet-card {
+      max-width: 340px;
+    }
+    .inventory-active-card {
+      max-width: 640px;
+    }
+    .inventory-body-card {
+      max-width: 640px;
     }
     .inventory-card-title {
       font-family: 'Cinzel', serif;
@@ -835,12 +845,6 @@
       flex-wrap: wrap;
       align-items: end;
       gap: 8px;
-    }
-    .inventory-yen-adjust-input {
-      width: 88px;
-      font-family: 'Cinzel', serif;
-      font-size: 14px;
-      font-weight: 600;
     }
     .inventory-yen-actions {
       display: flex;
@@ -958,8 +962,8 @@
       padding: 6px;
     }
     .equipped-slot-card {
-      min-height: 84px;
-      padding: 5px;
+      min-height: 76px;
+      padding: 4px;
     }
     .inventory-body-col .equipped-slot-item,
     .inventory-body-col .inventory-item-name {
@@ -970,7 +974,12 @@
     .inventory-body-col .inventory-item-modifier,
     .inventory-body-col .inventory-item-desc,
     .inventory-body-col .inventory-item-slots {
-      font-size: 11px;
+      font-size: 10px;
+    }
+    .inventory-body-col .inventory-mini-btn {
+      font-size: 7px;
+      letter-spacing: 0.5px;
+      padding: 2px 5px;
     }
     .equipped-slot-label,
     .inventory-slot-label {
@@ -1112,7 +1121,7 @@
       100% { transform: translateX(0); }
     }
 
-    @media (max-width: 860px) {
+    @media (max-width: 680px) {
       .inventory-layout { grid-template-columns: 1fr; }
       .equipped-slots-grid { grid-template-columns: 1fr; }
     }
