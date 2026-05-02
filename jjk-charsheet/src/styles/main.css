@@ -832,6 +832,7 @@
       display: inline-flex;
       align-items: center;
       gap: 6px;
+      position: relative;
     }
     .inventory-yen-symbol {
       font-family: 'Cinzel', serif;
@@ -845,6 +846,42 @@
       font-size: 18px;
       font-weight: 600;
       width: 120px;
+    }
+    .inventory-yen-adjust-btn {
+      min-width: 22px;
+      padding: 1px 6px;
+      font-size: 12px;
+      line-height: 1;
+    }
+    .inventory-yen-popover {
+      margin-top: 6px;
+      display: inline-flex;
+      flex-direction: column;
+      gap: 4px;
+      border: 1px solid var(--border);
+      background: var(--parchment);
+      padding: 5px;
+      box-shadow: 1px 2px 0 rgba(26, 20, 16, 0.2);
+      max-width: 300px;
+    }
+    .inventory-yen-popover-title {
+      font-family: 'Cinzel', serif;
+      font-size: 8px;
+      letter-spacing: 0.9px;
+      text-transform: uppercase;
+      color: var(--ink-faint);
+    }
+    .inventory-yen-popover-row {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      flex-wrap: wrap;
+    }
+    .inventory-yen-adjust-input {
+      width: 110px;
+      font-family: 'Cinzel', serif;
+      font-size: 14px;
+      font-weight: 600;
     }
     .inventory-creator-wrap {
       display: flex;
@@ -981,7 +1018,7 @@
     }
     .inventory-body-col .equipped-slot-item,
     .inventory-body-col .inventory-item-name {
-      font-size: 13px;
+      font-size: 14px;
     }
     .inventory-body-col .equipped-slot-meta,
     .inventory-body-col .equipped-slot-mod,
@@ -989,7 +1026,7 @@
     .inventory-body-col .equipped-slot-desc,
     .inventory-body-col .inventory-item-desc,
     .inventory-body-col .inventory-item-slots {
-      font-size: 10px;
+      font-size: 11px;
     }
     .inventory-body-col .inventory-mini-btn {
       font-size: 7px;

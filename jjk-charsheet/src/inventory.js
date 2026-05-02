@@ -8,6 +8,7 @@ let draggingItemId = null;
 let dragGhostEl = null;
 const expandedDescriptionIds = new Set();
 let openEquipPickerItemId = null;
+let openYenAdjustMode = null;
 
 function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
@@ -126,6 +127,66 @@ function parseYenValue(rawValue) {
   const parsed = parseInt(rawValue, 10);
   if (!Number.isFinite(parsed)) return 0;
   return Math.max(0, parsed);
+}
+
+function parseYenInputText(rawValue) {
+  const digitsOnly = String(rawValue ?? "").replace(/[^\d]/g, "");
+  if (!digitsOnly) return 0;
+  return parseYenValue(digitsOnly);
+}
+
+function formatYenValue(value) {
+  return parseYenValue(value).toLocaleString("en-US");
+}
+
+function setYenInputDisplay(value) {
+  const yenInput = document.getElementById("yenInput");
+  if (!yenInput) return;
+  yenInput.value = formatYenValue(value);
+}
+
+function closeYenAdjustPopover() {
+  const popover = document.getElementById("yenAdjustPopover");
+  if (!popover) return;
+  openYenAdjustMode = null;
+  popover.hidden = true;
+}
+
+function openYenAdjustPopoverFor(mode) {
+  const popover = document.getElementById("yenAdjustPopover");
+  const title = document.getElementById("yenAdjustTitle");
+  const amountInput = document.getElementById("yenAdjustAmountInput");
+  if (!popover || !title || !amountInput) return;
+
+  openYenAdjustMode = mode;
+  title.textContent = mode === "add" ? "Add Yen" : "Deduct Yen";
+  amountInput.value = "";
+  popover.hidden = false;
+  amountInput.focus();
+}
+
+function applyYenAdjustFromPopover() {
+  if (!openYenAdjustMode) return;
+
+  const amountInput = document.getElementById("yenAdjustAmountInput");
+  const state = getState();
+  if (!amountInput || !state) return;
+
+  const amount = parseYenInputText(amountInput.value);
+  if (amount <= 0) {
+    closeYenAdjustPopover();
+    return;
+  }
+
+  const currentYen = parseYenValue(state.yen);
+  const nextYen = openYenAdjustMode === "add"
+    ? currentYen + amount
+    : Math.max(0, currentYen - amount);
+
+  state.yen = nextYen;
+  setYenInputDisplay(nextYen);
+  closeYenAdjustPopover();
+  scheduleSave();
 }
 
 function makeItemId() {
@@ -691,7 +752,10 @@ function saveItemFromForm() {
 }
 
 function renderInventoryItemCard(item, controlsHtml, locationTag) {
-  const modifier = item.modifier ? `<div class="inventory-item-modifier">${escapeHtml(item.modifier)}</div>` : "";
+  const modifierPrefix = locationTag === "Stored" ? "Inactive: " : "";
+  const modifier = item.modifier
+    ? `<div class="inventory-item-modifier">${modifierPrefix}${escapeHtml(item.modifier)}</div>`
+    : "";
   const hasDescription = Boolean(item.description);
   const isDescriptionExpanded = expandedDescriptionIds.has(item.id);
   const description = hasDescription
@@ -710,7 +774,7 @@ function renderInventoryItemCard(item, controlsHtml, locationTag) {
   } else {
     if (normalizedType === "clothing" && equipText) details.push(`Equip: ${equipText}`);
     if ((parseInt(item.slotsNeeded, 10) || 1) > 1) {
-      details.push(`Needs ${item.slotsNeeded} slots`);
+      details.push(`${item.slotsNeeded} Slots`);
     }
   }
 
@@ -768,7 +832,7 @@ function renderEquippedSlots() {
         ${occupies ? `<div class="equipped-slot-meta">${occupies}</div>` : ""}
         ${hasDescription ? renderDescriptionToggleButton(isDescriptionExpanded) : ""}
         ${hasDescription ? `<div class="equipped-slot-desc${isDescriptionExpanded ? "" : " collapsed"}">${escapeHtml(item.description)}</div>` : ""}
-        ${item.modifier ? `<div class="equipped-slot-mod">Active: ${escapeHtml(item.modifier)}</div>` : ""}
+        ${item.modifier ? `<div class="equipped-slot-mod">${escapeHtml(item.modifier)}</div>` : ""}
         <div class="equipped-slot-actions">
           <button type="button" class="inventory-mini-btn" data-action="unequipToInventory">To Inventory</button>
           ${isItemTypeDormRestricted(item) ? "" : '<button type="button" class="inventory-mini-btn" data-action="unequipToDorm">To Storage</button>'}
@@ -1217,8 +1281,7 @@ function ensureInventoryStateShape() {
 export function renderInventory() {
   ensureInventoryStateShape();
   const state = getState();
-  const yenInput = document.getElementById("yenInput");
-  if (yenInput) yenInput.value = parseYenValue(state?.yen);
+  setYenInputDisplay(state?.yen);
   renderEquippedSlots();
   renderInventorySlots();
   renderDormInventory();
@@ -1239,11 +1302,17 @@ export function initInventory({ getState: getStateFn, scheduleSave: scheduleSave
   const inventoryList = document.getElementById("inventorySlotsList");
   const dormList = document.getElementById("dormInventoryList");
   const yenInput = document.getElementById("yenInput");
+  const addYenBtn = document.querySelector("button[data-yen-adjust='add']");
+  const subtractYenBtn = document.querySelector("button[data-yen-adjust='subtract']");
+  const yenAdjustPopover = document.getElementById("yenAdjustPopover");
+  const yenAdjustAmountInput = document.getElementById("yenAdjustAmountInput");
+  const yenAdjustApplyBtn = document.getElementById("yenAdjustApplyBtn");
+  const yenAdjustCancelBtn = document.getElementById("yenAdjustCancelBtn");
   const editorToggleBtn = document.getElementById("toggleItemEditorBtn");
   const dormToggleBtn = document.getElementById("dormToggleBtn");
   const itemTypeSelect = document.getElementById("itemTypeSelect");
 
-  if (!saveBtn || !cancelBtn || !equippedGrid || !inventoryList || !dormList || !yenInput || !editorToggleBtn || !dormToggleBtn || !itemTypeSelect) return;
+  if (!saveBtn || !cancelBtn || !equippedGrid || !inventoryList || !dormList || !yenInput || !addYenBtn || !subtractYenBtn || !yenAdjustPopover || !yenAdjustAmountInput || !yenAdjustApplyBtn || !yenAdjustCancelBtn || !editorToggleBtn || !dormToggleBtn || !itemTypeSelect) return;
 
   saveBtn.addEventListener("click", saveItemFromForm);
   cancelBtn.addEventListener("click", resetItemEditor);
@@ -1264,17 +1333,61 @@ export function initInventory({ getState: getStateFn, scheduleSave: scheduleSave
   });
 
   document.addEventListener("click", event => {
-    if (!openEquipPickerItemId) return;
-    const clickedInsidePicker = event.target.closest(".inventory-equip-picker");
-    const clickedEquipBtn = event.target.closest("button[data-action='equipItem']");
-    if (clickedInsidePicker || clickedEquipBtn) return;
-    closeEquipPicker();
+    if (openEquipPickerItemId) {
+      const clickedInsidePicker = event.target.closest(".inventory-equip-picker");
+      const clickedEquipBtn = event.target.closest("button[data-action='equipItem']");
+      if (!clickedInsidePicker && !clickedEquipBtn) closeEquipPicker();
+    }
+
+    if (openYenAdjustMode) {
+      const clickedInsideYenPopover = event.target.closest("#yenAdjustPopover");
+      const clickedYenAdjustBtn = event.target.closest("button[data-yen-adjust]");
+      if (!clickedInsideYenPopover && !clickedYenAdjustBtn) closeYenAdjustPopover();
+    }
   });
 
   yenInput.addEventListener("input", e => {
     const state = getState();
-    state.yen = parseYenValue(e.target.value);
+    const nextValue = parseYenInputText(e.target.value);
+    state.yen = nextValue;
+    e.target.value = nextValue ? formatYenValue(nextValue) : "";
     scheduleSave();
+  });
+
+  yenInput.addEventListener("blur", () => {
+    const state = getState();
+    setYenInputDisplay(state?.yen || 0);
+  });
+
+  addYenBtn.addEventListener("click", () => {
+    openYenAdjustPopoverFor("add");
+  });
+
+  subtractYenBtn.addEventListener("click", () => {
+    openYenAdjustPopoverFor("subtract");
+  });
+
+  yenAdjustApplyBtn.addEventListener("click", () => {
+    applyYenAdjustFromPopover();
+  });
+
+  yenAdjustCancelBtn.addEventListener("click", () => {
+    closeYenAdjustPopover();
+  });
+
+  yenAdjustAmountInput.addEventListener("input", e => {
+    const value = parseYenInputText(e.target.value);
+    e.target.value = value ? formatYenValue(value) : "";
+  });
+
+  yenAdjustAmountInput.addEventListener("keydown", e => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      applyYenAdjustFromPopover();
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      closeYenAdjustPopover();
+    }
   });
 
   [equippedGrid, inventoryList, dormList].forEach(el => {

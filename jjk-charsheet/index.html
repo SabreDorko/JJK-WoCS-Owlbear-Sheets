@@ -216,14 +216,25 @@
               <span class="field-label">Yen</span>
               <div class="inventory-yen-input-wrap">
                 <span class="inventory-yen-symbol" aria-hidden="true">¥</span>
-                <input id="yenInput" class="meta-input inventory-yen-input" type="number" min="0" step="1" placeholder="0" />
+                <input id="yenInput" class="meta-input inventory-yen-input" type="text" inputmode="numeric" placeholder="0" />
+                <button type="button" class="inventory-mini-btn inventory-yen-adjust-btn" data-yen-adjust="add" aria-label="Add yen" title="Add yen">+</button>
+                <button type="button" class="inventory-mini-btn inventory-yen-adjust-btn" data-yen-adjust="subtract" aria-label="Deduct yen" title="Deduct yen">-</button>
+              </div>
+              <div id="yenAdjustPopover" class="inventory-yen-popover" hidden>
+                <div id="yenAdjustTitle" class="inventory-yen-popover-title">Adjust Yen</div>
+                <div class="inventory-yen-popover-row">
+                  <span class="inventory-yen-symbol" aria-hidden="true">¥</span>
+                  <input id="yenAdjustAmountInput" class="meta-input inventory-yen-adjust-input" type="text" inputmode="numeric" placeholder="0" />
+                  <button id="yenAdjustApplyBtn" type="button" class="inventory-mini-btn">Apply</button>
+                  <button id="yenAdjustCancelBtn" type="button" class="inventory-mini-btn">Cancel</button>
+                </div>
               </div>
             </label>
           </div>
 
           <div class="inventory-card inventory-active-card">
-            <div class="inventory-card-title">Active Inventory (5 Slots)</div>
-            <div class="inventory-card-note">Drag and drop items into slots. Modifiers are inactive here.</div>
+            <div class="inventory-card-title">Inventory</div>
+            <div class="inventory-card-note">Modifiers are inactive here.</div>
             <div id="inventorySlotsList" class="inventory-slot-list" data-drop-zone="inventory-list"></div>
           </div>
 
@@ -307,7 +318,7 @@
         <div class="inventory-body-col">
           <div class="inventory-card inventory-body-card">
             <div class="inventory-card-title">Equipped Body Slots</div>
-            <div class="inventory-card-note">Drop items on body boxes to equip. Equipped modifiers are active.</div>
+            <div class="inventory-card-note">Equipped modifiers are active.</div>
             <div id="equippedSlotsGrid" class="equipped-slots-grid"></div>
           </div>
         </div>
