@@ -964,6 +964,20 @@ function renderEquippedSlots() {
     }
 
     const normalizedType = normalizeItemType(item.itemType);
+    const primarySlot = item.equippedSlots?.[0] || slot;
+    const isSecondarySlot = item.equippedSlots.length > 1 && slot !== primarySlot;
+    const occupyingSlotsText = item.equippedSlots.map(key => BODY_SLOT_LABELS[key]).join(", ");
+
+    if (isSecondarySlot) {
+      return `
+      <div class="equipped-slot-card is-secondary" data-item-id="${item.id}" data-slot-key="${slot}" data-drop-zone="equipped-slot">
+        <div class="equipped-slot-label">${BODY_SLOT_LABELS[slot]}</div>
+        <div class="equipped-slot-item">${escapeHtml(item.name)}</div>
+        <div class="equipped-slot-meta equipped-slot-link">Equipped: ${occupyingSlotsText}</div>
+      </div>
+    `;
+    }
+
     const quantityText = normalizedType === "item" && parseStackableValue(item.stackable)
       ? `<div class="inventory-item-amount-row"><div class="inventory-item-amount">Amount: ${parseItemQuantity(item.quantity)}</div>${renderQuantityControls(item)}</div>`
       : "";
