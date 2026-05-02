@@ -922,12 +922,12 @@
     .inventory-creator-wrap {
       display: flex;
       align-items: center;
-      justify-content: flex-end;
+      justify-content: flex-start;
       gap: 8px;
-      margin-top: -2px;
-      position: sticky;
-      top: 8px;
-      z-index: 5;
+      margin-top: 6px;
+      min-height: 30px;
+      position: static;
+      width: 100%;
     }
     .inventory-type-toolbar {
       flex: 1 1 auto;
@@ -974,10 +974,10 @@
       transition: transform 220ms ease, opacity 160ms ease;
     }
     .inventory-plus-btn.is-open {
-      transform: rotate(180deg);
+      transform: none;
     }
     .inventory-plus-btn.is-open .inventory-plus-icon {
-      transform: rotate(-180deg);
+      transform: rotate(180deg);
     }
     .inventory-plus-btn.is-open .inventory-plus-icon-line-vertical {
       transform: scaleY(0);
@@ -1010,16 +1010,16 @@
     }
     .inventory-type-tabs {
       display: flex;
-      flex-wrap: wrap;
+      flex-wrap: nowrap;
       gap: 6px;
       padding: 6px;
       border: 1px solid var(--border);
       background: rgba(240, 235, 224, 0.7);
       width: 100%;
-      justify-content: flex-end;
+      justify-content: flex-start;
     }
     .inventory-type-tab {
-      flex: 1 1 110px;
+      flex: 1 1 0;
       min-width: 0;
       border: 1px solid var(--border-strong);
       background: transparent;
@@ -1029,6 +1029,8 @@
       letter-spacing: 0.8px;
       text-transform: uppercase;
       padding: 7px 8px;
+      line-height: 1.15;
+      text-align: center;
       cursor: pointer;
       transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
     }
