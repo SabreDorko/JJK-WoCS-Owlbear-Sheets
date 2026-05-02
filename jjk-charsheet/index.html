@@ -1147,10 +1147,15 @@
 // ── OBR SDK ──────────────────────────────────────────────────────────────────
 import OBR from "https://cdn.jsdelivr.net/npm/@owlbear-rodeo/sdk@3.1.0/+esm";
 
-const STORAGE_KEY = "jjk-charsheet-v1";
+const STORAGE_KEY_BASE = "jjk-charsheet-v1";
 const ROLL_BROADCAST_CHANNEL = "jjk-roll-v1";
 const PARTY_BROADCAST_CHANNEL = "jjk-party-v1";
 const PARTY_SYNC_REQUEST_CHANNEL = "jjk-party-sync-v1";
+
+// Generate player-specific storage key
+function getStorageKey() {
+  return localPlayerId ? `${STORAGE_KEY_BASE}-${localPlayerId}` : STORAGE_KEY_BASE;
+}
 // ── ARCHETYPES ────────────────────────────────────────────────────────────────
 const ARCHETYPES = {
   acrobat:       ["Untouchable", "Link"],
@@ -1615,21 +1620,31 @@ function scheduleSave() {
 
 async function saveState() {
   try {
-    await OBR.room.setMetadata({ [STORAGE_KEY]: state });
+    const key = getStorageKey();
+    await OBR.room.setMetadata({ [key]: state });
   } catch (e) {
     // Outside OBR — use localStorage fallback for dev
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    const key = getStorageKey();
+    localStorage.setItem(key, JSON.stringify(state));
   }
   broadcastPartySnapshot();
 }
 
 async function loadState() {
+  const key = getStorageKey();
   try {
     const meta = await OBR.room.getMetadata();
-    if (meta[STORAGE_KEY]) return meta[STORAGE_KEY];
+    // Try player-specific key first
+    if (meta[key]) return meta[key];
+    // Fallback to old shared key for backwards compatibility (migration)
+    if (meta[STORAGE_KEY_BASE]) return meta[STORAGE_KEY_BASE];
   } catch (e) {
-    const saved = localStorage.getItem(STORAGE_KEY);
+    // Try player-specific localStorage
+    const saved = localStorage.getItem(key);
     if (saved) return JSON.parse(saved);
+    // Fallback to old shared key
+    const oldSaved = localStorage.getItem(STORAGE_KEY_BASE);
+    if (oldSaved) return JSON.parse(oldSaved);
   }
   return null;
 }
