@@ -680,7 +680,7 @@ function renderInventoryItemCard(item, controlsHtml, locationTag) {
   const details = [];
 
   if (normalizedType === "weapon") {
-    if (normalizeWeaponGrip(item.weaponGrip, item.slotsNeeded) === "twoHanded") details.push("Two-Handed");
+    details.push(normalizeWeaponGrip(item.weaponGrip, item.slotsNeeded) === "twoHanded" ? "Two-Handed" : "One-Handed");
   } else {
     if (normalizedType === "clothing" && equipText) details.push(`Equip: ${equipText}`);
     if ((parseInt(item.slotsNeeded, 10) || 1) > 1) {
@@ -688,7 +688,7 @@ function renderInventoryItemCard(item, controlsHtml, locationTag) {
     }
   }
 
-  const slotsMeta = [`Type: ${typeLabel}`, ...details].join(" | ");
+  const slotsMeta = [typeLabel, ...details].join(" | ");
 
   return `
     <div class="inventory-item-card" data-item-id="${item.id}" draggable="true">
@@ -722,13 +722,15 @@ function renderEquippedSlots() {
       `;
     }
 
-    const occupies = item.equippedSlots.map(key => BODY_SLOT_LABELS[key]).join(", ");
-    const shouldShowOccupiesMeta = normalizeItemType(item.itemType) !== "weapon" && item.equippedSlots.length > 1;
+    const normalizedType = normalizeItemType(item.itemType);
+    const weaponHandedness = normalizedType === "weapon"
+      ? (normalizeWeaponGrip(item.weaponGrip, item.slotsNeeded) === "twoHanded" ? "Two-Handed" : "One-Handed")
+      : "";
     return `
       <div class="equipped-slot-card" data-item-id="${item.id}" data-slot-key="${slot}" data-drop-zone="equipped-slot" draggable="true">
         <div class="equipped-slot-label">${BODY_SLOT_LABELS[slot]}</div>
         <div class="equipped-slot-item">${escapeHtml(item.name)}</div>
-        ${shouldShowOccupiesMeta ? `<div class="equipped-slot-meta">Occupies: ${occupies}</div>` : ""}
+        ${weaponHandedness ? `<div class="equipped-slot-meta">${weaponHandedness}</div>` : ""}
         ${item.modifier ? `<div class="equipped-slot-mod">Active: ${escapeHtml(item.modifier)}</div>` : ""}
         <div class="equipped-slot-actions">
           <button type="button" class="inventory-mini-btn" data-action="unequipToInventory">To Inventory</button>
