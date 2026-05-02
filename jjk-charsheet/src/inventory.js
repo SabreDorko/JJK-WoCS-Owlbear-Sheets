@@ -162,7 +162,6 @@ function getEquipSlotsForItem(item, preferredPrimarySlot) {
 
   const tryPrimary = (primary) => {
     if (primary && !allowed.includes(primary)) return null;
-    if (primary && !isSlotUsable(primary)) return null;
 
     const chosen = [];
     if (primary) chosen.push(primary);
@@ -299,17 +298,28 @@ function moveItemToEquippedSlot(item, slotKey, options = {}) {
   let displacedPlacementResult = { ok: false, message: "Could not place swapped item." };
   if (sourcePlacement.location === "inventory" && Number.isInteger(sourcePlacement.inventorySlot)) {
     displacedPlacementResult = placeItemInInventorySlot(displacedItem, sourcePlacement.inventorySlot)
-      ? { ok: true }
+      ? { ok: true, message: `${displacedItem.name} moved to Inventory Slot ${sourcePlacement.inventorySlot + 1}.` }
       : { ok: false, message: "Could not place swapped item into original inventory slot." };
   } else if (sourcePlacement.location === "dorm") {
     displacedPlacementResult = placeItemInDorm(displacedItem)
-      ? { ok: true }
+      ? { ok: true, message: `${displacedItem.name} moved to Dorm.` }
       : { ok: false, message: "Could not place swapped item into dorm." };
   } else if (sourcePlacement.location === "equipped") {
-    const reEquipResult = placeItemEquipped(displacedItem, sourcePlacement.preferredSlot);
-    displacedPlacementResult = reEquipResult.ok
-      ? { ok: true }
-      : { ok: false, message: reEquipResult.message || "Swapped item cannot be equipped into the original slot." };
+    if (placeItemEquipped(displacedItem, sourcePlacement.preferredSlot).ok) {
+      displacedPlacementResult = { ok: true };
+    } else if (placeItemInFirstFreeInventorySlot(displacedItem)) {
+      displacedPlacementResult = {
+        ok: true,
+        message: `${displacedItem.name} moved to Inventory Slot ${displacedItem.inventorySlot + 1} (original slot unavailable).`,
+      };
+    } else if (placeItemInDorm(displacedItem)) {
+      displacedPlacementResult = {
+        ok: true,
+        message: `${displacedItem.name} moved to Dorm (original slot unavailable).`,
+      };
+    } else {
+      displacedPlacementResult = { ok: false, message: "Swapped item cannot be moved from target slot." };
+    }
   }
 
   return finalize(displacedPlacementResult.ok ? { ok: true } : displacedPlacementResult);
@@ -493,11 +503,12 @@ function renderEquippedSlots() {
     }
 
     const occupies = item.equippedSlots.map(key => BODY_SLOT_LABELS[key]).join(", ");
+    const shouldShowOccupiesMeta = !(item.equippedSlots.length === 1 && countInternalAllowedSlots(item.allowedSlots) === 1);
     return `
       <div class="equipped-slot-card" data-item-id="${item.id}" data-slot-key="${slot}" data-drop-zone="equipped-slot" draggable="true">
         <div class="equipped-slot-label">${BODY_SLOT_LABELS[slot]}</div>
         <div class="equipped-slot-item">${escapeHtml(item.name)}</div>
-        <div class="equipped-slot-meta">Occupies: ${occupies}</div>
+        ${shouldShowOccupiesMeta ? `<div class="equipped-slot-meta">Occupies: ${occupies}</div>` : ""}
         ${item.modifier ? `<div class="equipped-slot-mod">Active: ${escapeHtml(item.modifier)}</div>` : ""}
         <div class="equipped-slot-actions">
           <button type="button" class="inventory-mini-btn" data-action="unequipToInventory">To Inventory</button>
@@ -597,7 +608,7 @@ function handleInventoryActions(event) {
     const result = moveItemToEquippedSlot(item, preferredSlot || null);
     renderInventory();
     scheduleSave();
-    if (!result.ok) setItemFormError(result.message);
+    setItemFormError(result.message || "");
     return;
   }
 
@@ -773,7 +784,7 @@ function handleInventoryDrop(event) {
 
   hideDragGhost();
   draggingItemId = null;
-  setItemFormError("");
+  setItemFormError(result.message || "");
   renderInventory();
   scheduleSave();
 }
