@@ -776,7 +776,7 @@ function saveItemFromForm() {
     return;
   }
   if (slotsNeeded > countInternalAllowedSlots(allowedSlots)) {
-          <path fill="currentColor" d="M9 3a1 1 0 0 0-1 1v1H5a1 1 0 1 0 0 2h.293l.853 12.789A2 2 0 0 0 8.14 22h7.72a2 2 0 0 0 1.994-2.211L18.707 7H19a1 1 0 1 0 0-2h-3V4a1 1 0 0 0-1-1H9Zm2 4a1 1 0 0 1 1 1v10a1 1 0 1 1-2 0V8a1 1 0 0 1 1-1Zm4 1a1 1 0 1 0-2 0v10a1 1 0 1 0 2 0V8Z"/>
+    setItemFormError("Body slots needed cannot be greater than selected allowed slots.");
     return;
   }
 
