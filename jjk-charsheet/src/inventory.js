@@ -28,7 +28,62 @@ function scheduleSave() {
   if (_scheduleSave) _scheduleSave();
 }
 
-const SELECTABLE_SLOT_KEYS = [...BODY_SLOT_KEYS, "accessory"];
+const HAND_SLOT_KEYS = ["rightHand", "leftHand"];
+const CLOTHING_SELECTABLE_SLOT_KEYS = ["head", "chest", "back", "legs", "feet", "accessory"];
+const ITEM_TYPES = ["clothing", "weapon", "item"];
+
+function normalizeItemType(rawType) {
+  return ITEM_TYPES.includes(rawType) ? rawType : "clothing";
+}
+
+function normalizeWeaponGrip(rawGrip, slotsNeeded) {
+  if (rawGrip === "twoHanded" || rawGrip === "oneHanded") return rawGrip;
+  return clamp(parseInt(slotsNeeded, 10) || 1, 1, 3) >= 2 ? "twoHanded" : "oneHanded";
+}
+
+function getItemTypeLabel(itemType) {
+  if (itemType === "weapon") return "Weapon";
+  if (itemType === "item") return "Item";
+  return "Clothing/Accessory";
+}
+
+function isItemTypeDormRestricted(item) {
+  return normalizeItemType(item?.itemType) === "item";
+}
+
+function getInternalAllowedSlots(item) {
+  return [...new Set((item.allowedSlots || []).flatMap(toInternalEquipSlots))].filter(slot => BODY_SLOT_KEYS.includes(slot));
+}
+
+function applyItemTypeDefaults(item) {
+  const itemType = normalizeItemType(item.itemType);
+  item.itemType = itemType;
+
+  if (itemType === "weapon") {
+    item.weaponGrip = normalizeWeaponGrip(item.weaponGrip, item.slotsNeeded);
+    item.allowedSlots = ["rightHand", "leftHand"];
+    item.slotsNeeded = item.weaponGrip === "twoHanded" ? 2 : 1;
+    return;
+  }
+
+  if (itemType === "item") {
+    item.weaponGrip = null;
+    item.allowedSlots = ["rightHand", "leftHand"];
+    item.slotsNeeded = 1;
+    return;
+  }
+
+  item.weaponGrip = null;
+  item.allowedSlots = normalizeAllowedSlots(item.allowedSlots).filter(slot => CLOTHING_SELECTABLE_SLOT_KEYS.includes(slot));
+  item.slotsNeeded = clamp(parseInt(item.slotsNeeded, 10) || 1, 1, 3);
+}
+
+function inferLegacyItemType(item) {
+  const allowed = normalizeAllowedSlots(item?.allowedSlots);
+  const internalAllowed = [...new Set(allowed.flatMap(toInternalEquipSlots))];
+  const onlyHands = internalAllowed.length > 0 && internalAllowed.every(slot => HAND_SLOT_KEYS.includes(slot));
+  return onlyHands ? "weapon" : "clothing";
+}
 
 function toInternalEquipSlots(slot) {
   if (slot === "accessory") return ["accessory1", "accessory2"];
@@ -127,6 +182,7 @@ function placeItemInFirstFreeInventorySlot(item) {
 }
 
 function placeItemInDorm(item) {
+  if (isItemTypeDormRestricted(item)) return false;
   const state = getState();
   removeItemFromContainers(item);
   item.location = "dorm";
@@ -136,7 +192,7 @@ function placeItemInDorm(item) {
 
 function getEquipSlotsForItem(item, preferredPrimarySlot) {
   const state = getState();
-  const allowed = [...new Set((item.allowedSlots || []).flatMap(toInternalEquipSlots))].filter(slot => BODY_SLOT_KEYS.includes(slot));
+  const allowed = getInternalAllowedSlots(item);
   if (!allowed.length) return { ok: false, message: "This item has no equip slots selected." };
 
   const slotsNeeded = clamp(parseInt(item.slotsNeeded, 10) || 1, 1, 3);
@@ -265,7 +321,7 @@ function restoreInventoryPlacementState(snapshot) {
 }
 
 function moveItemToEquippedSlot(item, slotKey, options = {}) {
-  const { dryRun = false } = options;
+  const { dryRun = false, strictTarget = false } = options;
   const state = getState();
 
   // Generic accessory target should try both concrete accessory slots.
@@ -297,7 +353,10 @@ function moveItemToEquippedSlot(item, slotKey, options = {}) {
 
   // Normal equip when target slot is empty (or already occupied by this item).
   if (!slotKey || !targetOccupantId || targetOccupantId === item.id) {
-    return finalize(placeItemEquipped(item, slotKey || null));
+    const equipResult = placeItemEquipped(item, slotKey || null);
+    if (!equipResult.ok) return finalize(equipResult);
+    if (!strictTarget || !slotKey || item.equippedSlots.includes(slotKey)) return finalize(equipResult);
+    return finalize({ ok: false, message: `Cannot equip to ${BODY_SLOT_LABELS[slotKey] || slotKey}.` });
   }
 
   const displacedItem = getInventoryItemById(targetOccupantId);
@@ -374,6 +433,10 @@ function moveItemToEquippedSlot(item, slotKey, options = {}) {
     }
   }
 
+  if (displacedPlacementResult.ok && strictTarget && slotKey && !item.equippedSlots.includes(slotKey)) {
+    return finalize({ ok: false, message: `Cannot equip to ${BODY_SLOT_LABELS[slotKey] || slotKey}.` });
+  }
+
   return finalize(displacedPlacementResult.ok ? { ok: true } : displacedPlacementResult);
 }
 
@@ -392,7 +455,67 @@ function deleteInventoryItem(itemId) {
 function collectAllowedSlotsFromForm() {
   return Array.from(document.querySelectorAll("#itemAllowedSlots input[type='checkbox']:checked"))
     .map(input => input.value)
-    .filter(slot => SELECTABLE_SLOT_KEYS.includes(slot));
+    .filter(slot => CLOTHING_SELECTABLE_SLOT_KEYS.includes(slot));
+}
+
+function setItemTypeFieldsVisibility(itemType) {
+  const slotsNeededField = document.getElementById("itemSlotsNeededField");
+  const slotsNeededLabel = document.getElementById("itemSlotsNeededLabel");
+  const allowedSlotsField = document.getElementById("itemAllowedSlotsField");
+  const weaponGripField = document.getElementById("itemWeaponGripField");
+  const preferredLocation = document.getElementById("itemPreferredLocation");
+  if (!slotsNeededField || !slotsNeededLabel || !allowedSlotsField || !weaponGripField || !preferredLocation) return;
+
+  const isClothing = itemType === "clothing";
+  const isWeapon = itemType === "weapon";
+  const isItem = itemType === "item";
+
+  slotsNeededLabel.textContent = isClothing ? "Body Slots Needed" : "Slots Needed";
+  slotsNeededField.hidden = !isClothing;
+  allowedSlotsField.hidden = !isClothing;
+  weaponGripField.hidden = !isWeapon;
+
+  const dormOption = preferredLocation.querySelector("option[value='dorm']");
+  if (dormOption) {
+    dormOption.disabled = isItem;
+    dormOption.hidden = isItem;
+  }
+  if (isItem && preferredLocation.value === "dorm") preferredLocation.value = "inventory";
+}
+
+function getItemTypeFromForm() {
+  const select = document.getElementById("itemTypeSelect");
+  return normalizeItemType(select?.value);
+}
+
+function getItemConfigFromForm() {
+  const itemType = getItemTypeFromForm();
+  if (itemType === "weapon") {
+    const gripSelect = document.getElementById("itemWeaponGripSelect");
+    const weaponGrip = normalizeWeaponGrip(gripSelect?.value, 1);
+    return {
+      itemType,
+      weaponGrip,
+      allowedSlots: ["rightHand", "leftHand"],
+      slotsNeeded: weaponGrip === "twoHanded" ? 2 : 1,
+    };
+  }
+
+  if (itemType === "item") {
+    return {
+      itemType,
+      weaponGrip: null,
+      allowedSlots: ["rightHand", "leftHand"],
+      slotsNeeded: 1,
+    };
+  }
+
+  return {
+    itemType,
+    weaponGrip: null,
+    allowedSlots: collectAllowedSlotsFromForm(),
+    slotsNeeded: clamp(parseInt(document.getElementById("itemSlotsNeededSelect")?.value, 10) || 1, 1, 3),
+  };
 }
 
 function resetItemEditor() {
@@ -404,11 +527,14 @@ function resetItemEditor() {
   document.getElementById("itemNameInput").value = "";
   document.getElementById("itemModifierInput").value = "";
   document.getElementById("itemDescriptionInput").value = "";
+  document.getElementById("itemTypeSelect").value = "clothing";
+  document.getElementById("itemWeaponGripSelect").value = "oneHanded";
   document.getElementById("itemSlotsNeededSelect").value = "1";
   document.getElementById("itemPreferredLocation").value = "inventory";
   document.querySelectorAll("#itemAllowedSlots input[type='checkbox']").forEach(input => {
     input.checked = false;
   });
+  setItemTypeFieldsVisibility("clothing");
   document.getElementById("saveItemBtn").textContent = "Save Item";
   document.getElementById("cancelEditItemBtn").style.display = "none";
   setItemFormError("");
@@ -424,11 +550,14 @@ function startItemEdit(itemId) {
   document.getElementById("itemNameInput").value = item.name;
   document.getElementById("itemModifierInput").value = item.modifier;
   document.getElementById("itemDescriptionInput").value = item.description;
+  document.getElementById("itemTypeSelect").value = normalizeItemType(item.itemType);
+  document.getElementById("itemWeaponGripSelect").value = normalizeWeaponGrip(item.weaponGrip, item.slotsNeeded);
   document.getElementById("itemSlotsNeededSelect").value = String(item.slotsNeeded || 1);
   document.getElementById("itemPreferredLocation").value = item.location === "equipped" ? "equipped" : item.location;
   document.querySelectorAll("#itemAllowedSlots input[type='checkbox']").forEach(input => {
     input.checked = item.allowedSlots.includes(input.value);
   });
+  setItemTypeFieldsVisibility(normalizeItemType(item.itemType));
   document.getElementById("saveItemBtn").textContent = "Update Item";
   document.getElementById("cancelEditItemBtn").style.display = "";
   setItemFormError("");
@@ -440,9 +569,13 @@ function saveItemFromForm() {
   const name = document.getElementById("itemNameInput").value.trim();
   const modifier = document.getElementById("itemModifierInput").value.trim();
   const description = document.getElementById("itemDescriptionInput").value.trim();
-  const slotsNeeded = clamp(parseInt(document.getElementById("itemSlotsNeededSelect").value, 10) || 1, 1, 3);
-  const preferredLocation = document.getElementById("itemPreferredLocation").value;
-  const allowedSlots = collectAllowedSlotsFromForm();
+  const itemConfig = getItemConfigFromForm();
+  const slotsNeeded = itemConfig.slotsNeeded;
+  const requestedLocation = document.getElementById("itemPreferredLocation").value;
+  const preferredLocation = itemConfig.itemType === "item" && requestedLocation === "dorm"
+    ? "inventory"
+    : requestedLocation;
+  const allowedSlots = itemConfig.allowedSlots;
 
   if (!name) {
     setItemFormError("Item name is required.");
@@ -460,6 +593,8 @@ function saveItemFromForm() {
       name,
       modifier,
       description,
+      itemType: itemConfig.itemType,
+      weaponGrip: itemConfig.weaponGrip,
       allowedSlots,
       slotsNeeded,
       location: "dorm",
@@ -471,23 +606,36 @@ function saveItemFromForm() {
     item.name = name;
     item.modifier = modifier;
     item.description = description;
+    item.itemType = itemConfig.itemType;
+    item.weaponGrip = itemConfig.weaponGrip;
     item.allowedSlots = allowedSlots;
     item.slotsNeeded = slotsNeeded;
   }
+
+  applyItemTypeDefaults(item);
 
   let placementResult = { ok: true };
   if (preferredLocation === "equipped") {
     placementResult = placeItemEquipped(item);
     if (!placementResult.ok) {
-      if (!placeItemInFirstFreeInventorySlot(item)) placeItemInDorm(item);
+      if (!placeItemInFirstFreeInventorySlot(item)) {
+        if (!placeItemInDorm(item)) {
+          placementResult = { ok: false, message: "No valid space found. Free an inventory slot or hand slot." };
+        }
+      }
     }
   } else if (preferredLocation === "inventory") {
     if (!placeItemInFirstFreeInventorySlot(item)) {
-      placeItemInDorm(item);
-      placementResult = { ok: false, message: "Active inventory is full. Item sent to dorm storage." };
+      if (placeItemInDorm(item)) {
+        placementResult = { ok: false, message: "Active inventory is full. Item sent to dorm storage." };
+      } else {
+        placementResult = { ok: false, message: "Active inventory is full. Free a slot first." };
+      }
     }
   } else {
-    placeItemInDorm(item);
+    if (!placeItemInDorm(item)) {
+      placementResult = { ok: false, message: "This item group cannot be stored in dorm." };
+    }
   }
 
   renderInventory();
@@ -521,6 +669,11 @@ function buildEquipSelectOptions(itemId, allowedSlots) {
 function renderInventoryItemCard(item, controlsHtml, locationTag) {
   const modifier = item.modifier ? `<div class="inventory-item-modifier">${escapeHtml(item.modifier)}</div>` : "";
   const description = item.description ? `<div class="inventory-item-desc">${escapeHtml(item.description)}</div>` : "";
+  const typeLabel = getItemTypeLabel(normalizeItemType(item.itemType));
+  const equipText = item.allowedSlots.map(slot => getAllowedSlotLabel(slot)).join(", ") || "None";
+  const needsText = item.slotsNeeded === 2 && normalizeItemType(item.itemType) === "weapon"
+    ? "Two-Handed"
+    : `Needs ${item.slotsNeeded} slot${item.slotsNeeded > 1 ? "s" : ""}`;
 
   return `
     <div class="inventory-item-card" data-item-id="${item.id}" draggable="true">
@@ -530,7 +683,7 @@ function renderInventoryItemCard(item, controlsHtml, locationTag) {
       </div>
       ${modifier}
       ${description}
-      <div class="inventory-item-slots">Equip: ${item.allowedSlots.map(slot => getAllowedSlotLabel(slot)).join(", ") || "None"} | Needs ${item.slotsNeeded} slot${item.slotsNeeded > 1 ? "s" : ""}</div>
+      <div class="inventory-item-slots">Type: ${typeLabel} | Equip: ${equipText} | ${needsText}</div>
       <div class="inventory-item-actions">${controlsHtml}</div>
     </div>
   `;
@@ -564,7 +717,7 @@ function renderEquippedSlots() {
         ${item.modifier ? `<div class="equipped-slot-mod">Active: ${escapeHtml(item.modifier)}</div>` : ""}
         <div class="equipped-slot-actions">
           <button type="button" class="inventory-mini-btn" data-action="unequipToInventory">To Inventory</button>
-          <button type="button" class="inventory-mini-btn" data-action="unequipToDorm">To Dorm</button>
+          ${isItemTypeDormRestricted(item) ? "" : '<button type="button" class="inventory-mini-btn" data-action="unequipToDorm">To Dorm</button>'}
           <button type="button" class="inventory-mini-btn" data-action="editItem">Edit</button>
           <button type="button" class="inventory-mini-btn danger" data-action="deleteItem">Delete</button>
         </div>
@@ -594,7 +747,7 @@ function renderInventorySlots() {
     const controls = `
       ${buildEquipSelectOptions(item.id, item.allowedSlots)}
       <button type="button" class="inventory-mini-btn" data-action="equipItem">Equip</button>
-      <button type="button" class="inventory-mini-btn" data-action="toDorm">To Dorm</button>
+      ${isItemTypeDormRestricted(item) ? "" : '<button type="button" class="inventory-mini-btn" data-action="toDorm">To Dorm</button>'}
       <button type="button" class="inventory-mini-btn" data-action="editItem">Edit</button>
       <button type="button" class="inventory-mini-btn danger" data-action="deleteItem">Delete</button>
     `;
@@ -665,6 +818,10 @@ function handleInventoryActions(event) {
   }
 
   if (action === "toDorm" || action === "unequipToDorm") {
+    if (isItemTypeDormRestricted(item)) {
+      setItemFormError("Items cannot be sent to dorm storage.");
+      return;
+    }
     placeItemInDorm(item);
     renderInventory();
     scheduleSave();
@@ -755,12 +912,15 @@ function evaluateDropTarget(item, zoneEl, currentTarget) {
   }
 
   if (zoneType === "dorm-list") {
+    if (isItemTypeDormRestricted(item)) {
+      return { ok: false, message: "Items cannot be dropped into dorm storage." };
+    }
     return { ok: true };
   }
 
   if (zoneType === "equipped-slot") {
     const slotKey = zoneEl?.dataset?.slotKey ?? currentTarget?.dataset?.slotKey;
-    return moveItemToEquippedSlot(item, slotKey || null, { dryRun: true });
+    return moveItemToEquippedSlot(item, slotKey || null, { dryRun: true, strictTarget: true });
   }
 
   return { ok: false, message: "Drop target not recognized." };
@@ -820,7 +980,7 @@ function handleInventoryDrop(event) {
       : { ok: false, message: "Active inventory is full. Drop onto a specific slot to swap." };
   } else if (zoneType === "equipped-slot") {
     const slotKey = zone?.dataset?.slotKey ?? event.currentTarget?.dataset?.slotKey;
-    result = moveItemToEquippedSlot(item, slotKey || null);
+    result = moveItemToEquippedSlot(item, slotKey || null, { strictTarget: true });
   } else if (zoneType === "dorm-list") {
     result = placeItemInDorm(item) ? { ok: true } : { ok: false, message: "Could not move item to dorm." };
   }
@@ -916,6 +1076,8 @@ function ensureInventoryStateShape() {
     name: String(item?.name || "").trim(),
     description: String(item?.description || ""),
     modifier: String(item?.modifier || ""),
+    itemType: normalizeItemType(item?.itemType || inferLegacyItemType(item)),
+    weaponGrip: item?.weaponGrip || null,
     allowedSlots: normalizeAllowedSlots(item?.allowedSlots),
     slotsNeeded: clamp(parseInt(item?.slotsNeeded, 10) || 1, 1, 3),
     location: ["inventory", "dorm", "equipped"].includes(item?.location) ? item.location : "dorm",
@@ -924,6 +1086,8 @@ function ensureInventoryStateShape() {
       ? item.equippedSlots.filter(slot => BODY_SLOT_KEYS.includes(slot))
       : [],
   })).filter(item => item.id && item.name);
+
+  state.inventoryItems.forEach(item => applyItemTypeDefaults(item));
 
   const byId = new Map(state.inventoryItems.map(item => [item.id, item]));
 
@@ -961,6 +1125,10 @@ function ensureInventoryStateShape() {
     if (item.location === "dorm" && state.dormItemIds.includes(item.id)) return;
     if (item.location === "equipped" && item.equippedSlots.length) return;
     if (placeItemInFirstFreeInventorySlot(item)) return;
+    if (isItemTypeDormRestricted(item)) {
+      if (placeItemEquipped(item, "rightHand").ok) return;
+      if (placeItemEquipped(item, "leftHand").ok) return;
+    }
     placeItemInDorm(item);
   });
 }
@@ -992,8 +1160,9 @@ export function initInventory({ getState: getStateFn, scheduleSave: scheduleSave
   const yenInput = document.getElementById("yenInput");
   const editorToggleBtn = document.getElementById("toggleItemEditorBtn");
   const dormToggleBtn = document.getElementById("dormToggleBtn");
+  const itemTypeSelect = document.getElementById("itemTypeSelect");
 
-  if (!saveBtn || !cancelBtn || !equippedGrid || !inventoryList || !dormList || !yenInput || !editorToggleBtn || !dormToggleBtn) return;
+  if (!saveBtn || !cancelBtn || !equippedGrid || !inventoryList || !dormList || !yenInput || !editorToggleBtn || !dormToggleBtn || !itemTypeSelect) return;
 
   saveBtn.addEventListener("click", saveItemFromForm);
   cancelBtn.addEventListener("click", resetItemEditor);
@@ -1008,6 +1177,9 @@ export function initInventory({ getState: getStateFn, scheduleSave: scheduleSave
   dormToggleBtn.addEventListener("click", () => {
     const isOpen = dormToggleBtn.getAttribute("aria-expanded") === "true";
     setDormOpen(!isOpen);
+  });
+  itemTypeSelect.addEventListener("change", () => {
+    setItemTypeFieldsVisibility(getItemTypeFromForm());
   });
 
   yenInput.addEventListener("input", e => {

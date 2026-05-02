@@ -250,12 +250,27 @@
                 <span class="field-label">Modifier</span>
                 <input id="itemModifierInput" class="meta-input" maxlength="60" placeholder="+1 Tempo, +2 AC, etc." />
               </label>
+              <label class="inventory-field" id="itemTypeField">
+                <span class="field-label">Item Group</span>
+                <select id="itemTypeSelect" class="meta-select">
+                  <option value="clothing">Clothing / Accessory</option>
+                  <option value="weapon">Weapon</option>
+                  <option value="item">Item</option>
+                </select>
+              </label>
+              <label class="inventory-field" id="itemWeaponGripField" hidden>
+                <span class="field-label">Weapon Grip</span>
+                <select id="itemWeaponGripSelect" class="meta-select">
+                  <option value="oneHanded">One-Handed</option>
+                  <option value="twoHanded">Two-Handed</option>
+                </select>
+              </label>
               <label class="inventory-field inventory-field-full">
                 <span class="field-label">Description</span>
                 <textarea id="itemDescriptionInput" class="inventory-textarea" rows="3" maxlength="280" placeholder="Short details, uses, limitations..."></textarea>
               </label>
-              <label class="inventory-field">
-                <span class="field-label">Body Slots Needed</span>
+              <label class="inventory-field" id="itemSlotsNeededField">
+                <span class="field-label" id="itemSlotsNeededLabel">Body Slots Needed</span>
                 <select id="itemSlotsNeededSelect" class="meta-select">
                   <option value="1">1 slot</option>
                   <option value="2">2 slots</option>
@@ -270,7 +285,7 @@
                   <option value="equipped">Equip Now</option>
                 </select>
               </label>
-              <div class="inventory-field inventory-field-full">
+              <div class="inventory-field inventory-field-full" id="itemAllowedSlotsField">
                 <span class="field-label">Can Equip To</span>
                 <div id="itemAllowedSlots" class="slot-option-grid">
                   <label><input type="checkbox" value="head" /> Head</label>
@@ -278,8 +293,6 @@
                   <label><input type="checkbox" value="back" /> Back</label>
                   <label><input type="checkbox" value="legs" /> Legs</label>
                   <label><input type="checkbox" value="feet" /> Feet</label>
-                  <label><input type="checkbox" value="rightHand" /> Right Hand</label>
-                  <label><input type="checkbox" value="leftHand" /> Left Hand</label>
                   <label><input type="checkbox" value="accessory" /> Accessory</label>
                 </div>
               </div>
