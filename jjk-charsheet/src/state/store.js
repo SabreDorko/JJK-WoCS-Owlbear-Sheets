@@ -43,7 +43,8 @@ export const BODY_SLOT_KEYS = [
   "feet",
   "rightHand",
   "leftHand",
-  "accessory",
+  "accessory1",
+  "accessory2",
 ];
 
 export const BODY_SLOT_LABELS = {
@@ -54,7 +55,8 @@ export const BODY_SLOT_LABELS = {
   feet: "Feet",
   rightHand: "Right Hand",
   leftHand: "Left Hand",
-  accessory: "Accessory",
+  accessory1: "Accessory 1",
+  accessory2: "Accessory 2",
 };
 
 // ── DEFAULT STATE ─────────────────────────────────────────────────────────────
@@ -81,7 +83,8 @@ export function defaultState() {
       feet: null,
       rightHand: null,
       leftHand: null,
-      accessory: null,
+      accessory1: null,
+      accessory2: null,
     },
     stats,
   };

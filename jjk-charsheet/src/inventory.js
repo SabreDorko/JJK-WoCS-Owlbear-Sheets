@@ -26,6 +26,22 @@ function scheduleSave() {
   if (_scheduleSave) _scheduleSave();
 }
 
+function normalizeAllowedSlots(rawSlots) {
+  if (!Array.isArray(rawSlots)) return [];
+
+  const normalized = [];
+  rawSlots.forEach(slot => {
+    // Legacy support: old data used a single "accessory" key.
+    if (slot === "accessory") {
+      normalized.push("accessory1", "accessory2");
+      return;
+    }
+    if (BODY_SLOT_KEYS.includes(slot)) normalized.push(slot);
+  });
+
+  return [...new Set(normalized)];
+}
+
 function getInventoryItemById(itemId) {
   const state = getState();
   return state?.inventoryItems?.find(item => item.id === itemId) || null;
@@ -88,17 +104,32 @@ function getEquipSlotsForItem(item, preferredPrimarySlot) {
     return { ok: false, message: "Body slots needed is greater than selected allowed slots." };
   }
 
+  const isSlotUsable = (slot) => {
+    const occupant = state.equippedSlots[slot];
+    return !occupant || occupant === item.id;
+  };
+
+  // If the item must consume all of its allowed slots (ex: kimono chest+legs),
+  // use that exact set rather than trying to derive a subset.
+  if (slotsNeeded === allowed.length) {
+    const blocked = allowed.filter(slot => !isSlotUsable(slot));
+    if (!blocked.length) {
+      return { ok: true, slots: allowed };
+    }
+    const blockedNames = blocked.map(slot => BODY_SLOT_LABELS[slot]).join(", ");
+    return { ok: false, message: `Required slot(s) occupied: ${blockedNames}.` };
+  }
+
   const tryPrimary = (primary) => {
     if (primary && !allowed.includes(primary)) return null;
-    if (primary && state.equippedSlots[primary] && state.equippedSlots[primary] !== item.id) return null;
+    if (primary && !isSlotUsable(primary)) return null;
 
     const chosen = [];
     if (primary) chosen.push(primary);
 
     for (const slot of allowed) {
       if (chosen.includes(slot)) continue;
-      const occupant = state.equippedSlots[slot];
-      if (occupant && occupant !== item.id) continue;
+      if (!isSlotUsable(slot)) continue;
       chosen.push(slot);
       if (chosen.length === slotsNeeded) break;
     }
@@ -115,6 +146,11 @@ function getEquipSlotsForItem(item, preferredPrimarySlot) {
     if (result) return { ok: true, slots: result };
   }
 
+  const blocked = allowed.filter(slot => !isSlotUsable(slot));
+  if (blocked.length) {
+    const blockedNames = blocked.map(slot => BODY_SLOT_LABELS[slot]).join(", ");
+    return { ok: false, message: `No valid combination. Occupied slot(s): ${blockedNames}.` };
+  }
   return { ok: false, message: "No valid free body slot combination available for this item." };
 }
 
@@ -267,8 +303,11 @@ function saveItemFromForm() {
   if (!placementResult.ok && placementResult.message) setItemFormError(placementResult.message);
 }
 
-function getItemEquipTarget(item, listRoot) {
-  const select = listRoot.querySelector(`select[data-equip-select='${item.id}']`);
+function getItemEquipTarget(triggerEl, itemId) {
+  const actionRow = triggerEl.closest(".inventory-item-actions") || triggerEl.closest(".equipped-slot-actions");
+  const select = actionRow?.querySelector(`select[data-equip-select='${itemId}']`)
+    || triggerEl.closest("[data-item-id]")?.querySelector(`select[data-equip-select='${itemId}']`)
+    || document.querySelector(`select[data-equip-select='${itemId}']`);
   const selected = select ? select.value : "auto";
   if (!selected || selected === "auto") return null;
   return selected;
@@ -360,12 +399,12 @@ function renderInventorySlots() {
 
     const controls = `
       ${buildEquipSelectOptions(item.id, item.allowedSlots)}
-      <button class="inventory-mini-btn" data-action="equipItem">Equip</button>
-      <button class="inventory-mini-btn" data-action="toDorm">To Dorm</button>
-      <button class="inventory-mini-btn" data-action="shiftLeft">Shift Left</button>
-      <button class="inventory-mini-btn" data-action="shiftRight">Shift Right</button>
-      <button class="inventory-mini-btn" data-action="editItem">Edit</button>
-      <button class="inventory-mini-btn danger" data-action="deleteItem">Delete</button>
+      <button type="button" class="inventory-mini-btn" data-action="equipItem">Equip</button>
+      <button type="button" class="inventory-mini-btn" data-action="toDorm">To Dorm</button>
+      <button type="button" class="inventory-mini-btn" data-action="shiftLeft">Shift Left</button>
+      <button type="button" class="inventory-mini-btn" data-action="shiftRight">Shift Right</button>
+      <button type="button" class="inventory-mini-btn" data-action="editItem">Edit</button>
+      <button type="button" class="inventory-mini-btn danger" data-action="deleteItem">Delete</button>
     `;
 
     return `
@@ -392,11 +431,11 @@ function renderDormInventory() {
     if (!item) return "";
 
     const controls = `
-      <button class="inventory-mini-btn" data-action="toInventory">To Inventory</button>
+      <button type="button" class="inventory-mini-btn" data-action="toInventory">To Inventory</button>
       ${buildEquipSelectOptions(item.id, item.allowedSlots)}
-      <button class="inventory-mini-btn" data-action="equipItem">Equip</button>
-      <button class="inventory-mini-btn" data-action="editItem">Edit</button>
-      <button class="inventory-mini-btn danger" data-action="deleteItem">Delete</button>
+      <button type="button" class="inventory-mini-btn" data-action="equipItem">Equip</button>
+      <button type="button" class="inventory-mini-btn" data-action="editItem">Edit</button>
+      <button type="button" class="inventory-mini-btn danger" data-action="deleteItem">Delete</button>
     `;
 
     return renderInventoryItemCard(item, controls, "Dorm");
@@ -425,7 +464,7 @@ function handleInventoryActions(event) {
   }
 
   if (action === "equipItem") {
-    const preferredSlot = getItemEquipTarget(item, card);
+    const preferredSlot = getItemEquipTarget(button, item.id);
     const result = placeItemEquipped(item, preferredSlot);
     renderInventory();
     scheduleSave();
@@ -486,6 +525,17 @@ function ensureInventoryStateShape() {
     state.equippedSlots = {};
   }
 
+  // Legacy migration: single accessory slot -> two accessory slots.
+  if (state.equippedSlots.accessory) {
+    const legacyAccessoryId = state.equippedSlots.accessory;
+    if (!state.equippedSlots.accessory1) {
+      state.equippedSlots.accessory1 = legacyAccessoryId;
+    } else if (!state.equippedSlots.accessory2) {
+      state.equippedSlots.accessory2 = legacyAccessoryId;
+    }
+    delete state.equippedSlots.accessory;
+  }
+
   BODY_SLOT_KEYS.forEach(slot => {
     if (!(slot in state.equippedSlots)) state.equippedSlots[slot] = null;
   });
@@ -495,15 +545,11 @@ function ensureInventoryStateShape() {
     name: String(item?.name || "").trim(),
     description: String(item?.description || ""),
     modifier: String(item?.modifier || ""),
-    allowedSlots: Array.isArray(item?.allowedSlots)
-      ? item.allowedSlots.filter(slot => BODY_SLOT_KEYS.includes(slot))
-      : [],
+    allowedSlots: normalizeAllowedSlots(item?.allowedSlots),
     slotsNeeded: clamp(parseInt(item?.slotsNeeded, 10) || 1, 1, 3),
     location: ["inventory", "dorm", "equipped"].includes(item?.location) ? item.location : "dorm",
     inventorySlot: Number.isInteger(item?.inventorySlot) ? item.inventorySlot : null,
-    equippedSlots: Array.isArray(item?.equippedSlots)
-      ? item.equippedSlots.filter(slot => BODY_SLOT_KEYS.includes(slot))
-      : [],
+    equippedSlots: normalizeAllowedSlots(item?.equippedSlots),
   })).filter(item => item.id && item.name);
 
   const byId = new Map(state.inventoryItems.map(item => [item.id, item]));
