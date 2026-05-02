@@ -61,7 +61,7 @@ export const BODY_SLOT_LABELS = {
 export function defaultState() {
   const stats = {};
   [...CENTER_STATS, ...RIGHT_STATS].forEach(s => {
-    stats[s.key] = { score: "", skills: s.skills.map(() => ({ dot: false, bonus: "" })) };
+    stats[s.key] = { score: "", skills: s.skills.map(() => ({ aptitude: 0 })) };
   });
   return {
     charName: "", archetype: "", subArchetype: "", age: "",

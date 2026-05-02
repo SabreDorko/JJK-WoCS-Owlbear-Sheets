@@ -14,10 +14,14 @@ export function mergeLoadedState({ saved, defaultState, centerStats, rightStats 
         const savedSkills = Array.isArray(savedStat.skills) ? savedStat.skills : [];
         next.stats[def.key] = {
           score: savedStat.score ?? "",
-          skills: def.skills.map((_, i) => ({
-            dot: !!savedSkills[i]?.dot,
-            bonus: savedSkills[i]?.bonus ?? "",
-          })),
+          skills: def.skills.map((_, i) => {
+            const savedSkill = savedSkills[i] || {};
+            const rawAptitude = parseInt(savedSkill.aptitude, 10);
+            const aptitude = Number.isFinite(rawAptitude)
+              ? Math.max(0, Math.min(2, rawAptitude))
+              : (savedSkill.dot ? 1 : 0);
+            return { aptitude };
+          }),
         };
       }
     });

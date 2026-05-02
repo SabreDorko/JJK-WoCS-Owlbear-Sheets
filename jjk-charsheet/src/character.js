@@ -26,6 +26,72 @@ function getBlackFlashRange(techniqueScore) {
   return (techniqueScore * 4) + 4;
 }
 
+function parseStatScore(rawValue) {
+  const parsed = parseInt(rawValue, 10);
+  if (!Number.isFinite(parsed)) return 0;
+  return Math.max(0, parsed);
+}
+
+function getAptitudeState(skillState) {
+  const parsed = parseInt(skillState?.aptitude, 10);
+  if (!Number.isFinite(parsed)) return 0;
+  return Math.max(0, Math.min(2, parsed));
+}
+
+function formatSignedValue(value) {
+  return value >= 0 ? `+${value}` : `${value}`;
+}
+
+function getEffectiveStatLevel(state, effects, statKey) {
+  return parseStatScore(state?.stats?.[statKey]?.score) + (effects?.statBonuses?.[statKey] || 0);
+}
+
+function getSubskillValue(state, effects, statKey, skillIndex) {
+  const statLevel = getEffectiveStatLevel(state, effects, statKey);
+  const skillState = state?.stats?.[statKey]?.skills?.[skillIndex] || {};
+  const aptitudeBonus = getAptitudeState(skillState) > 0 ? 2 : 0;
+  const statSkillBonus = effects?.skillBonuses?.[statKey] || 0;
+  const specificSkillBonus = effects?.specificSkillBonuses?.[`${statKey}:${skillIndex}`] || 0;
+  return statLevel + aptitudeBonus + statSkillBonus + specificSkillBonus;
+}
+
+function applyDerivedCharacterFields({ preserveCurrent = true } = {}) {
+  const state = getState();
+  if (!state) return;
+
+  const effects = computeActiveModifierEffects(state);
+  const powerLevel = getEffectiveStatLevel(state, effects, "power");
+  const techniqueLevel = getEffectiveStatLevel(state, effects, "technique");
+  const speedLevel = getEffectiveStatLevel(state, effects, "speed");
+
+  const nextHpMax = Math.max(1, 10 + (powerLevel * 5));
+  const nextCeMax = Math.max(1, 15 + (techniqueLevel * 5));
+  const nextAc = Math.max(0, techniqueLevel + speedLevel + (effects.acBonus || 0));
+  const nextMovement = Math.max(0, 30 + (speedLevel * 5) + (effects.movementBonus || 0));
+
+  const previousHpMax = parseInt(state.hpMax, 10);
+  const previousCeMax = parseInt(state.ceMax, 10);
+  const currentHp = parseInt(state.hpCurrent, 10);
+  const currentCe = parseInt(state.ceCurrent, 10);
+
+  state.hpMax = String(nextHpMax);
+  state.ceMax = String(nextCeMax);
+  state.ac = String(nextAc);
+  state.movement = String(nextMovement);
+
+  if (!preserveCurrent || !Number.isFinite(currentHp) || !Number.isFinite(previousHpMax) || currentHp === previousHpMax) {
+    state.hpCurrent = String(nextHpMax);
+  } else {
+    state.hpCurrent = String(Math.max(0, Math.min(currentHp, nextHpMax)));
+  }
+
+  if (!preserveCurrent || !Number.isFinite(currentCe) || !Number.isFinite(previousCeMax) || currentCe === previousCeMax) {
+    state.ceCurrent = String(nextCeMax);
+  } else {
+    state.ceCurrent = String(Math.max(0, Math.min(currentCe, nextCeMax)));
+  }
+}
+
 export function updateBlackFlashRangeDisplay() {
   const state = getState();
   const valueEl = document.getElementById("blackFlashRangeValue");
@@ -55,6 +121,7 @@ export function renderStats() {
 function buildStatBlocks(defs, container) {
   const state = getState();
   if (!container || !state) return;
+  const effects = computeActiveModifierEffects(state);
 
   container.innerHTML = "";
   defs.forEach(def => {
@@ -71,12 +138,11 @@ function buildStatBlocks(defs, container) {
       <button class="roll-btn" type="button" title="Roll ${def.label.charAt(0).toUpperCase() + def.label.slice(1).toLowerCase()}">Roll</button>
     `;
     scoreSide.querySelector(".roll-btn").addEventListener("click", () => {
-      const base = parseInt(document.getElementById("score_" + def.key).value, 10) || 0;
-      const effects = computeActiveModifierEffects(state);
-      const n = base + (effects.statBonuses[def.key] || 0);
+      const currentEffects = computeActiveModifierEffects(state);
+      const n = getEffectiveStatLevel(state, currentEffects, def.key);
       if (!n || n < 1) return;
       const rolls = Array.from({ length: n }, () => Math.floor(Math.random() * 6) + 1);
-      const rollBonus = effects.rollBonuses[def.key] || 0;
+      const rollBonus = currentEffects.rollBonuses[def.key] || 0;
       const total = rolls.reduce((a, b) => a + b, 0) + rollBonus;
       showRollToast(def.label, n, rolls, total);
     });
@@ -85,38 +151,44 @@ function buildStatBlocks(defs, container) {
     skillsSide.className = "skills-side";
     def.skills.forEach((skill, i) => {
       const sk = sd.skills[i];
+      const aptitudeState = getAptitudeState(sk);
+      const subskillValue = getSubskillValue(state, effects, def.key, i);
+      const aptitudeLabel = aptitudeState === 2 ? "Permanent Aptitude" : aptitudeState === 1 ? "Aptitude" : "No Aptitude";
       const row = document.createElement("div");
       row.className = "skill-row";
       row.innerHTML = `
-        <div class="skill-dot${sk.dot ? " filled" : ""}"
-             id="dot_${def.key}_${i}" role="checkbox" aria-label="${skill} proficiency"></div>
+        <div class="skill-dot${aptitudeState > 0 ? " filled" : ""}${aptitudeState === 2 ? " permanent" : ""}"
+             id="dot_${def.key}_${i}" role="checkbox" aria-label="${skill} ${aptitudeLabel}"></div>
         <input class="skill-bonus-input" type="text"
-               id="bonus_${def.key}_${i}" value="${sk.bonus}" placeholder="+0" maxlength="4" />
+               id="bonus_${def.key}_${i}" value="${formatSignedValue(subskillValue)}" readonly tabindex="-1" />
         <span class="skill-name">${skill}</span>
         <button class="skill-roll-btn" type="button" title="Roll ${skill}"></button>
       `;
       skillsSide.appendChild(row);
 
       row.querySelector(".skill-dot").addEventListener("click", () => {
-        state.stats[def.key].skills[i].dot = !state.stats[def.key].skills[i].dot;
-        row.querySelector(".skill-dot").classList.toggle("filled");
-        scheduleSave();
-      });
-      row.querySelector(".skill-bonus-input").addEventListener("input", e => {
-        state.stats[def.key].skills[i].bonus = e.target.value;
+        const skillState = state.stats[def.key].skills[i] || { aptitude: 0 };
+        const nextAptitude = (getAptitudeState(skillState) + 1) % 3;
+        state.stats[def.key].skills[i] = { aptitude: nextAptitude };
+        const dot = row.querySelector(".skill-dot");
+        dot.classList.toggle("filled", nextAptitude > 0);
+        dot.classList.toggle("permanent", nextAptitude === 2);
+        const nextLabel = nextAptitude === 2 ? "Permanent Aptitude" : nextAptitude === 1 ? "Aptitude" : "No Aptitude";
+        dot.setAttribute("aria-label", `${skill} ${nextLabel}`);
+        const valueEl = row.querySelector(".skill-bonus-input");
+        const nextValue = getSubskillValue(state, computeActiveModifierEffects(state), def.key, i);
+        valueEl.value = formatSignedValue(nextValue);
         scheduleSave();
       });
       row.querySelector(".skill-roll-btn").addEventListener("click", () => {
-        const effects = computeActiveModifierEffects(state);
-        const n = (parseInt(state.stats[def.key].score, 10) || 0) + (effects.statBonuses[def.key] || 0);
+        const currentEffects = computeActiveModifierEffects(state);
+        const n = getEffectiveStatLevel(state, currentEffects, def.key);
         if (!n || n < 1) return;
         const rolls = Array.from({ length: n }, () => Math.floor(Math.random() * 6) + 1);
         const rawTotal = rolls.reduce((a, b) => a + b, 0);
-        const baseSkillBonus = parseInt(state.stats[def.key].skills[i].bonus, 10) || 0;
-        const groupSkillBonus = effects.skillBonuses[def.key] || 0;
-        const statRollBonus = effects.rollBonuses[def.key] || 0;
-        const specificSkillBonus = effects.specificSkillBonuses[`${def.key}:${i}`] || 0;
-        const total = rawTotal + baseSkillBonus + groupSkillBonus + statRollBonus + specificSkillBonus;
+        const subskillBonus = getSubskillValue(state, currentEffects, def.key, i);
+        const statRollBonus = currentEffects.rollBonuses[def.key] || 0;
+        const total = rawTotal + subskillBonus + statRollBonus;
         const maxPossible = n * 6;
         const allOnes = rolls.every(r => r === 1);
         const critStatus = allOnes ? "fail" : total >= maxPossible ? "success" : null;
@@ -130,6 +202,8 @@ function buildStatBlocks(defs, container) {
 
     block.querySelector(`#score_${def.key}`).addEventListener("input", e => {
       state.stats[def.key].score = e.target.value;
+      applyDerivedCharacterFields({ preserveCurrent: true });
+      renderStats();
       if (def.key === "technique") updateBlackFlashRangeDisplay();
       scheduleSave();
     });
@@ -201,20 +275,16 @@ function bindField(id, stateKey) {
 }
 
 function syncHP() {
-  const state = getState();
-  const max = document.getElementById("hpMax").value;
-  const cur = document.getElementById("hpCurrent");
-  if (!cur.value) {
-    cur.value = max;
-    state.hpCurrent = max;
-  }
-  state.hpMax = max;
+  applyDerivedCharacterFields({ preserveCurrent: true });
+  applyCharacterStateToUI();
   scheduleSave();
 }
 
 export function applyCharacterStateToUI() {
   const state = getState();
   if (!state) return;
+
+  applyDerivedCharacterFields({ preserveCurrent: true });
 
   document.getElementById("charName").value = state.charName || "";
   document.getElementById("ageInput").value = state.age || "";
@@ -272,15 +342,17 @@ export function initCharacter({ getState: getStateFn, scheduleSave: scheduleSave
   bindField("gradeSelect", "grade");
   bindField("ctInput", "ct");
   bindField("playerName", "playerName");
-  bindField("acInput", "ac");
   bindField("hpCurrent", "hpCurrent");
-  bindField("hpMax", "hpMax");
-  bindField("moveInput", "movement");
   bindField("ceCurrent", "ceCurrent");
-  bindField("ceMax", "ceMax");
   bindField("ceNote", "ceNote");
   bindField("subArchetypeSelect", "subArchetype");
   bindField("subArchetypeSelect2", "subArchetype2");
+
+  const derivedFieldIds = ["acInput", "hpMax", "moveInput", "ceMax"];
+  derivedFieldIds.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.readOnly = true;
+  });
 
   document.getElementById("addSecondArchetypeBtn").addEventListener("click", toggleSecondArchetype);
   document.getElementById("removeSecondArchetypeBtn").addEventListener("click", toggleSecondArchetype);
