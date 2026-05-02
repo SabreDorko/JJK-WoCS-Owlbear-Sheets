@@ -694,7 +694,10 @@
     /* hide number spinners so text stays truly centered */
     input[type=number]::-webkit-inner-spin-button,
     input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
-    input[type=number] { -moz-appearance: textfield; }
+    input[type=number] {
+      appearance: textfield;
+      -moz-appearance: textfield;
+    }
 
     /* ── SKILL ROWS (uniform across all stat blocks) ── */
     .skills-side {
@@ -794,7 +797,7 @@
       min-width: 0;
     }
     .inventory-wallet-card {
-      max-width: 260px;
+      max-width: 520px;
     }
     .inventory-active-card {
       max-width: 520px;
@@ -942,9 +945,24 @@
     .inventory-collapsible.collapsed { display: none; }
     .equipped-slots-grid {
       display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      grid-template-areas:
+        ". head ."
+        "chest back legs"
+        ". feet ."
+        "leftHand . rightHand"
+        "accessory1 . accessory2";
       gap: 7px;
     }
+    .equipped-slot-card[data-slot-key="head"] { grid-area: head; }
+    .equipped-slot-card[data-slot-key="chest"] { grid-area: chest; }
+    .equipped-slot-card[data-slot-key="back"] { grid-area: back; }
+    .equipped-slot-card[data-slot-key="legs"] { grid-area: legs; }
+    .equipped-slot-card[data-slot-key="feet"] { grid-area: feet; }
+    .equipped-slot-card[data-slot-key="leftHand"] { grid-area: leftHand; }
+    .equipped-slot-card[data-slot-key="rightHand"] { grid-area: rightHand; }
+    .equipped-slot-card[data-slot-key="accessory1"] { grid-area: accessory1; }
+    .equipped-slot-card[data-slot-key="accessory2"] { grid-area: accessory2; }
     .equipped-slot-card,
     .inventory-slot-card,
     .inventory-item-card {
