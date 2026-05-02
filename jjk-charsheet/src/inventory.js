@@ -67,6 +67,7 @@ function applyItemTypeDefaults(item) {
     item.weaponGrip = normalizeWeaponGrip(item.weaponGrip, item.slotsNeeded);
     item.allowedSlots = ["rightHand", "leftHand"];
     item.slotsNeeded = item.weaponGrip === "twoHanded" ? 2 : 1;
+    item.stackable = false;
     item.quantity = 1;
     return;
   }
@@ -75,13 +76,15 @@ function applyItemTypeDefaults(item) {
     item.weaponGrip = null;
     item.allowedSlots = ["rightHand", "leftHand"];
     item.slotsNeeded = 1;
-    item.quantity = parseItemQuantity(item.quantity);
+    item.stackable = parseStackableValue(item.stackable);
+    item.quantity = item.stackable ? parseItemQuantity(item.quantity) : 1;
     return;
   }
 
   item.weaponGrip = null;
   item.allowedSlots = normalizeAllowedSlots(item.allowedSlots).filter(slot => CLOTHING_SELECTABLE_SLOT_KEYS.includes(slot));
   item.slotsNeeded = clamp(parseInt(item.slotsNeeded, 10) || 1, 1, 3);
+  item.stackable = false;
   item.quantity = 1;
 }
 
@@ -137,6 +140,10 @@ function parseItemQuantity(rawValue) {
   const parsed = parseInt(rawValue, 10);
   if (!Number.isFinite(parsed)) return 1;
   return clamp(parsed, 1, 999);
+}
+
+function parseStackableValue(rawValue) {
+  return rawValue === true || rawValue === "true" || rawValue === 1;
 }
 
 function parseYenInputText(rawValue) {
@@ -571,6 +578,7 @@ function renderDeleteButton() {
     <button type="button" class="inventory-mini-btn inventory-icon-btn danger" data-action="deleteItem" aria-label="Delete item" title="Delete item">
       <svg class="inventory-icon-trash" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
         <path fill="currentColor" d="M9 3h6a1 1 0 0 1 1 1v1h4v2h-1l-1 12a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 7H4V5h4V4a1 1 0 0 1 1-1Zm1 2v0h4V5h-4Zm-1 4h2v9H9V9Zm4 0h2v9h-2V9Z"/>
+        <path fill="none" stroke="currentColor" stroke-width="1.5" d="M6 7.5h12"/>
       </svg>
     </button>
   `;
@@ -581,10 +589,18 @@ function renderMoveButton() {
 }
 
 function renderQuantityControls(item) {
-  if (normalizeItemType(item.itemType) !== "item") return "";
+  if (normalizeItemType(item.itemType) !== "item" || !parseStackableValue(item.stackable)) return "";
   return `
-    <button type="button" class="inventory-mini-btn inventory-qty-btn" data-action="decreaseQuantity" aria-label="Decrease amount" title="Decrease amount">-</button>
-    <button type="button" class="inventory-mini-btn inventory-qty-btn" data-action="increaseQuantity" aria-label="Increase amount" title="Increase amount">+</button>
+    <button type="button" class="inventory-mini-btn inventory-amount-adjust-btn" data-action="decreaseQuantity" aria-label="Decrease amount" title="Decrease amount">
+      <svg class="inventory-yen-adjust-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <path fill="currentColor" d="M5 11h14v2H5z"/>
+      </svg>
+    </button>
+    <button type="button" class="inventory-mini-btn inventory-amount-adjust-btn" data-action="increaseQuantity" aria-label="Increase amount" title="Increase amount">
+      <svg class="inventory-yen-adjust-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <path fill="currentColor" d="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6V5z"/>
+      </svg>
+    </button>
   `;
 }
 
@@ -650,9 +666,11 @@ function setItemTypeFieldsVisibility(itemType) {
   const slotsNeededLabel = document.getElementById("itemSlotsNeededLabel");
   const allowedSlotsField = document.getElementById("itemAllowedSlotsField");
   const weaponGripField = document.getElementById("itemWeaponGripField");
+  const stackableField = document.getElementById("itemStackableField");
+  const stackableToggle = document.getElementById("itemStackableToggle");
   const quantityField = document.getElementById("itemQuantityField");
   const preferredLocation = document.getElementById("itemPreferredLocation");
-  if (!slotsNeededField || !slotsNeededLabel || !allowedSlotsField || !weaponGripField || !quantityField || !preferredLocation) return;
+  if (!slotsNeededField || !slotsNeededLabel || !allowedSlotsField || !weaponGripField || !stackableField || !stackableToggle || !quantityField || !preferredLocation) return;
 
   const isClothing = itemType === "clothing";
   const isWeapon = itemType === "weapon";
@@ -667,7 +685,9 @@ function setItemTypeFieldsVisibility(itemType) {
   setVisible(slotsNeededField, isClothing);
   setVisible(allowedSlotsField, isClothing);
   setVisible(weaponGripField, isWeapon);
-  setVisible(quantityField, isItem);
+  setVisible(stackableField, isItem);
+  if (!isItem) stackableToggle.checked = false;
+  setVisible(quantityField, isItem && stackableToggle.checked);
 
   const dormOption = preferredLocation.querySelector("option[value='dorm']");
   if (dormOption) {
@@ -695,12 +715,14 @@ function getItemConfigFromForm() {
   }
 
   if (itemType === "item") {
+    const stackable = Boolean(document.getElementById("itemStackableToggle")?.checked);
     return {
       itemType,
       weaponGrip: null,
       allowedSlots: ["rightHand", "leftHand"],
       slotsNeeded: 1,
-      quantity: parseItemQuantity(document.getElementById("itemQuantityInput")?.value),
+      stackable,
+      quantity: stackable ? parseItemQuantity(document.getElementById("itemQuantityInput")?.value) : 1,
     };
   }
 
@@ -709,6 +731,7 @@ function getItemConfigFromForm() {
     weaponGrip: null,
     allowedSlots: collectAllowedSlotsFromForm(),
     slotsNeeded: clamp(parseInt(document.getElementById("itemSlotsNeededSelect")?.value, 10) || 1, 1, 3),
+    stackable: false,
     quantity: 1,
   };
 }
@@ -725,6 +748,7 @@ function resetItemEditor() {
   document.getElementById("itemTypeSelect").value = "clothing";
   document.getElementById("itemWeaponGripSelect").value = "oneHanded";
   document.getElementById("itemSlotsNeededSelect").value = "1";
+  document.getElementById("itemStackableToggle").checked = false;
   document.getElementById("itemQuantityInput").value = "1";
   document.getElementById("itemPreferredLocation").value = "inventory";
   document.querySelectorAll("#itemAllowedSlots input[type='checkbox']").forEach(input => {
@@ -749,6 +773,7 @@ function startItemEdit(itemId) {
   document.getElementById("itemTypeSelect").value = normalizeItemType(item.itemType);
   document.getElementById("itemWeaponGripSelect").value = normalizeWeaponGrip(item.weaponGrip, item.slotsNeeded);
   document.getElementById("itemSlotsNeededSelect").value = String(item.slotsNeeded || 1);
+  document.getElementById("itemStackableToggle").checked = parseStackableValue(item.stackable);
   document.getElementById("itemQuantityInput").value = String(parseItemQuantity(item.quantity));
   document.getElementById("itemPreferredLocation").value = item.location === "equipped" ? "equipped" : item.location;
   document.querySelectorAll("#itemAllowedSlots input[type='checkbox']").forEach(input => {
@@ -791,6 +816,7 @@ function saveItemFromForm() {
       weaponGrip: itemConfig.weaponGrip,
       allowedSlots,
       slotsNeeded,
+      stackable: itemConfig.stackable,
       quantity: itemConfig.quantity,
       location: "dorm",
       inventorySlot: null,
@@ -805,6 +831,7 @@ function saveItemFromForm() {
     item.weaponGrip = itemConfig.weaponGrip;
     item.allowedSlots = allowedSlots;
     item.slotsNeeded = slotsNeeded;
+    item.stackable = itemConfig.stackable;
     item.quantity = itemConfig.quantity;
   }
 
@@ -855,7 +882,9 @@ function renderInventoryItemCard(item, controlsHtml, locationTag) {
     : "";
   const normalizedType = normalizeItemType(item.itemType);
   const typeLabel = getItemTypeLabel(normalizedType);
-  const quantityText = normalizedType === "item" ? `<div class="inventory-item-amount">Amount: ${parseItemQuantity(item.quantity)}</div>` : "";
+  const quantityText = normalizedType === "item" && parseStackableValue(item.stackable)
+  ? `<div class="inventory-item-amount-row"><div class="inventory-item-amount">Amount: ${parseItemQuantity(item.quantity)}</div>${renderQuantityControls(item)}</div>`
+    : "";
   const equipText = item.allowedSlots.map(slot => getAllowedSlotLabel(slot)).join(", ");
   const details = [];
 
@@ -927,7 +956,6 @@ function renderEquippedSlots() {
         <div class="equipped-slot-actions">
           ${renderMoveButton()}
           ${renderMovePickerMenu(item, slot)}
-          ${renderQuantityControls(item)}
           ${renderEditButton()}
           ${renderDeleteButton()}
         </div>
@@ -959,7 +987,6 @@ function renderInventorySlots() {
       ${renderEquipPickerMenu(item)}
       ${renderMoveButton()}
       ${renderMovePickerMenu(item)}
-      ${renderQuantityControls(item)}
       ${renderEditButton()}
       ${renderDeleteButton()}
     `;
@@ -991,7 +1018,6 @@ function renderDormInventory() {
       ${renderEquipPickerMenu(item)}
       ${renderMoveButton()}
       ${renderMovePickerMenu(item)}
-      ${renderQuantityControls(item)}
       ${renderEditButton()}
       ${renderDeleteButton()}
     `;
@@ -1087,7 +1113,7 @@ function handleInventoryActions(event) {
   }
 
   if (action === "increaseQuantity") {
-    if (normalizeItemType(item.itemType) !== "item") return;
+    if (normalizeItemType(item.itemType) !== "item" || !parseStackableValue(item.stackable)) return;
     item.quantity = parseItemQuantity((item.quantity || 1) + 1);
     renderInventory();
     scheduleSave();
@@ -1095,7 +1121,7 @@ function handleInventoryActions(event) {
   }
 
   if (action === "decreaseQuantity") {
-    if (normalizeItemType(item.itemType) !== "item") return;
+    if (normalizeItemType(item.itemType) !== "item" || !parseStackableValue(item.stackable)) return;
     item.quantity = parseItemQuantity((item.quantity || 1) - 1);
     renderInventory();
     scheduleSave();
@@ -1234,6 +1260,14 @@ function moveItemToInventorySlot(item, slotIndex) {
   }
 
   if (!Number.isInteger(item.inventorySlot)) {
+    if (item.location === "dorm") {
+      if (!placeItemInDorm(other)) {
+        return { ok: false, message: "Could not move swapped item to storage." };
+      }
+      return placeItemInInventorySlot(item, slotIndex)
+        ? { ok: true }
+        : { ok: false, message: "That inventory slot is unavailable." };
+    }
     return { ok: false, message: "Target slot is occupied." };
   }
 
@@ -1369,6 +1403,7 @@ function ensureInventoryStateShape() {
     weaponGrip: item?.weaponGrip || null,
     allowedSlots: normalizeAllowedSlots(item?.allowedSlots),
     slotsNeeded: clamp(parseInt(item?.slotsNeeded, 10) || 1, 1, 3),
+    stackable: parseStackableValue(item?.stackable),
     quantity: parseItemQuantity(item?.quantity),
     location: ["inventory", "dorm", "equipped"].includes(item?.location) ? item.location : "dorm",
     inventorySlot: Number.isInteger(item?.inventorySlot) ? item.inventorySlot : null,
@@ -1456,8 +1491,9 @@ export function initInventory({ getState: getStateFn, scheduleSave: scheduleSave
   const editorToggleBtn = document.getElementById("toggleItemEditorBtn");
   const dormToggleBtn = document.getElementById("dormToggleBtn");
   const itemTypeSelect = document.getElementById("itemTypeSelect");
+  const itemStackableToggle = document.getElementById("itemStackableToggle");
 
-  if (!saveBtn || !cancelBtn || !equippedGrid || !inventoryList || !dormList || !yenInput || !addYenBtn || !subtractYenBtn || !yenAdjustPopover || !yenAdjustAmountInput || !yenAdjustApplyBtn || !yenAdjustCancelBtn || !editorToggleBtn || !dormToggleBtn || !itemTypeSelect) return;
+  if (!saveBtn || !cancelBtn || !equippedGrid || !inventoryList || !dormList || !yenInput || !addYenBtn || !subtractYenBtn || !yenAdjustPopover || !yenAdjustAmountInput || !yenAdjustApplyBtn || !yenAdjustCancelBtn || !editorToggleBtn || !dormToggleBtn || !itemTypeSelect || !itemStackableToggle) return;
 
   saveBtn.addEventListener("click", saveItemFromForm);
   cancelBtn.addEventListener("click", resetItemEditor);
@@ -1474,6 +1510,9 @@ export function initInventory({ getState: getStateFn, scheduleSave: scheduleSave
     setDormOpen(!isOpen);
   });
   itemTypeSelect.addEventListener("change", () => {
+    setItemTypeFieldsVisibility(getItemTypeFromForm());
+  });
+  itemStackableToggle.addEventListener("change", () => {
     setItemTypeFieldsVisibility(getItemTypeFromForm());
   });
 
