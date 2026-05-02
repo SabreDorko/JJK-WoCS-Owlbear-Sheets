@@ -986,6 +986,7 @@
     .inventory-body-col .equipped-slot-meta,
     .inventory-body-col .equipped-slot-mod,
     .inventory-body-col .inventory-item-modifier,
+    .inventory-body-col .equipped-slot-desc,
     .inventory-body-col .inventory-item-desc,
     .inventory-body-col .inventory-item-slots {
       font-size: 10px;
@@ -1015,6 +1016,7 @@
     .equipped-slot-meta,
     .equipped-slot-mod,
     .inventory-item-modifier,
+    .equipped-slot-desc,
     .inventory-item-desc,
     .inventory-item-slots {
       font-family: 'Crimson Text', serif;
@@ -1022,6 +1024,35 @@
       color: var(--ink-light);
       margin-top: 3px;
       line-height: 1.25;
+    }
+    .inventory-item-desc.collapsed,
+    .equipped-slot-desc.collapsed {
+      display: none;
+    }
+    .inventory-desc-toggle-btn {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--ink-light);
+      font-family: 'Cinzel', serif;
+      font-size: 10px;
+      line-height: 1;
+      width: 18px;
+      height: 16px;
+      padding: 0;
+      margin-top: 4px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .inventory-desc-toggle-btn:hover {
+      border-color: var(--ink);
+      color: var(--ink);
+    }
+    .inventory-slot-card .inventory-item-card {
+      border: none;
+      background: transparent;
+      padding: 0;
     }
     .equipped-slot-mod { color: var(--accent); font-style: italic; }
     .equipped-slot-empty,

@@ -6,6 +6,7 @@ let editingItemId = null;
 let isInitialized = false;
 let draggingItemId = null;
 let dragGhostEl = null;
+const expandedDescriptionIds = new Set();
 
 function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
@@ -48,7 +49,7 @@ function getItemTypeLabel(itemType) {
 }
 
 function isItemTypeDormRestricted(item) {
-  return normalizeItemType(item?.itemType) === "item";
+  return false;
 }
 
 function getInternalAllowedSlots(item) {
@@ -399,8 +400,8 @@ function moveItemToEquippedSlot(item, slotKey, options = {}) {
       : { ok: false, message: "Could not place swapped item into original inventory slot." };
   } else if (sourcePlacement.location === "dorm") {
     displacedPlacementResult = placeItemInDorm(displacedItem)
-      ? { ok: true, message: `${displacedItem.name} moved to Dorm.` }
-      : { ok: false, message: "Could not place swapped item into dorm." };
+      ? { ok: true, message: `${displacedItem.name} moved to Storage.` }
+      : { ok: false, message: "Could not place swapped item into storage." };
   } else if (sourcePlacement.location === "equipped") {
     if (placeItemEquipped(displacedItem, sourcePlacement.preferredSlot).ok) {
       displacedPlacementResult = { ok: true };
@@ -412,7 +413,7 @@ function moveItemToEquippedSlot(item, slotKey, options = {}) {
     } else if (placeItemInDorm(displacedItem)) {
       displacedPlacementResult = {
         ok: true,
-        message: `${displacedItem.name} moved to Dorm (original slot unavailable).`,
+        message: `${displacedItem.name} moved to Storage (original slot unavailable).`,
       };
     } else {
       displacedPlacementResult = { ok: false, message: "Swapped item cannot be moved from target slot." };
@@ -428,7 +429,7 @@ function moveItemToEquippedSlot(item, slotKey, options = {}) {
     } else if (placeItemInDorm(displacedItem)) {
       displacedPlacementResult = {
         ok: true,
-        message: `${displacedItem.name} moved to Dorm.`,
+        message: `${displacedItem.name} moved to Storage.`,
       };
     }
   }
@@ -445,11 +446,25 @@ function deleteInventoryItem(itemId) {
   const item = getInventoryItemById(itemId);
   if (!item) return;
 
+  expandedDescriptionIds.delete(itemId);
   removeItemFromContainers(item);
   state.inventoryItems = state.inventoryItems.filter(entry => entry.id !== itemId);
   if (editingItemId === itemId) resetItemEditor();
   renderInventory();
   scheduleSave();
+}
+
+function shouldShowEquipTargetSelect(item) {
+  const allowed = normalizeAllowedSlots(item?.allowedSlots);
+  if (allowed.length <= 1) return false;
+  const slotsNeeded = clamp(parseInt(item?.slotsNeeded, 10) || 1, 1, 3);
+  return slotsNeeded < countInternalAllowedSlots(allowed);
+}
+
+function renderDescriptionToggleButton(isDescriptionExpanded) {
+  const ariaLabel = isDescriptionExpanded ? "Collapse description" : "Expand description";
+  const chevron = isDescriptionExpanded ? "&#9662;" : "&#9656;";
+  return `<button type="button" class="inventory-desc-toggle-btn" data-action="toggleDescription" aria-label="${ariaLabel}" title="${ariaLabel}" aria-expanded="${isDescriptionExpanded ? "true" : "false"}">${chevron}</button>`;
 }
 
 function collectAllowedSlotsFromForm() {
@@ -482,10 +497,9 @@ function setItemTypeFieldsVisibility(itemType) {
 
   const dormOption = preferredLocation.querySelector("option[value='dorm']");
   if (dormOption) {
-    dormOption.disabled = isItem;
-    dormOption.hidden = isItem;
+    dormOption.disabled = false;
+    dormOption.hidden = false;
   }
-  if (isItem && preferredLocation.value === "dorm") preferredLocation.value = "inventory";
 }
 
 function getItemTypeFromForm() {
@@ -576,10 +590,7 @@ function saveItemFromForm() {
   const description = document.getElementById("itemDescriptionInput").value.trim();
   const itemConfig = getItemConfigFromForm();
   const slotsNeeded = itemConfig.slotsNeeded;
-  const requestedLocation = document.getElementById("itemPreferredLocation").value;
-  const preferredLocation = itemConfig.itemType === "item" && requestedLocation === "dorm"
-    ? "inventory"
-    : requestedLocation;
+  const preferredLocation = document.getElementById("itemPreferredLocation").value;
   const allowedSlots = itemConfig.allowedSlots;
 
   if (!name) {
@@ -632,14 +643,14 @@ function saveItemFromForm() {
   } else if (preferredLocation === "inventory") {
     if (!placeItemInFirstFreeInventorySlot(item)) {
       if (placeItemInDorm(item)) {
-        placementResult = { ok: false, message: "Active inventory is full. Item sent to dorm storage." };
+        placementResult = { ok: false, message: "Active inventory is full. Item sent to storage." };
       } else {
         placementResult = { ok: false, message: "Active inventory is full. Free a slot first." };
       }
     }
   } else {
     if (!placeItemInDorm(item)) {
-      placementResult = { ok: false, message: "This item group cannot be stored in dorm." };
+      placementResult = { ok: false, message: "This item group cannot be stored in storage." };
     }
   }
 
@@ -673,7 +684,14 @@ function buildEquipSelectOptions(itemId, allowedSlots) {
 
 function renderInventoryItemCard(item, controlsHtml, locationTag) {
   const modifier = item.modifier ? `<div class="inventory-item-modifier">${escapeHtml(item.modifier)}</div>` : "";
-  const description = item.description ? `<div class="inventory-item-desc">${escapeHtml(item.description)}</div>` : "";
+  const hasDescription = Boolean(item.description);
+  const isDescriptionExpanded = expandedDescriptionIds.has(item.id);
+  const description = hasDescription
+    ? `<div class="inventory-item-desc${isDescriptionExpanded ? "" : " collapsed"}">${escapeHtml(item.description)}</div>`
+    : "";
+  const descriptionToggle = hasDescription
+    ? renderDescriptionToggleButton(isDescriptionExpanded)
+    : "";
   const normalizedType = normalizeItemType(item.itemType);
   const typeLabel = getItemTypeLabel(normalizedType);
   const equipText = item.allowedSlots.map(slot => getAllowedSlotLabel(slot)).join(", ");
@@ -697,6 +715,7 @@ function renderInventoryItemCard(item, controlsHtml, locationTag) {
         <div class="inventory-item-location">${escapeHtml(locationTag)}</div>
       </div>
       ${modifier}
+      ${descriptionToggle}
       ${description}
       <div class="inventory-item-slots">${slotsMeta}</div>
       <div class="inventory-item-actions">${controlsHtml}</div>
@@ -726,15 +745,23 @@ function renderEquippedSlots() {
     const weaponHandedness = normalizedType === "weapon"
       ? (normalizeWeaponGrip(item.weaponGrip, item.slotsNeeded) === "twoHanded" ? "Two-Handed" : "One-Handed")
       : "";
+    const occupies = normalizedType !== "weapon" && item.equippedSlots.length > 1
+      ? `Occupying: ${item.equippedSlots.map(key => BODY_SLOT_LABELS[key]).join(", ")}`
+      : "";
+    const hasDescription = Boolean(item.description);
+    const isDescriptionExpanded = expandedDescriptionIds.has(item.id);
     return `
       <div class="equipped-slot-card" data-item-id="${item.id}" data-slot-key="${slot}" data-drop-zone="equipped-slot" draggable="true">
         <div class="equipped-slot-label">${BODY_SLOT_LABELS[slot]}</div>
         <div class="equipped-slot-item">${escapeHtml(item.name)}</div>
         ${weaponHandedness ? `<div class="equipped-slot-meta">${weaponHandedness}</div>` : ""}
+        ${occupies ? `<div class="equipped-slot-meta">${occupies}</div>` : ""}
+        ${hasDescription ? renderDescriptionToggleButton(isDescriptionExpanded) : ""}
+        ${hasDescription ? `<div class="equipped-slot-desc${isDescriptionExpanded ? "" : " collapsed"}">${escapeHtml(item.description)}</div>` : ""}
         ${item.modifier ? `<div class="equipped-slot-mod">Active: ${escapeHtml(item.modifier)}</div>` : ""}
         <div class="equipped-slot-actions">
           <button type="button" class="inventory-mini-btn" data-action="unequipToInventory">To Inventory</button>
-          ${isItemTypeDormRestricted(item) ? "" : '<button type="button" class="inventory-mini-btn" data-action="unequipToDorm">To Dorm</button>'}
+          ${isItemTypeDormRestricted(item) ? "" : '<button type="button" class="inventory-mini-btn" data-action="unequipToDorm">To Storage</button>'}
           <button type="button" class="inventory-mini-btn" data-action="editItem">Edit</button>
           <button type="button" class="inventory-mini-btn danger" data-action="deleteItem">Delete</button>
         </div>
@@ -762,16 +789,15 @@ function renderInventorySlots() {
     if (!item) return "";
 
     const controls = `
-      ${buildEquipSelectOptions(item.id, item.allowedSlots)}
+      ${shouldShowEquipTargetSelect(item) ? buildEquipSelectOptions(item.id, item.allowedSlots) : ""}
       <button type="button" class="inventory-mini-btn" data-action="equipItem">Equip</button>
-      ${isItemTypeDormRestricted(item) ? "" : '<button type="button" class="inventory-mini-btn" data-action="toDorm">To Dorm</button>'}
+      ${isItemTypeDormRestricted(item) ? "" : '<button type="button" class="inventory-mini-btn" data-action="toDorm">To Storage</button>'}
       <button type="button" class="inventory-mini-btn" data-action="editItem">Edit</button>
       <button type="button" class="inventory-mini-btn danger" data-action="deleteItem">Delete</button>
     `;
 
     return `
       <div class="inventory-slot-card" data-slot-index="${index}" data-item-id="${item.id}" data-drop-zone="inventory-slot">
-        <div class="inventory-slot-label">Slot ${index + 1}</div>
         ${renderInventoryItemCard(item, controls, "Stored")}
       </div>
     `;
@@ -784,7 +810,7 @@ function renderDormInventory() {
   if (!root) return;
 
   if (!state.dormItemIds.length) {
-    root.innerHTML = '<div class="inventory-slot-empty">Dorm storage is empty.</div>';
+    root.innerHTML = '<div class="inventory-slot-empty">Storage is empty.</div>';
     return;
   }
 
@@ -794,13 +820,13 @@ function renderDormInventory() {
 
     const controls = `
       <button type="button" class="inventory-mini-btn" data-action="toInventory">To Inventory</button>
-      ${buildEquipSelectOptions(item.id, item.allowedSlots)}
+      ${shouldShowEquipTargetSelect(item) ? buildEquipSelectOptions(item.id, item.allowedSlots) : ""}
       <button type="button" class="inventory-mini-btn" data-action="equipItem">Equip</button>
       <button type="button" class="inventory-mini-btn" data-action="editItem">Edit</button>
       <button type="button" class="inventory-mini-btn danger" data-action="deleteItem">Delete</button>
     `;
 
-    return renderInventoryItemCard(item, controls, "Dorm");
+    return renderInventoryItemCard(item, controls, "Storage");
   }).join("");
 }
 
@@ -825,6 +851,13 @@ function handleInventoryActions(event) {
     return;
   }
 
+  if (action === "toggleDescription") {
+    if (expandedDescriptionIds.has(item.id)) expandedDescriptionIds.delete(item.id);
+    else expandedDescriptionIds.add(item.id);
+    renderInventory();
+    return;
+  }
+
   if (action === "equipItem") {
     const preferredSlot = getItemEquipTarget(button, item.id);
     const result = moveItemToEquippedSlot(item, preferredSlot || null);
@@ -836,7 +869,7 @@ function handleInventoryActions(event) {
 
   if (action === "toDorm" || action === "unequipToDorm") {
     if (isItemTypeDormRestricted(item)) {
-      setItemFormError("Items cannot be sent to dorm storage.");
+      setItemFormError("Items cannot be sent to storage.");
       return;
     }
     placeItemInDorm(item);
@@ -930,7 +963,7 @@ function evaluateDropTarget(item, zoneEl, currentTarget) {
 
   if (zoneType === "dorm-list") {
     if (isItemTypeDormRestricted(item)) {
-      return { ok: false, message: "Items cannot be dropped into dorm storage." };
+      return { ok: false, message: "Items cannot be dropped into storage." };
     }
     return { ok: true };
   }
@@ -999,7 +1032,7 @@ function handleInventoryDrop(event) {
     const slotKey = zone?.dataset?.slotKey ?? event.currentTarget?.dataset?.slotKey;
     result = moveItemToEquippedSlot(item, slotKey || null, { strictTarget: true });
   } else if (zoneType === "dorm-list") {
-    result = placeItemInDorm(item) ? { ok: true } : { ok: false, message: "Could not move item to dorm." };
+    result = placeItemInDorm(item) ? { ok: true } : { ok: false, message: "Could not move item to storage." };
   }
 
   clearDropHighlights();
