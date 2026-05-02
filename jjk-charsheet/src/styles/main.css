@@ -1034,16 +1034,17 @@
       border: 1px solid var(--border);
       color: var(--ink-light);
       font-family: 'Cinzel', serif;
-      font-size: 10px;
+      font-size: 14px;
       line-height: 1;
-      width: 18px;
-      height: 16px;
+      width: 22px;
+      height: 20px;
       padding: 0;
-      margin-top: 4px;
+      margin-top: 0;
       cursor: pointer;
       display: inline-flex;
       align-items: center;
       justify-content: center;
+      flex: 0 0 auto;
     }
     .inventory-desc-toggle-btn:hover {
       border-color: var(--ink);
@@ -1070,6 +1071,12 @@
       align-items: baseline;
       gap: 6px;
     }
+    .inventory-item-name-wrap {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      min-width: 0;
+    }
     .inventory-item-location {
       font-family: 'Cinzel', serif;
       font-size: 8px;
@@ -1084,6 +1091,7 @@
       display: flex;
       flex-wrap: wrap;
       gap: 5px;
+      position: relative;
     }
     .inventory-mini-btn {
       background: var(--parchment);
@@ -1099,6 +1107,38 @@
     .inventory-mini-btn:hover { border-color: var(--ink); }
     .inventory-mini-btn.danger { color: var(--accent); border-color: rgba(139, 26, 26, 0.55); }
     .inventory-mini-btn.danger:hover { border-color: var(--accent); }
+    .inventory-icon-btn {
+      text-transform: none;
+      letter-spacing: 0;
+      font-size: 13px;
+      line-height: 1;
+      min-width: 22px;
+      padding: 2px 5px;
+    }
+    .inventory-icon-btn-edit {
+      border: none;
+      background: transparent;
+      color: var(--ink-faint);
+      padding: 0 3px;
+      min-width: auto;
+    }
+    .inventory-icon-btn-edit:hover {
+      border: none;
+      color: var(--ink);
+    }
+    .inventory-equip-picker {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      border: 1px solid var(--border);
+      background: var(--parchment);
+      padding: 4px;
+      position: absolute;
+      left: 0;
+      top: calc(100% + 4px);
+      z-index: 20;
+      box-shadow: 1px 2px 0 rgba(26, 20, 16, 0.2);
+    }
     .inventory-inline-select {
       font-family: 'Crimson Text', serif;
       font-size: 12px;

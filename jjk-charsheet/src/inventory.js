@@ -7,6 +7,7 @@ let isInitialized = false;
 let draggingItemId = null;
 let dragGhostEl = null;
 const expandedDescriptionIds = new Set();
+let openEquipPickerItemId = null;
 
 function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
@@ -447,6 +448,7 @@ function deleteInventoryItem(itemId) {
   if (!item) return;
 
   expandedDescriptionIds.delete(itemId);
+  if (openEquipPickerItemId === itemId) openEquipPickerItemId = null;
   removeItemFromContainers(item);
   state.inventoryItems = state.inventoryItems.filter(entry => entry.id !== itemId);
   if (editingItemId === itemId) resetItemEditor();
@@ -465,6 +467,34 @@ function renderDescriptionToggleButton(isDescriptionExpanded) {
   const ariaLabel = isDescriptionExpanded ? "Collapse description" : "Expand description";
   const chevron = isDescriptionExpanded ? "&#9662;" : "&#9656;";
   return `<button type="button" class="inventory-desc-toggle-btn" data-action="toggleDescription" aria-label="${ariaLabel}" title="${ariaLabel}" aria-expanded="${isDescriptionExpanded ? "true" : "false"}">${chevron}</button>`;
+}
+
+function renderEditButton() {
+  return '<button type="button" class="inventory-mini-btn inventory-icon-btn inventory-icon-btn-edit" data-action="editItem" aria-label="Edit item" title="Edit item">&#9998;</button>';
+}
+
+function renderDeleteButton() {
+  return '<button type="button" class="inventory-mini-btn inventory-icon-btn danger" data-action="deleteItem" aria-label="Delete item" title="Delete item">&#128465;</button>';
+}
+
+function renderEquipPickerMenu(item) {
+  if (!shouldShowEquipTargetSelect(item) || openEquipPickerItemId !== item.id) return "";
+
+  const options = item.allowedSlots.map(slot => `
+    <button type="button" class="inventory-mini-btn" data-action="equipToSlot" data-slot-key="${slot}">${getAllowedSlotLabel(slot)}</button>
+  `).join("");
+
+  return `
+    <div class="inventory-equip-picker" role="menu" aria-label="Choose equip slot">
+      ${options}
+    </div>
+  `;
+}
+
+function closeEquipPicker() {
+  if (!openEquipPickerItemId) return;
+  openEquipPickerItemId = null;
+  renderInventory();
 }
 
 function collectAllowedSlotsFromForm() {
@@ -660,28 +690,6 @@ function saveItemFromForm() {
   if (!placementResult.ok && placementResult.message) setItemFormError(placementResult.message);
 }
 
-function getItemEquipTarget(triggerEl, itemId) {
-  const actionRow = triggerEl.closest(".inventory-item-actions") || triggerEl.closest(".equipped-slot-actions");
-  const select = actionRow?.querySelector(`select[data-equip-select='${itemId}']`)
-    || triggerEl.closest("[data-item-id]")?.querySelector(`select[data-equip-select='${itemId}']`)
-    || document.querySelector(`select[data-equip-select='${itemId}']`);
-  const selected = select ? select.value : "auto";
-  if (!selected || selected === "auto") return null;
-  return selected;
-}
-
-function buildEquipSelectOptions(itemId, allowedSlots) {
-  const options = ["<option value='auto'>Auto</option>"];
-  allowedSlots.forEach(slot => {
-    options.push(`<option value='${slot}'>${getAllowedSlotLabel(slot)}</option>`);
-  });
-  return `
-    <select class="inventory-inline-select" data-equip-select="${itemId}">
-      ${options.join("")}
-    </select>
-  `;
-}
-
 function renderInventoryItemCard(item, controlsHtml, locationTag) {
   const modifier = item.modifier ? `<div class="inventory-item-modifier">${escapeHtml(item.modifier)}</div>` : "";
   const hasDescription = Boolean(item.description);
@@ -711,11 +719,13 @@ function renderInventoryItemCard(item, controlsHtml, locationTag) {
   return `
     <div class="inventory-item-card" data-item-id="${item.id}" draggable="true">
       <div class="inventory-item-top">
-        <div class="inventory-item-name">${escapeHtml(item.name)}</div>
+        <div class="inventory-item-name-wrap">
+          <div class="inventory-item-name">${escapeHtml(item.name)}</div>
+          ${descriptionToggle}
+        </div>
         <div class="inventory-item-location">${escapeHtml(locationTag)}</div>
       </div>
       ${modifier}
-      ${descriptionToggle}
       ${description}
       <div class="inventory-item-slots">${slotsMeta}</div>
       <div class="inventory-item-actions">${controlsHtml}</div>
@@ -762,8 +772,8 @@ function renderEquippedSlots() {
         <div class="equipped-slot-actions">
           <button type="button" class="inventory-mini-btn" data-action="unequipToInventory">To Inventory</button>
           ${isItemTypeDormRestricted(item) ? "" : '<button type="button" class="inventory-mini-btn" data-action="unequipToDorm">To Storage</button>'}
-          <button type="button" class="inventory-mini-btn" data-action="editItem">Edit</button>
-          <button type="button" class="inventory-mini-btn danger" data-action="deleteItem">Delete</button>
+          ${renderEditButton()}
+          ${renderDeleteButton()}
         </div>
       </div>
     `;
@@ -789,11 +799,11 @@ function renderInventorySlots() {
     if (!item) return "";
 
     const controls = `
-      ${shouldShowEquipTargetSelect(item) ? buildEquipSelectOptions(item.id, item.allowedSlots) : ""}
       <button type="button" class="inventory-mini-btn" data-action="equipItem">Equip</button>
+      ${renderEquipPickerMenu(item)}
       ${isItemTypeDormRestricted(item) ? "" : '<button type="button" class="inventory-mini-btn" data-action="toDorm">To Storage</button>'}
-      <button type="button" class="inventory-mini-btn" data-action="editItem">Edit</button>
-      <button type="button" class="inventory-mini-btn danger" data-action="deleteItem">Delete</button>
+      ${renderEditButton()}
+      ${renderDeleteButton()}
     `;
 
     return `
@@ -820,10 +830,10 @@ function renderDormInventory() {
 
     const controls = `
       <button type="button" class="inventory-mini-btn" data-action="toInventory">To Inventory</button>
-      ${shouldShowEquipTargetSelect(item) ? buildEquipSelectOptions(item.id, item.allowedSlots) : ""}
       <button type="button" class="inventory-mini-btn" data-action="equipItem">Equip</button>
-      <button type="button" class="inventory-mini-btn" data-action="editItem">Edit</button>
-      <button type="button" class="inventory-mini-btn danger" data-action="deleteItem">Delete</button>
+      ${renderEquipPickerMenu(item)}
+      ${renderEditButton()}
+      ${renderDeleteButton()}
     `;
 
     return renderInventoryItemCard(item, controls, "Storage");
@@ -842,16 +852,19 @@ function handleInventoryActions(event) {
 
   const action = button.dataset.action;
   if (action === "deleteItem") {
+    openEquipPickerItemId = null;
     deleteInventoryItem(item.id);
     return;
   }
 
   if (action === "editItem") {
+    openEquipPickerItemId = null;
     startItemEdit(item.id);
     return;
   }
 
   if (action === "toggleDescription") {
+    openEquipPickerItemId = null;
     if (expandedDescriptionIds.has(item.id)) expandedDescriptionIds.delete(item.id);
     else expandedDescriptionIds.add(item.id);
     renderInventory();
@@ -859,8 +872,24 @@ function handleInventoryActions(event) {
   }
 
   if (action === "equipItem") {
-    const preferredSlot = getItemEquipTarget(button, item.id);
-    const result = moveItemToEquippedSlot(item, preferredSlot || null);
+    if (shouldShowEquipTargetSelect(item)) {
+      openEquipPickerItemId = openEquipPickerItemId === item.id ? null : item.id;
+      renderInventory();
+      return;
+    }
+
+    openEquipPickerItemId = null;
+    const result = moveItemToEquippedSlot(item, null);
+    renderInventory();
+    scheduleSave();
+    setItemFormError(result.message || "");
+    return;
+  }
+
+  if (action === "equipToSlot") {
+    const selectedSlot = button.dataset.slotKey || null;
+    openEquipPickerItemId = null;
+    const result = moveItemToEquippedSlot(item, selectedSlot);
     renderInventory();
     scheduleSave();
     setItemFormError(result.message || "");
@@ -868,6 +897,7 @@ function handleInventoryActions(event) {
   }
 
   if (action === "toDorm" || action === "unequipToDorm") {
+    openEquipPickerItemId = null;
     if (isItemTypeDormRestricted(item)) {
       setItemFormError("Items cannot be sent to storage.");
       return;
@@ -879,6 +909,7 @@ function handleInventoryActions(event) {
   }
 
   if (action === "toInventory" || action === "unequipToInventory") {
+    openEquipPickerItemId = null;
     if (!placeItemInFirstFreeInventorySlot(item)) {
       setItemFormError("Active inventory is full. Free a slot first.");
       return;
@@ -1230,6 +1261,14 @@ export function initInventory({ getState: getStateFn, scheduleSave: scheduleSave
   });
   itemTypeSelect.addEventListener("change", () => {
     setItemTypeFieldsVisibility(getItemTypeFromForm());
+  });
+
+  document.addEventListener("click", event => {
+    if (!openEquipPickerItemId) return;
+    const clickedInsidePicker = event.target.closest(".inventory-equip-picker");
+    const clickedEquipBtn = event.target.closest("button[data-action='equipItem']");
+    if (clickedInsidePicker || clickedEquipBtn) return;
+    closeEquipPicker();
   });
 
   yenInput.addEventListener("input", e => {
