@@ -162,9 +162,11 @@ function getEquipSlotsForItem(item, preferredPrimarySlot) {
 
   const tryPrimary = (primary) => {
     if (primary && !allowed.includes(primary)) return null;
+    if (primary && !isSlotUsable(primary)) return null;
 
     const chosen = [];
     if (primary) chosen.push(primary);
+    if (chosen.length === slotsNeeded) return chosen;
 
     for (const slot of allowed) {
       if (chosen.includes(slot)) continue;
@@ -311,8 +313,25 @@ function moveItemToEquippedSlot(item, slotKey, options = {}) {
 
   removeItemFromContainers(displacedItem);
 
-  const equipResult = placeItemEquipped(item, slotKey);
-  if (!equipResult.ok) return finalize(equipResult);
+  let equipResult = placeItemEquipped(item, slotKey);
+  if (!equipResult.ok) {
+    const internalAllowed = [...new Set((item.allowedSlots || []).flatMap(toInternalEquipSlots))].filter(slot => BODY_SLOT_KEYS.includes(slot));
+    const slotsNeeded = clamp(parseInt(item.slotsNeeded, 10) || 1, 1, 3);
+    const canDirectEquipToTarget = slotsNeeded === 1
+      && Boolean(slotKey)
+      && internalAllowed.includes(slotKey)
+      && (!state.equippedSlots[slotKey] || state.equippedSlots[slotKey] === item.id);
+
+    if (!canDirectEquipToTarget) return finalize(equipResult);
+
+    // Fallback: directly place single-slot items on the explicit drop slot.
+    removeItemFromContainers(item);
+    state.equippedSlots[slotKey] = item.id;
+    item.location = "equipped";
+    item.inventorySlot = null;
+    item.equippedSlots = [slotKey];
+    equipResult = { ok: true };
+  }
 
   let displacedPlacementResult = { ok: false, message: "Could not place swapped item." };
   if (sourcePlacement.location === "inventory" && Number.isInteger(sourcePlacement.inventorySlot)) {
@@ -1013,3 +1032,4 @@ export function initInventory({ getState: getStateFn, scheduleSave: scheduleSave
   resetItemEditor();
   renderInventory();
 }
+
