@@ -945,13 +945,13 @@
     .inventory-collapsible.collapsed { display: none; }
     .equipped-slots-grid {
       display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
+      grid-template-columns: repeat(2, minmax(0, 1fr));
       grid-template-areas:
-        ". head ."
-        "chest back legs"
-        ". feet ."
-        "leftHand . rightHand"
-        "accessory1 . accessory2";
+        "head chest"
+        "back legs"
+        "feet feet"
+        "leftHand rightHand"
+        "accessory1 accessory2";
       gap: 7px;
     }
     .equipped-slot-card[data-slot-key="head"] { grid-area: head; }
@@ -963,6 +963,11 @@
     .equipped-slot-card[data-slot-key="rightHand"] { grid-area: rightHand; }
     .equipped-slot-card[data-slot-key="accessory1"] { grid-area: accessory1; }
     .equipped-slot-card[data-slot-key="accessory2"] { grid-area: accessory2; }
+    .equipped-slot-card[data-slot-key="feet"] {
+      justify-self: center;
+      width: calc(50% - 3.5px);
+      min-width: 110px;
+    }
     .equipped-slot-card,
     .inventory-slot-card,
     .inventory-item-card {
