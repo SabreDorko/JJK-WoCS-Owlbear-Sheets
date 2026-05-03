@@ -189,13 +189,12 @@ function getEffectiveStatLevel(state, effects, statKey) {
 function getSubskillValue(state, effects, statKey, skillIndex) {
   const overridden = getSubskillOverride(state, statKey, skillIndex);
   if (Number.isFinite(overridden)) return overridden;
-  const statLevel = getEffectiveStatLevel(state, effects, statKey);
   const skillState = state?.stats?.[statKey]?.skills?.[skillIndex] || {};
   const lockedFromArchetype = getArchetypePermanentAptitudeSource(state, statKey, skillIndex);
   const aptitudeBonus = (lockedFromArchetype || getAptitudeState(skillState) > 0) ? 2 : 0;
   const statSkillBonus = effects?.skillBonuses?.[statKey] || 0;
   const specificSkillBonus = effects?.specificSkillBonuses?.[`${statKey}:${skillIndex}`] || 0;
-  return statLevel + aptitudeBonus + statSkillBonus + specificSkillBonus;
+  return aptitudeBonus + statSkillBonus + specificSkillBonus;
 }
 
 function applyDerivedCharacterFields({ preserveCurrent = true } = {}) {
