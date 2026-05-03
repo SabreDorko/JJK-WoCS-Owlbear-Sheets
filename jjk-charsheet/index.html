@@ -400,10 +400,18 @@
 
         <div class="jujutsu-subpanel active" id="jujutsuSubpanelTechnique" data-subpanel="technique" role="tabpanel">
           <div id="techniqueSummaryCard">
-            <button class="technique-edit-icon-btn" id="techniqueEditBtn" type="button" aria-label="Edit Technique" title="Edit Technique">&#9998;</button>
-            <div class="technique-summary-text" id="techniqueSummaryText">No technique.</div>
-            <div class="technique-type-summary" id="techniqueTypeSummary"><em>No Cursed Technique</em></div>
+            <div class="technique-summary-header">
+              <div>
+                <div class="technique-summary-text" id="techniqueSummaryText">No technique.</div>
+                <div class="technique-type-summary" id="techniqueTypeSummary"><em>No Cursed Technique</em></div>
+              </div>
+              <button class="technique-edit-icon-btn" id="techniqueEditBtn" type="button" aria-label="Edit Technique" title="Edit Technique">&#9998;</button>
+            </div>
             <div class="techniques-app-card-grid" id="techniqueApplicationsSummary"></div>
+            <div class="technique-summary-footer" id="techniqueSummaryFooter" style="display:none;">
+              <button class="inventory-mini-btn" id="techniqueAddAppSummaryBtn" type="button">+ Add Application</button>
+              <textarea id="techniqueInlineNotesInput" class="inventory-textarea technique-inline-notes" rows="3" maxlength="500" placeholder="Technique notes / DM rulings..."></textarea>
+            </div>
           </div>
 
           <div id="techniqueEditor" style="display:none;">

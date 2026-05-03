@@ -913,7 +913,23 @@
     .jujutsu-subpanel.active { display: block; padding-top: 8px; }
     #techniqueSummaryCard {
       position: relative;
-      padding-right: 32px;
+    }
+    .technique-summary-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 6px;
+      margin-bottom: 4px;
+    }
+    .technique-summary-footer {
+      display: grid;
+      gap: 6px;
+      margin-top: 8px;
+    }
+    .technique-inline-notes {
+      font-size: 13px;
+      color: var(--ink-light);
+      resize: vertical;
     }
     .technique-edit-icon-btn {
       position: absolute;

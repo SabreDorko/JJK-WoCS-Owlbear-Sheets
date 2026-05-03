@@ -241,8 +241,7 @@ function renderBindingVowsEditor(state) {
     return `
       <div class="techniques-app-editor-item">
         <div class="techniques-app-editor-item-head">
-          <span class="field-label">Vow ${idx + 1}</span>
-          <button type="button" class="inventory-mini-btn inventory-icon-btn danger" data-vow-remove="${idx}" aria-label="Delete vow" title="Delete vow">
+          <button type="button" class="inventory-mini-btn inventory-icon-btn danger" data-vow-remove="${idx}" aria-label="Delete vow" title="Delete vow" style="margin-left:auto;">
             <svg class="inventory-icon-trash" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
               <path fill="currentColor" d="M9 3h6a1 1 0 0 1 1 1v1h4v2h-1l-1 12a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 7H4V5h4V4a1 1 0 0 1 1-1Zm1 2v0h4V5h-4Zm-1 4h2v9H9V9Zm4 0h2v9h-2V9Z"/>
               <path fill="none" stroke="currentColor" stroke-width="1.5" d="M6 7.5h12"/>
@@ -321,6 +320,15 @@ export function updateTechniquesDerivedUI(stateArg = null) {
   if (typeEl) typeEl.innerHTML = `<em>${getTechniqueTypeText(state.techniques.mode)}</em>`;
 
   renderApplicationsSummary(state);
+
+  const hasActiveTechnique = state.techniques.mode !== "none";
+  const summaryFooter = document.getElementById("techniqueSummaryFooter");
+  if (summaryFooter) summaryFooter.style.display = hasActiveTechnique ? "" : "none";
+
+  const inlineNotes = document.getElementById("techniqueInlineNotesInput");
+  if (inlineNotes && document.activeElement !== inlineNotes) {
+    inlineNotes.value = state.techniques.notes || "";
+  }
 }
 
 export function applyTechniquesStateToUI() {
@@ -346,6 +354,9 @@ export function applyTechniquesStateToUI() {
   const notes = document.getElementById("techniqueNotesInput");
   if (notes) notes.value = state.techniques.notes || "";
 
+  const inlineNotes = document.getElementById("techniqueInlineNotesInput");
+  if (inlineNotes) inlineNotes.value = state.techniques.notes || "";
+
   renderApplicationsEditor(state);
   renderBindingVowsEditor(state);
 
@@ -361,7 +372,7 @@ function startTechniqueEditing() {
   if (!state) return;
   _editSnapshot = createEditSnapshot(state);
   _isEditing = true;
-  _editorStep = "mode";
+  _editorStep = "details";
   applyTechniquesStateToUI();
 }
 
@@ -370,7 +381,7 @@ function cancelTechniqueEditing() {
   if (!state) return;
   restoreEditSnapshot(state, _editSnapshot);
   _isEditing = false;
-  _editorStep = "mode";
+  _editorStep = "details";
   refreshCharacterStats();
   applyTechniquesStateToUI();
   scheduleSave();
@@ -399,7 +410,7 @@ function saveTechniqueEditing() {
   if (!state) return;
   ensureTechniquesState(state);
   _isEditing = false;
-  _editorStep = "mode";
+  _editorStep = "details";
   _editSnapshot = null;
   refreshCharacterStats();
   applyTechniquesStateToUI();
@@ -447,6 +458,33 @@ export function initTechniques({ getState: getStateFn, scheduleSave: scheduleSav
 
   const editBtn = document.getElementById("techniqueEditBtn");
   if (editBtn) editBtn.addEventListener("click", startTechniqueEditing);
+
+  const addAppSummaryBtn = document.getElementById("techniqueAddAppSummaryBtn");
+  if (addAppSummaryBtn) {
+    addAppSummaryBtn.addEventListener("click", () => {
+      const state = getState();
+      if (!state) return;
+      ensureTechniquesState(state);
+      state.techniques.applications.push(createDefaultApplication(state.techniques.applications.length));
+      _editSnapshot = createEditSnapshot(state);
+      _isEditing = true;
+      _editorStep = "details";
+      applyTechniquesStateToUI();
+    });
+  }
+
+  const inlineNotesInput = document.getElementById("techniqueInlineNotesInput");
+  if (inlineNotesInput) {
+    inlineNotesInput.addEventListener("input", e => {
+      const state = getState();
+      if (!state) return;
+      ensureTechniquesState(state);
+      state.techniques.notes = String(e.target.value || "");
+      const editorNotes = document.getElementById("techniqueNotesInput");
+      if (editorNotes && document.activeElement !== editorNotes) editorNotes.value = state.techniques.notes;
+      scheduleSave();
+    });
+  }
 
   const modeContinueBtn = document.getElementById("techniqueModeContinueBtn");
   if (modeContinueBtn) modeContinueBtn.addEventListener("click", continueTechniqueEditingFromMode);
@@ -543,8 +581,8 @@ export function initTechniques({ getState: getStateFn, scheduleSave: scheduleSav
       const state = getState();
       if (!state) return;
       ensureTechniquesState(state);
-      state.techniques.notes = e.target.value;
-      scheduleSave();
+      state.techniques.notes = e.target.value;      const inlineNotes = document.getElementById("techniqueInlineNotesInput");
+      if (inlineNotes && document.activeElement !== inlineNotes) inlineNotes.value = state.techniques.notes;      scheduleSave();
     });
   }
 
