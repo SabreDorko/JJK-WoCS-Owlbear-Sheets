@@ -1628,8 +1628,8 @@
     }
     .techniques-app-metrics {
       display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
+      flex-direction: column;
+      gap: 3px;
       margin-bottom: 6px;
       padding: 0;
       border: 0;
