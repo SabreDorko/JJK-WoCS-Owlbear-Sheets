@@ -95,11 +95,10 @@ function formatRollBody(entry) {
   const modeLabel = rollModeLabel(entry.rollMode || breakdown?.rollMode);
 
   if (modeLabel && comparedRolls?.length === 2 && comparedTotals?.length === 2) {
-    const firstLine = formatRollFormula(entry, comparedRolls[0], comparedTotals[0]);
-    const secondLine = formatRollFormula(entry, comparedRolls[1], comparedTotals[1]);
-    const firstClass = selectedIndex === 0 ? "roll-compared-line roll-compared-kept" : "roll-compared-line roll-compared-discarded";
-    const secondClass = selectedIndex === 1 ? "roll-compared-line roll-compared-kept" : "roll-compared-line roll-compared-discarded";
-    return `${modeLabel}:<br><span class="${firstClass}">${firstLine}</span><span class="${secondClass}">${secondLine}</span>`;
+    const discardedIndex = selectedIndex === 0 ? 1 : 0;
+    const discardedLine = formatRollFormula(entry, comparedRolls[discardedIndex], comparedTotals[discardedIndex]);
+    const keptLine = formatRollFormula(entry, comparedRolls[selectedIndex], comparedTotals[selectedIndex]);
+    return `<span class="roll-compared-line roll-compared-discarded">${discardedLine}</span><span class="roll-compared-line roll-compared-kept">${keptLine}</span>`;
   }
 
   return formatRollFormula(entry);
