@@ -69,8 +69,7 @@ export function defaultState() {
     techniques: {
       mode: "none",
       activeSubtab: "technique",
-      ctAbilities: ["", "", ""],
-      domainAbilities: ["", "", ""],
+      applications: [],
       noCtPath: "",
       notes: "",
     },

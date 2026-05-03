@@ -915,8 +915,51 @@
       font-family: 'Crimson Text', serif;
       font-size: 18px;
       color: var(--ink);
-      margin-bottom: 8px;
+      margin-bottom: 2px;
       line-height: 1.2;
+    }
+    .technique-type-summary {
+      font-family: 'Crimson Text', serif;
+      font-size: 14px;
+      color: var(--ink-faint);
+      margin-bottom: 8px;
+    }
+    .techniques-app-card-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 7px;
+      margin-bottom: 8px;
+    }
+    .techniques-app-card {
+      border: 1px solid var(--border);
+      background: rgba(240, 235, 224, 0.72);
+      padding: 7px 8px;
+      min-height: 72px;
+    }
+    .techniques-app-card-title {
+      font-family: 'Cinzel', serif;
+      font-size: 10px;
+      letter-spacing: 0.9px;
+      text-transform: uppercase;
+      color: var(--ink);
+      margin-bottom: 4px;
+      line-height: 1.2;
+    }
+    .techniques-app-card-desc {
+      font-family: 'Crimson Text', serif;
+      font-size: 13px;
+      color: var(--ink-light);
+      line-height: 1.25;
+      white-space: pre-wrap;
+    }
+    .techniques-app-empty {
+      border: 1px dashed var(--border-strong);
+      background: rgba(240, 235, 224, 0.45);
+      font-family: 'Crimson Text', serif;
+      font-size: 13px;
+      color: var(--ink-faint);
+      font-style: italic;
+      padding: 7px 8px;
     }
     .techniques-layout {
       display: grid;
@@ -965,52 +1008,40 @@
       color: var(--accent);
       font-weight: 600;
     }
-    .techniques-ability-grid {
-      display: grid;
-      gap: 4px;
-    }
-    .techniques-rules-grid {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 6px;
-      margin-bottom: 5px;
-    }
-    .techniques-rule-chip {
-      border: 1px solid var(--border);
-      background: rgba(240, 235, 224, 0.65);
-      padding: 5px 7px;
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
-    }
-    .techniques-rule-label {
-      font-family: 'Cinzel', serif;
-      font-size: 8px;
-      letter-spacing: 1px;
-      text-transform: uppercase;
-      color: var(--ink-faint);
-    }
-    .techniques-rule-chip strong {
-      font-family: 'Cinzel', serif;
-      font-size: 18px;
-      line-height: 1;
-      color: var(--ink);
-    }
-    .techniques-warning {
-      border: 1px solid rgba(139, 26, 26, 0.45);
-      background: rgba(139, 26, 26, 0.08);
-      color: #6b1515;
-      font-family: 'Crimson Text', serif;
-      font-size: 13px;
-      padding: 5px 6px;
-      margin-bottom: 4px;
-    }
     .techniques-muted {
       font-family: 'Crimson Text', serif;
       font-size: 13px;
       color: var(--ink-light);
       line-height: 1.35;
       font-style: italic;
+    }
+    .techniques-app-editor-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+    }
+    .techniques-app-editor-list {
+      display: grid;
+      gap: 8px;
+    }
+    .techniques-app-editor-item {
+      border: 1px solid var(--border);
+      background: rgba(240, 235, 224, 0.65);
+      padding: 6px 7px;
+    }
+    .techniques-app-editor-item-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 4px;
+      gap: 6px;
+    }
+    .techniques-app-remove-btn {
+      width: auto;
+      min-width: auto;
+      padding: 3px 8px;
+      font-size: 8px;
     }
     .techniques-actions-row {
       margin-top: 8px;
@@ -1854,7 +1885,7 @@
       .inventory-form-grid { grid-template-columns: 1fr; }
       .slot-option-grid { grid-template-columns: 1fr; }
       .techniques-layout { grid-template-columns: 1fr; }
-      .techniques-rules-grid { grid-template-columns: 1fr; }
+      .techniques-app-card-grid { grid-template-columns: 1fr; }
     }
 
     /* ── PARTY TAB ── */

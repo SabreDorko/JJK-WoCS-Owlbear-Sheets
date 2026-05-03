@@ -1,5 +1,3 @@
-import { computeActiveModifierEffects } from "./modifiers.js";
-
 let _getState = null;
 let _scheduleSave = null;
 let _refreshCharacterStats = null;
@@ -28,6 +26,16 @@ function parseNonNegativeInt(rawValue) {
   return Math.max(0, parsed);
 }
 
+function normalizeApplication(raw, index) {
+  const fallbackTitle = `Application ${index + 1}`;
+  const title = String(raw?.title || "").trim();
+  const description = String(raw?.description || "").trim();
+  return {
+    title: title || fallbackTitle,
+    description,
+  };
+}
+
 function ensureTechniquesState(state) {
   if (!state || typeof state !== "object") return;
   if (!state.techniques || typeof state.techniques !== "object") state.techniques = {};
@@ -35,12 +43,19 @@ function ensureTechniquesState(state) {
   const techniques = state.techniques;
   if (!["ct", "domain", "none"].includes(techniques.mode)) techniques.mode = "none";
   if (!JUJUTSU_SUBTABS.has(techniques.activeSubtab)) techniques.activeSubtab = "technique";
-  if (!Array.isArray(techniques.ctAbilities)) techniques.ctAbilities = ["", "", ""];
-  if (!Array.isArray(techniques.domainAbilities)) techniques.domainAbilities = ["", "", ""];
-  while (techniques.ctAbilities.length < 3) techniques.ctAbilities.push("");
-  while (techniques.domainAbilities.length < 3) techniques.domainAbilities.push("");
-  techniques.ctAbilities = techniques.ctAbilities.slice(0, 3).map(v => String(v || ""));
-  techniques.domainAbilities = techniques.domainAbilities.slice(0, 3).map(v => String(v || ""));
+  if (!Array.isArray(techniques.applications)) techniques.applications = [];
+
+  if (!techniques.applications.length) {
+    const legacyCt = Array.isArray(techniques.ctAbilities) ? techniques.ctAbilities : [];
+    const legacyDomain = Array.isArray(techniques.domainAbilities) ? techniques.domainAbilities : [];
+    const legacy = [...legacyCt, ...legacyDomain]
+      .map(v => String(v || "").trim())
+      .filter(Boolean)
+      .map((title, idx) => ({ title: title || `Application ${idx + 1}`, description: "" }));
+    if (legacy.length) techniques.applications = legacy;
+  }
+
+  techniques.applications = techniques.applications.map((entry, idx) => normalizeApplication(entry, idx));
   techniques.noCtPath = String(techniques.noCtPath || "");
   techniques.notes = String(techniques.notes || "");
 }
@@ -93,9 +108,73 @@ function getTechniqueSummaryText(state) {
   const mode = state.techniques.mode;
   const name = String(state.ct || "").trim();
   if (mode === "none") return "No technique.";
-  if (!name) return mode === "domain" ? "Domain-based cursed technique." : "Cursed technique.";
-  if (mode === "domain") return `${name} (Domain-Based Cursed Technique)`;
-  return name;
+  return name || "Unnamed technique";
+}
+
+function getTechniqueTypeText(mode) {
+  if (mode === "domain") return "Domain-Based Cursed Technique";
+  if (mode === "none") return "No Cursed Technique";
+  return "Cursed Technique";
+}
+
+function renderApplicationsSummary(state) {
+  const grid = document.getElementById("techniqueApplicationsSummary");
+  if (!grid) return;
+
+  const mode = state?.techniques?.mode || "none";
+  const apps = Array.isArray(state?.techniques?.applications) ? state.techniques.applications : [];
+
+  if (mode === "none") {
+    grid.innerHTML = "";
+    return;
+  }
+
+  if (!apps.length) {
+    grid.innerHTML = '<div class="techniques-app-empty">No applications added yet.</div>';
+    return;
+  }
+
+  grid.innerHTML = apps.map((app, idx) => {
+    const normalized = normalizeApplication(app, idx);
+    const description = normalized.description || "No description yet.";
+    return `
+      <article class="techniques-app-card">
+        <h4 class="techniques-app-card-title">${normalized.title}</h4>
+        <p class="techniques-app-card-desc">${description}</p>
+      </article>
+    `;
+  }).join("");
+}
+
+function renderApplicationsEditor(state) {
+  const list = document.getElementById("techniqueApplicationsList");
+  if (!list) return;
+
+  const apps = Array.isArray(state?.techniques?.applications) ? state.techniques.applications : [];
+  if (!apps.length) {
+    list.innerHTML = '<div class="techniques-app-empty">No applications yet. Add one to get started.</div>';
+    return;
+  }
+
+  list.innerHTML = apps.map((app, idx) => {
+    const normalized = normalizeApplication(app, idx);
+    return `
+      <div class="techniques-app-editor-item">
+        <div class="techniques-app-editor-item-head">
+          <span class="field-label">Application ${idx + 1}</span>
+          <button type="button" class="inventory-secondary-btn techniques-app-remove-btn" data-app-remove="${idx}">Remove</button>
+        </div>
+        <label class="techniques-field" for="techniqueAppTitle${idx}">
+          <span class="field-label">Title</span>
+          <input id="techniqueAppTitle${idx}" class="meta-input" data-app-title="${idx}" value="${normalized.title}" />
+        </label>
+        <label class="techniques-field" for="techniqueAppDesc${idx}">
+          <span class="field-label">Description</span>
+          <textarea id="techniqueAppDesc${idx}" class="inventory-textarea" rows="3" maxlength="360" data-app-description="${idx}">${normalized.description}</textarea>
+        </label>
+      </div>
+    `;
+  }).join("");
 }
 
 function setEditorVisibility() {
@@ -110,17 +189,6 @@ function setEditorVisibility() {
   if (detailsStep) detailsStep.style.display = _isEditing && _editorStep === "details" ? "" : "none";
 }
 
-function getEffectiveTechniqueLevel(state) {
-  const effects = computeActiveModifierEffects(state);
-  const baseLevel = parseNonNegativeInt(state?.stats?.technique?.score);
-  return Math.max(0, baseLevel + (effects?.statBonuses?.technique || 0));
-}
-
-function getFilledAbilityCount(list) {
-  if (!Array.isArray(list)) return 0;
-  return list.filter(name => String(name || "").trim()).length;
-}
-
 function getSelectedMode() {
   if (document.getElementById("techniqueModeDomain")?.checked) return "domain";
   if (document.getElementById("techniqueModeNone")?.checked) return "none";
@@ -129,14 +197,12 @@ function getSelectedMode() {
 
 function setModeUI(mode) {
   const isNone = mode === "none";
-  const isDomain = mode === "domain";
-
-  const ctSection = document.getElementById("techniquesCtSection");
-  const domainSection = document.getElementById("techniquesDomainSection");
+  const nameField = document.getElementById("techniquesNameField");
+  const applicationsSection = document.getElementById("techniquesApplicationsSection");
   const noCtSection = document.getElementById("techniquesNoCtSection");
 
-  if (ctSection) ctSection.style.display = isNone ? "none" : "";
-  if (domainSection) domainSection.style.display = isDomain ? "" : "none";
+  if (nameField) nameField.style.display = isNone ? "none" : "";
+  if (applicationsSection) applicationsSection.style.display = isNone ? "none" : "";
   if (noCtSection) noCtSection.style.display = isNone ? "" : "none";
 }
 
@@ -155,50 +221,19 @@ function syncTechniqueNameInput() {
   }
 }
 
-function updateCapacityWarning(state, techniqueLevel) {
-  const warningEl = document.getElementById("techniquesCapacityWarning");
-  if (!warningEl) return;
-
-  const mode = state?.techniques?.mode || "ct";
-  const ctFilled = getFilledAbilityCount(state?.techniques?.ctAbilities);
-  const startingCtCap = Math.max(0, Math.min(3, techniqueLevel));
-  const domainOutsideCap = Math.max(0, techniqueLevel);
-
-  let warningText = "";
-  if (mode === "ct" && ctFilled > startingCtCap) {
-    warningText = `You have ${ctFilled} CT abilities listed, but your current starting cap is ${startingCtCap}.`;
-  } else if (mode === "domain" && ctFilled > domainOutsideCap) {
-    warningText = `You have ${ctFilled} outside-domain abilities listed, but your current outside-domain cap is ${domainOutsideCap}.`;
-  }
-
-  warningEl.textContent = warningText;
-  warningEl.style.display = warningText ? "block" : "none";
-}
-
 export function updateTechniquesDerivedUI(stateArg = null) {
   const state = stateArg || getState();
   if (!state) return;
 
   ensureTechniquesState(state);
 
-  const techniqueLevel = getEffectiveTechniqueLevel(state);
-  const startingCtCap = Math.max(0, Math.min(3, techniqueLevel));
-  const domainOutsideCap = Math.max(0, techniqueLevel);
-  const autoSuccessThreshold = techniqueLevel * 2;
+  const summaryEl = document.getElementById("techniqueSummaryText");
+  if (summaryEl) summaryEl.textContent = getTechniqueSummaryText(state);
 
-  const levelEl = document.getElementById("techniqueLevelValue");
-  const capEl = document.getElementById("ctAbilityCapValue");
-  const domainCapEl = document.getElementById("domainOutsideCapValue");
-  const autoEl = document.getElementById("talentAutoValue");
-  const ceEl = document.getElementById("domainCeValue");
+  const typeEl = document.getElementById("techniqueTypeSummary");
+  if (typeEl) typeEl.innerHTML = `<em>${getTechniqueTypeText(state.techniques.mode)}</em>`;
 
-  if (levelEl) levelEl.textContent = String(techniqueLevel);
-  if (capEl) capEl.textContent = String(startingCtCap);
-  if (domainCapEl) domainCapEl.textContent = String(domainOutsideCap);
-  if (autoEl) autoEl.textContent = `< ${autoSuccessThreshold}`;
-  if (ceEl) ceEl.textContent = state.techniques.mode === "domain" ? "+10 (active)" : "+10";
-
-  updateCapacityWarning(state, techniqueLevel);
+  renderApplicationsSummary(state);
 }
 
 export function applyTechniquesStateToUI() {
@@ -218,21 +253,13 @@ export function applyTechniquesStateToUI() {
   const nameInput = document.getElementById("techniqueNameInput");
   if (nameInput) nameInput.value = state.ct || "";
 
-  for (let i = 0; i < 3; i += 1) {
-    const ctInput = document.getElementById(`ctAbilityInput${i + 1}`);
-    const domainInput = document.getElementById(`domainAbilityInput${i + 1}`);
-    if (ctInput) ctInput.value = state.techniques.ctAbilities[i] || "";
-    if (domainInput) domainInput.value = state.techniques.domainAbilities[i] || "";
-  }
-
   const noCtPath = document.getElementById("noCtPathSelect");
   if (noCtPath) noCtPath.value = state.techniques.noCtPath || "";
 
   const notes = document.getElementById("techniqueNotesInput");
   if (notes) notes.value = state.techniques.notes || "";
 
-  const summaryEl = document.getElementById("techniqueSummaryText");
-  if (summaryEl) summaryEl.textContent = getTechniqueSummaryText(state);
+  renderApplicationsEditor(state);
 
   setJujutsuSubtabUI(getActiveSubtab(state));
 
@@ -353,33 +380,61 @@ export function initTechniques({ getState: getStateFn, scheduleSave: scheduleSav
       state.ct = e.target.value;
       const headerInput = document.getElementById("ctInput");
       if (headerInput && headerInput.value !== state.ct) headerInput.value = state.ct;
+      updateTechniquesDerivedUI(state);
       scheduleSave();
     });
   }
 
-  for (let i = 0; i < 3; i += 1) {
-    const ctInput = document.getElementById(`ctAbilityInput${i + 1}`);
-    if (ctInput) {
-      ctInput.addEventListener("input", e => {
-        const state = getState();
-        if (!state) return;
-        ensureTechniquesState(state);
-        state.techniques.ctAbilities[i] = e.target.value;
-        updateTechniquesDerivedUI(state);
-        scheduleSave();
+  const addApplicationBtn = document.getElementById("addTechniqueApplicationBtn");
+  if (addApplicationBtn) {
+    addApplicationBtn.addEventListener("click", () => {
+      const state = getState();
+      if (!state) return;
+      ensureTechniquesState(state);
+      state.techniques.applications.push({
+        title: `Application ${state.techniques.applications.length + 1}`,
+        description: "",
       });
-    }
+      renderApplicationsEditor(state);
+      updateTechniquesDerivedUI(state);
+      scheduleSave();
+    });
+  }
 
-    const domainInput = document.getElementById(`domainAbilityInput${i + 1}`);
-    if (domainInput) {
-      domainInput.addEventListener("input", e => {
-        const state = getState();
-        if (!state) return;
-        ensureTechniquesState(state);
-        state.techniques.domainAbilities[i] = e.target.value;
-        scheduleSave();
-      });
-    }
+  const appList = document.getElementById("techniqueApplicationsList");
+  if (appList) {
+    appList.addEventListener("input", e => {
+      const state = getState();
+      if (!state) return;
+      ensureTechniquesState(state);
+
+      const titleIdx = parseNonNegativeInt(e.target?.dataset?.appTitle);
+      const descIdx = parseNonNegativeInt(e.target?.dataset?.appDescription);
+
+      if (e.target?.dataset?.appTitle !== undefined && state.techniques.applications[titleIdx]) {
+        state.techniques.applications[titleIdx].title = String(e.target.value || "");
+      }
+      if (e.target?.dataset?.appDescription !== undefined && state.techniques.applications[descIdx]) {
+        state.techniques.applications[descIdx].description = String(e.target.value || "");
+      }
+
+      updateTechniquesDerivedUI(state);
+      scheduleSave();
+    });
+
+    appList.addEventListener("click", e => {
+      const removeIdxRaw = e.target?.dataset?.appRemove;
+      if (removeIdxRaw === undefined) return;
+      const state = getState();
+      if (!state) return;
+      ensureTechniquesState(state);
+      const removeIdx = parseNonNegativeInt(removeIdxRaw);
+      state.techniques.applications.splice(removeIdx, 1);
+      state.techniques.applications = state.techniques.applications.map((entry, idx) => normalizeApplication(entry, idx));
+      renderApplicationsEditor(state);
+      updateTechniquesDerivedUI(state);
+      scheduleSave();
+    });
   }
 
   const noCtPathSelect = document.getElementById("noCtPathSelect");
