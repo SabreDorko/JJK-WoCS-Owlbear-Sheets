@@ -51,6 +51,7 @@ let state           = defaultState();
 let localPlayerId = null;
 let localPlayerName = "";
 let obrReady = false;
+let _lastSaveTooltip = "No save yet.";
 
 function formatSavedAt(savedAt) {
   const parsed = parseInt(savedAt, 10);
@@ -66,33 +67,44 @@ function getSaveSourceLabel(source) {
   return "Unknown";
 }
 
-function setSaveStatusBadge({ text, pending = false, error = false }) {
+function setSaveStatusBadge({ label, tooltip, pending = false, error = false }) {
   const badge = document.getElementById("saveStatusBadge");
+  const labelEl = document.getElementById("saveStatusLabel");
   if (!badge) return;
-  badge.textContent = text;
+  if (labelEl) labelEl.textContent = label;
+  else badge.textContent = label;
+  const title = String(tooltip || "").trim() || "No save yet.";
+  badge.title = title;
+  badge.setAttribute("aria-label", `${label}. ${title}`);
   badge.classList.toggle("is-pending", Boolean(pending));
   badge.classList.toggle("is-error", Boolean(error));
 }
 
 function showSavePendingStatus() {
-  setSaveStatusBadge({ text: "Last Saved: saving...", pending: true });
+  const pendingTooltip = _lastSaveTooltip === "No save yet."
+    ? "Saving changes..."
+    : `${_lastSaveTooltip}\nSaving changes...`;
+  setSaveStatusBadge({ label: "Saving", tooltip: pendingTooltip, pending: true });
 }
 
 function showSavedStatus(info) {
   const timeText = formatSavedAt(info?.savedAt);
   const sourceText = getSaveSourceLabel(info?.source);
-  setSaveStatusBadge({ text: `Last Saved: ${timeText} (${sourceText})` });
+  _lastSaveTooltip = `Last saved: ${timeText}\nSource: ${sourceText}`;
+  setSaveStatusBadge({ label: "Saved", tooltip: _lastSaveTooltip });
 }
 
 function showLoadedStatus(info) {
   if (!info || info.source === "none") {
-    setSaveStatusBadge({ text: "Last Saved: no prior save", error: true });
+    _lastSaveTooltip = "No prior save found for this sheet yet.";
+    setSaveStatusBadge({ label: "Unsaved", tooltip: _lastSaveTooltip, error: true });
     return;
   }
 
   const timeText = formatSavedAt(info?.savedAt);
   const sourceText = getSaveSourceLabel(info?.source);
-  setSaveStatusBadge({ text: `Last Saved: ${timeText} (${sourceText})` });
+  _lastSaveTooltip = `Loaded save: ${timeText}\nSource: ${sourceText}`;
+  setSaveStatusBadge({ label: "Saved", tooltip: _lastSaveTooltip });
 }
 
 function getPreferredPlayerName() {
@@ -154,7 +166,7 @@ function activateMainTab(tabName) {
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
 async function init() {
-  setSaveStatusBadge({ text: "Last Saved: waiting...", pending: true });
+  setSaveStatusBadge({ label: "Saving", tooltip: "Waiting for initial load...", pending: true });
 
   initParty({
     getState: () => state,
