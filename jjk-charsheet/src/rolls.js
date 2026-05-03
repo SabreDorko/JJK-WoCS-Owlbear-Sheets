@@ -97,9 +97,9 @@ function formatRollBody(entry) {
   if (modeLabel && comparedRolls?.length === 2 && comparedTotals?.length === 2) {
     const firstLine = formatRollFormula(entry, comparedRolls[0], comparedTotals[0]);
     const secondLine = formatRollFormula(entry, comparedRolls[1], comparedTotals[1]);
-    const keptLabel = selectedIndex === 0 ? "first" : "second";
-    const verb = modeLabel === "Advantage" ? "keeping higher" : "keeping lower";
-    return `${modeLabel}: ${verb} (${keptLabel})<br>${firstLine}<br>${secondLine}`;
+    const firstClass = selectedIndex === 0 ? "roll-compared-line roll-compared-kept" : "roll-compared-line roll-compared-discarded";
+    const secondClass = selectedIndex === 1 ? "roll-compared-line roll-compared-kept" : "roll-compared-line roll-compared-discarded";
+    return `${modeLabel}:<br><span class="${firstClass}">${firstLine}</span><span class="${secondClass}">${secondLine}</span>`;
   }
 
   return formatRollFormula(entry);

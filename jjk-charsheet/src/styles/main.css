@@ -770,6 +770,21 @@
       color: var(--ink);
       line-height: 1.25;
     }
+    .roll-compared-line {
+      display: block;
+      margin-top: 2px;
+      transition: opacity 120ms ease, font-size 120ms ease;
+    }
+    .roll-compared-kept {
+      font-weight: 700;
+      font-size: 1.05em;
+      color: var(--ink);
+      opacity: 1;
+    }
+    .roll-compared-discarded {
+      font-weight: 400;
+      opacity: 0.55;
+    }
     .roll-history-btn {
       position: static;
       font-family: 'Cinzel', serif;
