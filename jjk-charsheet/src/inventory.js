@@ -279,10 +279,9 @@ function setModifierEditMode(isEditing) {
   if (editBtn) editBtn.textContent = isModifierEditMode ? "Done" : "Edit";
   if (addBtn) addBtn.hidden = !isModifierEditMode;
   if (editor) editor.hidden = false;
-  if (!isModifierEditMode) {
-    editingModifierIndex = null;
-    setModifierFormVisibility(false);
-  }
+  if (!isModifierEditMode) editingModifierIndex = null;
+  // Keep the Type/Stat/Substat/Value form hidden unless Add/Edit action explicitly opens it.
+  setModifierFormVisibility(false);
   renderDraftModifierList();
 }
 
