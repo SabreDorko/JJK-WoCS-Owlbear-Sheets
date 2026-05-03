@@ -395,7 +395,10 @@ function buildStatBlocks(defs, container) {
       setInputValueWithPulse(document.getElementById("hpMax"), state.hpMax || "");
       setInputValueWithPulse(document.getElementById("ceMax"), state.ceMax || "");
       setInputValueWithPulse(document.getElementById("moveInput"), state.movement || "");
-      if (def.key === "technique") updateBlackFlashRangeDisplay();
+      if (def.key === "technique") {
+        updateBlackFlashRangeDisplay();
+        updateTechniquesDerivedUI();
+      }
       scheduleSave();
     });
   });

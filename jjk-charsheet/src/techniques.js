@@ -1,3 +1,5 @@
+import { computeActiveModifierEffects, getRollModifierSources } from "./modifiers.js";
+
 let _getState = null;
 let _scheduleSave = null;
 let _refreshCharacterStats = null;
@@ -37,12 +39,13 @@ function performApplicationCast(state, techniqueIndex, applicationIndex) {
   const normalized = normalizeApplication(app, applicationIndex);
   const dc = normalized.dc || 0;
   const ceCost = normalized.ceCost || 0;
-  const sorcererXp = parseNonNegativeInt(state.sorcererXp);
+  const techScore = parseNonNegativeInt(state?.stats?.technique?.score);
+  const xpThreshold = techScore * 2;
   const ceCurrent = parseNonNegativeInt(state.ceCurrent);
   const label = `${techniqueName} › ${normalized.title}`;
-  
-  // Check if auto-pass (DC < Sorcerer XP)
-  if (dc < sorcererXp) {
+
+  // Check if auto-pass (DC < XP Threshold = technique score × 2)
+  if (xpThreshold > 0 && dc < xpThreshold) {
     // Auto-pass: log as "Pass" without rolling
     if (_showRollToast) {
       _showRollToast(label, 0, [], 0, "pass", null, null);
@@ -55,18 +58,21 @@ function performApplicationCast(state, techniqueIndex, applicationIndex) {
   }
   
   // Normal roll: talent check (Technique skill)
-  const techScore = parseNonNegativeInt(state?.stats?.technique?.score);
   const talentSkillIndex = 3; // Talent is the 4th skill in Technique (index 3)
   const talentAptitude = state?.stats?.technique?.skills?.[talentSkillIndex]?.aptitude || 0;
-  const diceCount = Math.max(1, techScore + (talentAptitude > 0 ? 2 : 0));
-  
+  const diceCount = Math.max(1, techScore);
+  const talentBonus = talentAptitude > 0 ? 2 : 0;
+  const effects = computeActiveModifierEffects(state);
+  const rollBonus = effects?.rollBonuses?.technique || 0;
+
   const rolls = Array.from({ length: diceCount }, () => Math.floor(Math.random() * 6) + 1);
-  const total = rolls.reduce((a, b) => a + b, 0);
-  const maxPossible = diceCount * 6;
+  const rawTotal = rolls.reduce((a, b) => a + b, 0);
+  const total = rawTotal + talentBonus + rollBonus;
+  const maxPossible = diceCount * 6 + talentBonus + rollBonus;
   const allOnes = rolls.every(r => r === 1);
-  
+
   let rollStatus = null;
-  
+
   if (allOnes) {
     rollStatus = "fail";
   } else if (total >= dc) {
@@ -78,10 +84,15 @@ function performApplicationCast(state, techniqueIndex, applicationIndex) {
   } else {
     rollStatus = "fail";
   }
-  
+
+  const breakdown = {
+    skillModifier: talentBonus,
+    equipmentBonuses: getRollModifierSources(state, "technique"),
+  };
+
   // Show the toast and log the roll
   if (_showRollToast) {
-    _showRollToast(label, diceCount, rolls, total, rollStatus, null, null);
+    _showRollToast(label, diceCount, rolls, total, rollStatus, "Talent", breakdown);
   }
   
   // Deduct CE
@@ -101,16 +112,17 @@ function getApplicationButtonState(state, applicationIndex) {
   const dc = normalized.dc || 0;
   const ceCost = normalized.ceCost || 0;
   const ceCurrent = parseNonNegativeInt(state.ceCurrent);
-  const sorcererXp = parseNonNegativeInt(state.sorcererXp);
-  
+  const techScore = parseNonNegativeInt(state?.stats?.technique?.score);
+  const xpThreshold = techScore * 2;
+
   // Check if insufficient CE
   if (ceCurrent < ceCost) {
     return { disabled: true, isAutoPass: false, tooltip: `Insufficient CE (need ${ceCost})` };
   }
-  
-  // Check if auto-pass
-  if (dc < sorcererXp) {
-    return { disabled: false, isAutoPass: true, tooltip: "Guaranteed success" };
+
+  // Check if auto-pass (DC < XP Threshold = technique score × 2)
+  if (xpThreshold > 0 && dc < xpThreshold) {
+    return { disabled: false, isAutoPass: true, tooltip: `Auto-pass (DC ${dc} < threshold ${xpThreshold})` };
   }
   
   return { disabled: false, isAutoPass: false, tooltip: "Roll talent check" };
@@ -604,6 +616,19 @@ export function updateTechniquesDerivedUI(stateArg = null) {
   const typeEl = document.getElementById("techniqueTypeSummary");
   if (typeEl) typeEl.innerHTML = `<em>${getTechniqueTypeText(state.techniques.mode)}</em>`;
 
+  const techScore = parseNonNegativeInt(state?.stats?.technique?.score);
+  const xpThreshold = techScore * 2;
+  const thresholdEl = document.getElementById("techniqueXpThreshold");
+  if (thresholdEl) {
+    const hasApps = Array.isArray(state?.techniques?.applications) && state.techniques.applications.length > 0;
+    if (hasApps && techScore > 0) {
+      thresholdEl.textContent = `XP Threshold: ${xpThreshold} (Technique ${techScore} × 2) — DC below this auto-passes`;
+      thresholdEl.style.display = "";
+    } else {
+      thresholdEl.style.display = "none";
+    }
+  }
+
   renderApplicationsSummary(state);
 
   const hasActiveTechnique = state.techniques.mode !== "none";
@@ -797,6 +822,8 @@ export function initTechniques({ getState: getStateFn, scheduleSave: scheduleSav
   const summaryGrid = document.getElementById("techniqueApplicationsSummary");
   if (summaryGrid) {
     summaryGrid.addEventListener("click", e => {
+      e.preventDefault();
+      e.stopPropagation();
       // Open edit (pencil icon on view card)
       const openTrigger = e.target?.closest?.("[data-app-edit-toggle]");
       if (openTrigger) {
@@ -852,8 +879,6 @@ export function initTechniques({ getState: getStateFn, scheduleSave: scheduleSav
       // Cast/Use Application
       const castTrigger = e.target?.closest?.("[data-app-cast]");
       if (castTrigger) {
-        e.preventDefault?.();
-        e.stopPropagation?.();
         const state = getState();
         if (!state) return;
         const idx = parseNonNegativeInt(castTrigger.dataset.appCast);
