@@ -1,6 +1,7 @@
 let _getState = null;
 let _scheduleSave = null;
 let _refreshCharacterStats = null;
+let _pushRollHistory = null;
 let _initialized = false;
 let _isEditing = false;
 let _editorStep = "mode";
@@ -23,6 +24,95 @@ function scheduleSave() {
 
 function refreshCharacterStats() {
   if (_refreshCharacterStats) _refreshCharacterStats();
+}
+
+function performApplicationCast(state, techniqueIndex, applicationIndex) {
+  if (!state) return;
+  ensureTechniquesState(state);
+  
+  const app = state.techniques.applications[applicationIndex];
+  const techniqueName = state.ct || "Technique";
+  if (!app) return;
+  
+  const normalized = normalizeApplication(app, applicationIndex);
+  const dc = normalized.dc || 0;
+  const ceCost = normalized.ceCost || 0;
+  const sorcererXp = parseNonNegativeInt(state.sorcererXp);
+  const ceCurrent = parseNonNegativeInt(state.ceCurrent);
+  
+  // Check if auto-pass (DC < Sorcerer XP)
+  if (dc < sorcererXp) {
+    // Auto-pass: log as "Pass" without rolling
+    const time = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+    if (_pushRollHistory) {
+      _pushRollHistory(`${techniqueName} › ${normalized.title}`, 0, [], 0, null, "Pass", null);
+    }
+    // Deduct CE
+    state.ceCurrent = String(Math.max(0, ceCurrent - ceCost));
+    refreshCharacterStats();
+    scheduleSave();
+    return;
+  }
+  
+  // Normal roll: talent check (Technique skill)
+  const techScore = parseNonNegativeInt(state?.stats?.technique?.score);
+  const talentSkillIndex = 3; // Talent is the 4th skill in Technique (index 3)
+  const talentAptitude = state?.stats?.technique?.skills?.[talentSkillIndex]?.aptitude || 0;
+  const diceCount = Math.max(1, techScore + (talentAptitude > 0 ? 2 : 0));
+  
+  const rolls = Array.from({ length: diceCount }, () => Math.floor(Math.random() * 6) + 1);
+  const total = rolls.reduce((a, b) => a + b, 0);
+  const maxPossible = diceCount * 6;
+  const allOnes = rolls.every(r => r === 1);
+  
+  let critStatus = null;
+  let resultText = "Fail";
+  
+  if (allOnes) {
+    critStatus = "fail";
+    resultText = "Fail";
+  } else if (total >= dc) {
+    if (total >= maxPossible) {
+      critStatus = "success";
+    }
+    resultText = "Pass";
+  }
+  
+  // Log the roll
+  if (_pushRollHistory) {
+    _pushRollHistory(`${techniqueName} › ${normalized.title}`, diceCount, rolls, total, critStatus, resultText, null);
+  }
+  
+  // Deduct CE
+  state.ceCurrent = String(Math.max(0, ceCurrent - ceCost));
+  refreshCharacterStats();
+  scheduleSave();
+}
+
+function getApplicationButtonState(state, applicationIndex) {
+  if (!state) return { disabled: false, isAutoPass: false, tooltip: "Cast" };
+  ensureTechniquesState(state);
+  
+  const app = state.techniques.applications[applicationIndex];
+  if (!app) return { disabled: false, isAutoPass: false, tooltip: "Cast" };
+  
+  const normalized = normalizeApplication(app, applicationIndex);
+  const dc = normalized.dc || 0;
+  const ceCost = normalized.ceCost || 0;
+  const ceCurrent = parseNonNegativeInt(state.ceCurrent);
+  const sorcererXp = parseNonNegativeInt(state.sorcererXp);
+  
+  // Check if insufficient CE
+  if (ceCurrent < ceCost) {
+    return { disabled: true, isAutoPass: false, tooltip: `Insufficient CE (need ${ceCost})` };
+  }
+  
+  // Check if auto-pass
+  if (dc < sorcererXp) {
+    return { disabled: false, isAutoPass: true, tooltip: "Guaranteed success" };
+  }
+  
+  return { disabled: false, isAutoPass: false, tooltip: "Roll talent check" };
 }
 
 function parseNonNegativeInt(rawValue) {
@@ -323,6 +413,10 @@ function renderApplicationsSummary(state) {
     const dcText = normalized.dc > 0 ? String(normalized.dc) : "-";
     const range = getRangeSummary(normalized);
     const effectText = normalized.effect || "No effect listed.";
+    const btnState = getApplicationButtonState(state, idx);
+    const btnClass = btnState.isAutoPass ? "techniques-app-cast-btn--auto-pass" : "";
+    const btnDisabled = btnState.disabled ? " disabled" : "";
+    const starMarkup = btnState.isAutoPass ? "✦ " : "";
     return `
       <article class="techniques-app-card" data-app-idx="${idx}">
         <button type="button" class="techniques-app-card-edit-btn" data-app-edit-toggle="${idx}" aria-label="Edit application" title="Edit">&#9998;</button>
@@ -334,6 +428,9 @@ function renderApplicationsSummary(state) {
         </div>
         <div class="techniques-app-effect"><strong>Effect:</strong> ${effectText}</div>
         <p class="techniques-app-card-desc">${description}</p>
+        <div class="techniques-app-card-footer">
+          <button type="button" class="techniques-app-cast-btn ${btnClass}" data-app-cast="${idx}" title="${btnState.tooltip}"${btnDisabled}>${starMarkup}Cast/Use</button>
+        </div>
       </article>
     `;
   }).join("");
@@ -623,10 +720,11 @@ function saveTechniqueEditing() {
   scheduleSave();
 }
 
-export function initTechniques({ getState: getStateFn, scheduleSave: scheduleSaveFn, refreshCharacterStats: refreshCharacterStatsFn }) {
+export function initTechniques({ getState: getStateFn, scheduleSave: scheduleSaveFn, refreshCharacterStats: refreshCharacterStatsFn, pushRollHistory: pushRollHistoryFn }) {
   _getState = getStateFn;
   _scheduleSave = scheduleSaveFn;
   _refreshCharacterStats = refreshCharacterStatsFn;
+  _pushRollHistory = pushRollHistoryFn;
 
   if (_initialized) {
     applyTechniquesStateToUI();
@@ -749,6 +847,15 @@ export function initTechniques({ getState: getStateFn, scheduleSave: scheduleSav
         _expandedAppIndices.clear();
         refreshApplicationCards(state);
         scheduleSave();
+      }
+      // Cast/Use Application
+      const castTrigger = e.target?.closest?.("[data-app-cast]");
+      if (castTrigger) {
+        const state = getState();
+        if (!state) return;
+        const idx = parseNonNegativeInt(castTrigger.dataset.appCast);
+        performApplicationCast(state, 0, idx);
+        refreshApplicationCards(state);
       }
     });
     summaryGrid.addEventListener("input", e => {

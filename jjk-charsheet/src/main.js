@@ -38,6 +38,7 @@ import {
 import {
   initRolls,
   showRollToast,
+  pushRollHistory,
   renderRollHistory,
   switchRollTab,
   getActiveRollTab,
@@ -184,6 +185,7 @@ async function init() {
     getState: () => state,
     scheduleSave,
     refreshCharacterStats: applyCharacterStateToUI,
+    pushRollHistory,
   });
 
   initArchetype({

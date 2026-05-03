@@ -70,8 +70,11 @@
     }
     .tab-content::before {
       content: '';
-      position: fixed;
-      inset: 0;
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
       background: repeating-linear-gradient(
         0deg,
         transparent,
@@ -1668,6 +1671,49 @@
     }
     .techniques-app-edit-grid .techniques-field {
       margin-bottom: 0;
+    }
+    .techniques-app-card-footer {
+      display: flex;
+      justify-content: flex-end;
+      gap: 6px;
+      margin-top: 8px;
+      padding-top: 6px;
+      border-top: 1px solid rgba(58, 48, 38, 0.12);
+    }
+    .techniques-app-cast-btn {
+      padding: 5px 12px;
+      font-size: 11px;
+      font-family: 'Cinzel', serif;
+      font-weight: 600;
+      letter-spacing: 0.6px;
+      text-transform: uppercase;
+      color: var(--ink);
+      background: rgba(240, 235, 224, 0.9);
+      border: 1px solid var(--border-strong);
+      border-radius: 2px;
+      cursor: pointer;
+      transition: all 200ms ease;
+      line-height: 1.2;
+    }
+    .techniques-app-cast-btn:hover:not(:disabled) {
+      background: rgba(240, 235, 224, 1);
+      border-color: var(--ink);
+    }
+    .techniques-app-cast-btn--auto-pass {
+      color: #1a5f7a;
+      background: rgba(122, 196, 220, 0.15);
+      border-color: rgba(122, 196, 220, 0.4);
+    }
+    .techniques-app-cast-btn--auto-pass:hover {
+      background: rgba(122, 196, 220, 0.25);
+      border-color: rgba(122, 196, 220, 0.6);
+    }
+    .techniques-app-cast-btn:disabled {
+      color: var(--ink-faint);
+      background: rgba(240, 235, 224, 0.5);
+      border-color: var(--border);
+      cursor: not-allowed;
+      opacity: 0.7;
     }
     .techniques-app-empty {
       border: 1px dashed var(--border-strong);
