@@ -5,7 +5,7 @@ let _initialized = false;
 let _isEditing = false;
 let _editorStep = "mode";
 let _editSnapshot = null;
-const _expandedAppIndices = new Set();
+const _expandedAppIndices = new Map();
 
 const JUJUTSU_SUBTABS = new Set(["technique", "vows", "training"]);
 
@@ -189,18 +189,28 @@ function renderApplicationsSummary(state) {
     if (_expandedAppIndices.has(idx)) {
       return `
         <article class="techniques-app-card techniques-app-card--editing" data-app-idx="${idx}">
-          <div class="techniques-app-card-actions">
+          <label class="techniques-field" for="appCardTitle${idx}">
+            <span class="field-label">Title</span>
+            <input id="appCardTitle${idx}" class="meta-input techniques-app-card-field" data-app-title-inline="${idx}" value="${normalized.title}" />
+          </label>
+          <label class="techniques-field" for="appCardCost${idx}">
+            <span class="field-label">CE Cost</span>
+            <input id="appCardCost${idx}" class="meta-input techniques-app-card-field" type="number" min="0" step="1" inputmode="numeric" data-app-cost-inline="${idx}" value="${normalized.ceCost || 0}" />
+          </label>
+          <label class="techniques-field" for="appCardDesc${idx}">
+            <span class="field-label">Description</span>
+            <textarea id="appCardDesc${idx}" class="inventory-textarea techniques-app-card-field" data-app-desc-inline="${idx}" rows="3" maxlength="360">${normalized.description}</textarea>
+          </label>
+          <div class="techniques-app-card-footer">
             <button type="button" class="inventory-mini-btn inventory-icon-btn danger" data-app-remove-inline="${idx}" aria-label="Delete application" title="Delete">
               <svg class="inventory-icon-trash" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
                 <path fill="currentColor" d="M9 3h6a1 1 0 0 1 1 1v1h4v2h-1l-1 12a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 7H4V5h4V4a1 1 0 0 1 1-1Zm1 2v0h4V5h-4Zm-1 4h2v9H9V9Zm4 0h2v9h-2V9Z"/>
                 <path fill="none" stroke="currentColor" stroke-width="1.5" d="M6 7.5h12"/>
               </svg>
             </button>
-            <button type="button" class="techniques-app-card-done-btn" data-app-edit-toggle="${idx}" aria-label="Done editing" title="Done">&#10003;</button>
+            <button type="button" class="inventory-secondary-btn" data-app-cancel-inline="${idx}">Cancel</button>
+            <button type="button" class="meta-toggle-btn techniques-app-save-btn" data-app-save-inline="${idx}">Save</button>
           </div>
-          <input class="meta-input techniques-app-card-field" data-app-title-inline="${idx}" value="${normalized.title}" placeholder="Title" />
-          <input class="meta-input techniques-app-card-field" type="number" min="0" step="1" inputmode="numeric" data-app-cost-inline="${idx}" value="${normalized.ceCost || 0}" placeholder="CE Cost" />
-          <textarea class="inventory-textarea techniques-app-card-field" data-app-desc-inline="${idx}" rows="3" maxlength="360">${normalized.description}</textarea>
         </article>
       `;
     }
@@ -496,7 +506,8 @@ export function initTechniques({ getState: getStateFn, scheduleSave: scheduleSav
       ensureTechniquesState(state);
       const newIdx = state.techniques.applications.length;
       state.techniques.applications.push(createDefaultApplication(newIdx));
-      _expandedAppIndices.add(newIdx);
+      const newSnap = JSON.parse(JSON.stringify(state.techniques.applications[newIdx]));
+      _expandedAppIndices.set(newIdx, newSnap);
       updateTechniquesDerivedUI(state);
       scheduleSave();
     });
@@ -505,15 +516,43 @@ export function initTechniques({ getState: getStateFn, scheduleSave: scheduleSav
   const summaryGrid = document.getElementById("techniqueApplicationsSummary");
   if (summaryGrid) {
     summaryGrid.addEventListener("click", e => {
-      const toggleTrigger = e.target?.closest?.("[data-app-edit-toggle]");
-      if (toggleTrigger) {
-        const idx = parseNonNegativeInt(toggleTrigger.dataset.appEditToggle);
-        if (_expandedAppIndices.has(idx)) _expandedAppIndices.delete(idx);
-        else _expandedAppIndices.add(idx);
+      // Open edit (pencil icon on view card)
+      const openTrigger = e.target?.closest?.("[data-app-edit-toggle]");
+      if (openTrigger) {
+        const state = getState();
+        if (!state) return;
+        const idx = parseNonNegativeInt(openTrigger.dataset.appEditToggle);
+        const snap = JSON.parse(JSON.stringify(state.techniques.applications[idx] || {}));
+        _expandedAppIndices.set(idx, snap);
+        renderApplicationsSummary(state);
+        return;
+      }
+      // Save (collapse, keep changes already written on input)
+      const saveTrigger = e.target?.closest?.("[data-app-save-inline]");
+      if (saveTrigger) {
+        const idx = parseNonNegativeInt(saveTrigger.dataset.appSaveInline);
+        _expandedAppIndices.delete(idx);
         const state = getState();
         if (state) renderApplicationsSummary(state);
         return;
       }
+      // Cancel (collapse, revert to snapshot)
+      const cancelTrigger = e.target?.closest?.("[data-app-cancel-inline]");
+      if (cancelTrigger) {
+        const idx = parseNonNegativeInt(cancelTrigger.dataset.appCancelInline);
+        const snap = _expandedAppIndices.get(idx);
+        _expandedAppIndices.delete(idx);
+        const state = getState();
+        if (!state) return;
+        ensureTechniquesState(state);
+        if (snap && state.techniques.applications[idx]) {
+          state.techniques.applications[idx] = { ...snap };
+        }
+        renderApplicationsSummary(state);
+        scheduleSave();
+        return;
+      }
+      // Delete
       const removeTrigger = e.target?.closest?.("[data-app-remove-inline]");
       if (removeTrigger) {
         const state = getState();
