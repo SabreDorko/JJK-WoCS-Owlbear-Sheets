@@ -1382,16 +1382,43 @@ function renderEquippedSlots() {
   }).join("");
 }
 
+function getStorageSlotGrantSources(state) {
+  if (!state?.inventoryItems || !state?.equippedSlots) return [];
+  const equippedIds = [...new Set(Object.values(state.equippedSlots).filter(Boolean))];
+  const sources = [];
+
+  equippedIds.forEach(itemId => {
+    const item = state.inventoryItems.find(entry => entry.id === itemId);
+    if (!item) return;
+    const grants = normalizeModifierList(item.modifiers)
+      .filter(modifier => modifier.kind === "storage")
+      .reduce((sum, modifier) => sum + Math.max(0, parseInt(modifier.value, 10) || 0), 0);
+    for (let i = 0; i < grants; i += 1) {
+      sources.push(item.name || "Item");
+    }
+  });
+
+  return sources;
+}
+
 function renderInventorySlots() {
   const state = getState();
   const root = document.getElementById("inventorySlotsList");
   if (!root) return;
 
+  const baseSlotCount = 5;
+  const storageSlotSources = getStorageSlotGrantSources(state);
+
   root.innerHTML = state.inventorySlots.map((itemId, index) => {
+    const sourceName = index >= baseSlotCount ? storageSlotSources[index - baseSlotCount] || null : null;
+    const slotLabel = sourceName
+      ? `Slot ${index + 1} (${escapeHtml(sourceName)})`
+      : `Slot ${index + 1}`;
+
     if (!itemId) {
       return `
         <div class="inventory-slot-card empty" data-slot-index="${index}" data-drop-zone="inventory-slot">
-          <div class="inventory-slot-label">Slot ${index + 1}</div>
+          <div class="inventory-slot-label">${slotLabel}</div>
           <div class="inventory-slot-empty">Empty</div>
         </div>
       `;
@@ -1412,7 +1439,7 @@ function renderInventorySlots() {
 
     return `
       <div class="inventory-slot-card" data-slot-index="${index}" data-item-id="${item.id}" data-drop-zone="inventory-slot">
-        ${renderInventoryItemCard(item, controls, "Stored")}
+        ${renderInventoryItemCard(item, controls, sourceName ? `Stored (${sourceName})` : "Stored")}
       </div>
     `;
   }).join("");
