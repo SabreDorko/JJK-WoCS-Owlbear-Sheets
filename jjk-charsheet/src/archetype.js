@@ -1288,6 +1288,11 @@ function ensureArchetypeState(state) {
     state.archetypeProgress.unlockedAbilityIds = legacyUnlocked;
   }
 
+  const parsedExtraSlots = parseInt(state.archetypeProgress.extraSlots, 10);
+  state.archetypeProgress.extraSlots = Number.isFinite(parsedExtraSlots)
+    ? Math.max(0, parsedExtraSlots)
+    : 0;
+
   const knownIds = getKnownAbilityIdsForState(state);
   state.archetypeProgress.unlockedAbilityIds = state.archetypeProgress.unlockedAbilityIds
     .map(value => String(value || "").trim())
@@ -1306,12 +1311,26 @@ function getSlotSummary(state) {
   const usedSlots = Array.isArray(state?.archetypeProgress?.unlockedAbilityIds)
     ? state.archetypeProgress.unlockedAbilityIds.length
     : 0;
-  const unlockedSlots = MAX_ABILITY_SLOTS;
+  const extraSlots = parseInt(state?.archetypeProgress?.extraSlots, 10) || 0;
+  const unlockedSlots = MAX_ABILITY_SLOTS + Math.max(0, extraSlots);
   return {
     unlockedSlots,
     usedSlots: Math.min(unlockedSlots, usedSlots),
     openSlots: Math.max(0, unlockedSlots - usedSlots),
   };
+}
+
+function isExtraAbilitySlot(state, slotIndex) {
+  const slotSummary = getSlotSummary(state);
+  return slotIndex >= MAX_ABILITY_SLOTS && slotIndex < slotSummary.unlockedSlots;
+}
+
+function canRemoveAbilityByGlobalId(state, unlockedList, globalId) {
+  const [archKey, abilityId] = String(globalId || "").split(":");
+  if (!archKey || !abilityId) return false;
+  const def = getAbilityDefinition(state, archKey, abilityId);
+  if (!def) return true;
+  return !hasHigherTierInSlots(new Set(unlockedList), archKey, def.tier);
 }
 
 function selectedArchetypeEntries(state) {
@@ -1417,7 +1436,7 @@ function renderArchetypeSummary(state) {
     const slotSummary = getSlotSummary(state);
     rulesSummary.innerHTML = `
       <div class="archetype-slot-pill">Ability Slots: ${slotSummary.usedSlots}/${slotSummary.unlockedSlots} used (${slotSummary.openSlots} open)</div>
-      <div class="archetype-rule-note">You have 5 base slots. Add abilities in tier order (1-5) within each archetype tree.</div>
+      <div class="archetype-rule-note">You have 5 base slots. Add abilities in tier order (1-5) within each archetype tree. Extra slots can be added below your slot list.</div>
     `;
   }
 }
@@ -1623,13 +1642,22 @@ function renderAbilitySlots(state) {
   const unlocked = Array.isArray(state?.archetypeProgress?.unlockedAbilityIds)
     ? state.archetypeProgress.unlockedAbilityIds
     : [];
+  const slotSummary = getSlotSummary(state);
 
   const cards = [];
-  for (let i = 0; i < MAX_ABILITY_SLOTS; i += 1) {
+  for (let i = 0; i < slotSummary.unlockedSlots; i += 1) {
     const globalId = unlocked[i] || "";
     if (!globalId) {
+      const canRemoveExtraSlot = isExtraAbilitySlot(state, i);
       cards.push(`
         <article class="archetype-slot-item archetype-slot-item--empty">
+          ${canRemoveExtraSlot
+            ? `<button type="button" class="inventory-plus-btn archetype-add-btn archetype-remove-btn archetype-slot-trash" data-slot-remove-extra="${i}" aria-label="Remove extra slot" title="Remove extra slot">
+                <svg class="inventory-plus-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <path class="inventory-plus-icon-line inventory-plus-icon-line-horizontal" fill="currentColor" d="M5 11h14v2H5z"/>
+                </svg>
+              </button>`
+            : ""}
           <div class="archetype-slot-index">Slot ${i + 1}</div>
           <div class="techniques-muted">Empty</div>
         </article>
@@ -1640,18 +1668,27 @@ function renderAbilitySlots(state) {
     const [archKey, abilityId] = globalId.split(":");
     const rule = getArchetypeRule(state, archKey);
     const def = getAbilityDefinition(state, archKey, abilityId);
-    const canRemove = def ? !hasHigherTierInSlots(new Set(unlocked), archKey, def.tier) : true;
+    const canRemove = canRemoveAbilityByGlobalId(state, unlocked, globalId);
     const descKey = `slot:${globalId}`;
     const isExpanded = _expandedAbilityDescriptions.has(descKey);
+    const canRemoveExtraSlot = isExtraAbilitySlot(state, i) && canRemove;
 
     cards.push(`
       <article class="archetype-slot-item">
-        <button type="button" class="inventory-mini-btn inventory-icon-btn danger archetype-slot-trash" data-slot-remove="${globalId}" aria-label="Remove ability" title="Remove ability"${canRemove ? "" : " disabled"}>
-          <svg class="inventory-icon-trash" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-            <path fill="currentColor" d="M9 3h6a1 1 0 0 1 1 1v1h4v2h-1l-1 12a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 7H4V5h4V4a1 1 0 0 1 1-1Zm1 2v0h4V5h-4Zm-1 4h2v9H9V9Zm4 0h2v9h-2V9Z"/>
-            <path fill="none" stroke="currentColor" stroke-width="1.5" d="M6 7.5h12"/>
-          </svg>
-        </button>
+        ${canRemove
+          ? `<button type="button" class="inventory-plus-btn archetype-add-btn archetype-remove-btn archetype-slot-trash" data-slot-remove="${globalId}" aria-label="Remove ability" title="Remove ability">
+              <svg class="inventory-plus-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path class="inventory-plus-icon-line inventory-plus-icon-line-horizontal" fill="currentColor" d="M5 11h14v2H5z"/>
+              </svg>
+            </button>`
+          : ""}
+        ${canRemoveExtraSlot
+          ? `<button type="button" class="inventory-plus-btn archetype-add-btn archetype-remove-btn archetype-slot-extra-remove" data-slot-remove-extra="${i}" aria-label="Remove extra slot" title="Remove extra slot">
+              <svg class="inventory-plus-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path class="inventory-plus-icon-line inventory-plus-icon-line-horizontal" fill="currentColor" d="M5 11h14v2H5z"/>
+              </svg>
+            </button>`
+          : ""}
         <div class="archetype-slot-index">Slot ${i + 1}</div>
         <div class="archetype-slot-name">${def?.name || abilityId}</div>
         <div class="archetype-slot-meta">${rule?.label || toTitleCase(archKey)} · Tier ${def?.tier || "?"}</div>
@@ -1664,7 +1701,60 @@ function renderAbilitySlots(state) {
     `);
   }
 
+  cards.push(`
+    <article class="archetype-slot-control">
+      <button type="button" class="inventory-plus-btn archetype-add-btn" data-slot-add="true" aria-label="Add ability slot" title="Add ability slot">
+        <svg class="inventory-plus-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path class="inventory-plus-icon-line inventory-plus-icon-line-horizontal" fill="currentColor" d="M5 11h14v2H5z"/>
+          <path class="inventory-plus-icon-line inventory-plus-icon-line-vertical" fill="currentColor" d="M11 5h2v14h-2z"/>
+        </svg>
+      </button>
+      <span class="field-label">Add Slot</span>
+    </article>
+  `);
+
   grid.innerHTML = cards.join("");
+}
+
+function addAbilitySlot() {
+  const state = getState();
+  if (!state) return;
+  ensureArchetypeState(state);
+  state.archetypeProgress.extraSlots = (parseInt(state.archetypeProgress.extraSlots, 10) || 0) + 1;
+  renderArchetypeSummary(state);
+  renderAbilitySlots(state);
+  renderAbilityTree(state);
+  scheduleSave();
+}
+
+function removeAbilitySlot(slotIndexRaw) {
+  const state = getState();
+  if (!state) return;
+  ensureArchetypeState(state);
+
+  const slotIndex = parseInt(slotIndexRaw, 10);
+  if (!Number.isFinite(slotIndex)) return;
+  if (!isExtraAbilitySlot(state, slotIndex)) return;
+
+  const unlocked = Array.isArray(state.archetypeProgress.unlockedAbilityIds)
+    ? [...state.archetypeProgress.unlockedAbilityIds]
+    : [];
+  const globalId = unlocked[slotIndex] || "";
+  if (globalId && !canRemoveAbilityByGlobalId(state, unlocked, globalId)) return;
+
+  if (slotIndex < unlocked.length) unlocked.splice(slotIndex, 1);
+  state.archetypeProgress.extraSlots = Math.max(0, (parseInt(state.archetypeProgress.extraSlots, 10) || 0) - 1);
+
+  const maxSlotsAfter = MAX_ABILITY_SLOTS + state.archetypeProgress.extraSlots;
+  while (unlocked.length > maxSlotsAfter) unlocked.pop();
+
+  const knownIds = getKnownAbilityIdsForState(state);
+  state.archetypeProgress.unlockedAbilityIds = unlocked.filter(value => knownIds.has(value));
+
+  renderArchetypeSummary(state);
+  renderAbilitySlots(state);
+  renderAbilityTree(state);
+  scheduleSave();
 }
 
 function renderAbilityTree(state) {
@@ -1953,6 +2043,18 @@ export function initArchetype({ getState: getStateFn, scheduleSave: scheduleSave
   const slotGrid = document.getElementById("archetypeAbilitySlots");
   if (slotGrid) {
     slotGrid.addEventListener("click", e => {
+      const addSlotTrigger = e.target?.closest?.("[data-slot-add]");
+      if (addSlotTrigger) {
+        addAbilitySlot();
+        return;
+      }
+
+      const removeSlotTrigger = e.target?.closest?.("[data-slot-remove-extra]");
+      if (removeSlotTrigger) {
+        removeAbilitySlot(removeSlotTrigger.dataset.slotRemoveExtra);
+        return;
+      }
+
       const removeTrigger = e.target?.closest?.("[data-slot-remove]");
       if (removeTrigger) {
         removeAbilityFromSlots(removeTrigger.dataset.slotRemove);

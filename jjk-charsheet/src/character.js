@@ -265,7 +265,10 @@ function buildStatBlocks(defs, container) {
       row.querySelector(".skill-dot").addEventListener("click", () => {
         if (lockedAptitudeSource && !_isOverrideMode) return;
         const skillState = state.stats[def.key].skills[i] || { aptitude: 0 };
-        const nextAptitude = (getAptitudeState(skillState) + 1) % 3;
+        const currentAptitude = getAptitudeState(skillState);
+        const nextAptitude = _isOverrideMode
+          ? (currentAptitude + 1) % 3
+          : (currentAptitude > 0 ? 0 : 1);
         state.stats[def.key].skills[i] = { aptitude: nextAptitude };
         const dot = row.querySelector(".skill-dot");
         dot.classList.toggle("filled", nextAptitude > 0);

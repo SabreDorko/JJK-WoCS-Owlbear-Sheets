@@ -53,7 +53,7 @@ function getPartyStatIcon(type) {
   if (type === "ce") {
     return `
       <svg class="party-stat-icon" viewBox="0 0 28 28" aria-hidden="true" focusable="false">
-        <path fill="currentColor" d="M14 3c.6 3.2-1.7 4.8-2.8 6.9-.6 1.1-.8 2.2-.8 3.3 0 1.7.9 3.3 2.5 4.2-1.4.1-2.8-.3-4-1.1.2 3.8 2.5 7.7 5.1 8.7 4.1-1.1 6.4-4.8 6.4-8.3 0-3.4-2.2-6.1-6.4-13.5Z"/>
+        <path fill="currentColor" d="M14 2 25 14 14 26 3 14Z"/>
         <text x="14" y="15">CE</text>
       </svg>
     `;
@@ -109,10 +109,12 @@ export function renderPartyList() {
     const metaLeft = [gradeStr, arcDisplay].filter(Boolean).join(" \u2022 ");
     return `
     <div class="party-item">
-      <div class="party-character">${entry.charName}</div>
+      <div class="party-item-header">
+        <div class="party-character">${entry.charName}</div>
+        <div class="party-player">${entry.playerName}</div>
+      </div>
       <div class="party-meta">
         <span class="party-meta-left">${metaLeft}</span>
-        <span class="party-meta-player">${entry.playerName}</span>
       </div>
       <div class="party-stats">
         <div class="party-stat">
