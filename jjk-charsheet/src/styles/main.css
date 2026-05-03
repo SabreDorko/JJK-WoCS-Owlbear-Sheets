@@ -1635,12 +1635,53 @@
       margin-bottom: 4px;
       line-height: 1.2;
     }
+    .techniques-app-range {
+      font-family: 'Cinzel', serif;
+      font-size: 9px;
+      letter-spacing: 0.55px;
+      text-transform: uppercase;
+      color: var(--ink-faint);
+      margin-bottom: 4px;
+      line-height: 1.2;
+    }
+    .techniques-app-aoe-row {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      margin-bottom: 4px;
+    }
+    .techniques-app-aoe-icon {
+      width: 16px;
+      height: 16px;
+      color: var(--accent);
+      flex: 0 0 auto;
+    }
+    .techniques-app-aoe-icon svg {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+    .techniques-app-effect {
+      font-family: 'Crimson Text', serif;
+      font-size: 12px;
+      color: var(--ink);
+      line-height: 1.25;
+      margin-bottom: 4px;
+    }
     .techniques-app-card-desc {
       font-family: 'Crimson Text', serif;
       font-size: 13px;
       color: var(--ink-light);
       line-height: 1.25;
       white-space: pre-wrap;
+    }
+    .techniques-app-edit-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 6px;
+    }
+    .techniques-app-edit-grid .techniques-field {
+      margin-bottom: 0;
     }
     .techniques-app-empty {
       border: 1px dashed var(--border-strong);
@@ -1762,6 +1803,12 @@
       min-width: 120px;
       padding-left: 10px;
       padding-right: 10px;
+    }
+
+    @media (max-width: 760px) {
+      .techniques-app-edit-grid {
+        grid-template-columns: 1fr;
+      }
     }
 
     /* ── INVENTORY TAB ── */
