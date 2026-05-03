@@ -94,6 +94,30 @@ function getAptitudeState(skillState) {
   return Math.max(0, Math.min(2, parsed));
 }
 
+function promoteStatFromFullAptitudes(state, statKey) {
+  const statState = state?.stats?.[statKey];
+  if (!statState || !Array.isArray(statState.skills) || !statState.skills.length) return false;
+
+  const temporaryAptitudeIndices = [];
+  for (let i = 0; i < statState.skills.length; i += 1) {
+    const lockedFromArchetype = getArchetypePermanentAptitudeSource(state, statKey, i);
+    const aptitudeState = getAptitudeState(statState.skills[i]);
+    const hasAptitude = Boolean(lockedFromArchetype) || aptitudeState > 0;
+    if (!hasAptitude) return false;
+    if (!lockedFromArchetype && aptitudeState === 1) temporaryAptitudeIndices.push(i);
+  }
+
+  // Only consume temporary aptitudes; permanent aptitudes are preserved.
+  if (!temporaryAptitudeIndices.length) return false;
+
+  statState.score = String(parseStatScore(statState.score) + 1);
+  temporaryAptitudeIndices.forEach(index => {
+    const currentSkill = statState.skills[index] || { aptitude: 0 };
+    statState.skills[index] = { ...currentSkill, aptitude: 0 };
+  });
+  return true;
+}
+
 function getDisplayedTechniqueName(state) {
   const mode = String(state?.techniques?.mode || "none");
   const name = String(state?.ct || "").trim();
@@ -334,6 +358,13 @@ function buildStatBlocks(defs, container) {
           ? (currentAptitude + 1) % 3
           : (currentAptitude > 0 ? 0 : 1);
         state.stats[def.key].skills[i] = { aptitude: nextAptitude };
+
+        if (promoteStatFromFullAptitudes(state, def.key)) {
+          applyCharacterStateToUI();
+          scheduleSave();
+          return;
+        }
+
         const dot = row.querySelector(".skill-dot");
         dot.classList.toggle("filled", nextAptitude > 0);
         dot.classList.toggle("permanent", nextAptitude === 2);
