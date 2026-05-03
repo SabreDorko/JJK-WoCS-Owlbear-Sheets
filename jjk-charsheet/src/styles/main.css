@@ -1566,6 +1566,8 @@
     }
     .techniques-app-card {
       position: relative;
+      display: flex;
+      flex-direction: column;
       border: 1px solid var(--border-strong);
       background: rgba(240, 235, 224, 0.75);
       padding: 6px;
@@ -1601,13 +1603,6 @@
       transform: scaleX(-1);
     }
     .techniques-app-card-edit-btn:hover { color: var(--accent); }
-    .techniques-app-card-footer {
-      display: flex;
-      align-items: center;
-      justify-content: flex-end;
-      gap: 5px;
-      margin-top: 8px;
-    }
     .techniques-app-save-btn {
       padding: 3px 10px;
       font-size: 11px;
@@ -1675,6 +1670,7 @@
       color: var(--ink-light);
       line-height: 1.25;
       white-space: pre-wrap;
+      flex: 1;
     }
     .techniques-app-edit-grid {
       display: grid;
@@ -1700,15 +1696,25 @@
       gap: 6px;
     }
     .techniques-app-step-btn {
-      width: 24px;
-      height: 24px;
+      width: 21px;
+      height: 21px;
+      min-width: 21px;
+      border-radius: 50%;
+      padding: 0;
+      line-height: 1;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
       border: 1px solid var(--border-strong);
-      background: rgba(240, 235, 224, 0.9);
+      background: var(--parchment);
       color: var(--ink);
       font-family: 'Cinzel', serif;
       font-size: 13px;
-      line-height: 1;
       cursor: pointer;
+    }
+    .techniques-app-step-btn:hover {
+      border-color: var(--ink);
+      color: var(--accent);
     }
     .techniques-app-step-btn:disabled {
       opacity: 0.5;
@@ -1724,6 +1730,7 @@
       text-align: center;
     }
     .techniques-app-cast-btn {
+      margin-left: auto;
       padding: 5px 12px;
       font-size: 11px;
       font-family: 'Cinzel', serif;
