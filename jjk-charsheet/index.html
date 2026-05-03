@@ -76,6 +76,15 @@
           <div class="meta-field" style="grid-column:1/-1;">
             <div class="field-label">Cursed Technique</div>
             <input class="meta-input" id="ctInput" placeholder="—" />
+            <div class="rest-control-wrap">
+              <button class="inventory-mini-btn" id="restBtn" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="restOptionsPopover">Rest</button>
+              <div id="restOptionsPopover" class="rest-options-popover" hidden>
+                <div class="rest-options-title">Choose Rest Type</div>
+                <button class="inventory-mini-btn" id="quickRestBtn" type="button">Quick Rest (25%)</button>
+                <button class="inventory-mini-btn" id="shortRestBtn" type="button">Short Rest (50%)</button>
+                <button class="inventory-mini-btn" id="fullRestBtn" type="button">Full Rest (100%)</button>
+              </div>
+            </div>
           </div>
         </div>
       </div>

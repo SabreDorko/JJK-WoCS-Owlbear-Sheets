@@ -165,6 +165,36 @@
     .meta-select { cursor: pointer; }
     .meta-select option { background: #f0ebe0; }
     .meta-input:focus, .meta-select:focus { border-bottom-color: var(--ink); }
+    .rest-control-wrap {
+      position: relative;
+      display: inline-flex;
+      margin-top: 6px;
+    }
+    .rest-options-popover {
+      position: absolute;
+      top: calc(100% + 4px);
+      left: 0;
+      z-index: 15;
+      border: 1px solid var(--border-strong);
+      background: var(--parchment);
+      padding: 6px;
+      display: grid;
+      gap: 5px;
+      min-width: 178px;
+      box-shadow: 1px 2px 0 rgba(26, 20, 16, 0.2);
+      animation: inventorySurfaceSlideIn 180ms ease;
+      transform-origin: top left;
+    }
+    .rest-options-popover[hidden] {
+      display: none !important;
+    }
+    .rest-options-title {
+      font-family: 'Cinzel', serif;
+      font-size: 8px;
+      letter-spacing: 0.9px;
+      text-transform: uppercase;
+      color: var(--ink-faint);
+    }
     .stat-derived-pulse {
       animation: statDerivedPulse 260ms ease;
     }
@@ -1161,6 +1191,17 @@
       border: 1px dashed var(--border-strong);
       background: rgba(240, 235, 224, 0.55);
       padding: 7px;
+      cursor: pointer;
+      width: 100%;
+      transition: border-color 140ms ease, background 140ms ease, color 140ms ease;
+    }
+    .archetype-slot-control:hover {
+      border-color: var(--ink);
+      background: rgba(240, 235, 224, 0.78);
+    }
+    .archetype-slot-control:focus-visible {
+      outline: 1px solid var(--accent);
+      outline-offset: 1px;
     }
     .archetype-add-btn {
       width: 22px;

@@ -1702,15 +1702,9 @@ function renderAbilitySlots(state) {
   }
 
   cards.push(`
-    <article class="archetype-slot-control">
-      <button type="button" class="inventory-plus-btn archetype-add-btn" data-slot-add="true" aria-label="Add ability slot" title="Add ability slot">
-        <svg class="inventory-plus-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-          <path class="inventory-plus-icon-line inventory-plus-icon-line-horizontal" fill="currentColor" d="M5 11h14v2H5z"/>
-          <path class="inventory-plus-icon-line inventory-plus-icon-line-vertical" fill="currentColor" d="M11 5h2v14h-2z"/>
-        </svg>
-      </button>
-      <span class="field-label">Add Slot</span>
-    </article>
+    <button type="button" class="archetype-slot-control" data-slot-add="true" aria-label="Add ability slot" title="Add ability slot">
+      <span class="field-label">+ Add Slot</span>
+    </button>
   `);
 
   grid.innerHTML = cards.join("");

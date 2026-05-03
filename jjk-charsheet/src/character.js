@@ -88,6 +88,46 @@ function getAptitudeState(skillState) {
   return Math.max(0, Math.min(2, parsed));
 }
 
+function getDisplayedTechniqueName(state) {
+  const mode = String(state?.techniques?.mode || "none");
+  const name = String(state?.ct || "").trim();
+  if (mode === "none") return "No Technique";
+  return name || "No Technique";
+}
+
+function parseResourceValue(rawValue) {
+  const parsed = parseInt(rawValue, 10);
+  if (!Number.isFinite(parsed)) return 0;
+  return Math.max(0, parsed);
+}
+
+function applyRestRecovery(state, kind) {
+  const hpCurrent = parseResourceValue(state.hpCurrent);
+  const hpMax = parseResourceValue(state.hpMax);
+  const ceCurrent = parseResourceValue(state.ceCurrent);
+  const ceMax = parseResourceValue(state.ceMax);
+
+  if (kind === "full") {
+    state.hpCurrent = String(hpMax);
+    state.ceCurrent = String(ceMax);
+    return;
+  }
+
+  const fraction = kind === "short" ? 0.5 : 0.25;
+  const hpRecovered = hpMax > 0 ? Math.max(1, Math.floor(hpMax * fraction)) : 0;
+  const ceRecovered = ceMax > 0 ? Math.max(1, Math.floor(ceMax * fraction)) : 0;
+  state.hpCurrent = String(Math.min(hpMax, hpCurrent + hpRecovered));
+  state.ceCurrent = String(Math.min(ceMax, ceCurrent + ceRecovered));
+}
+
+function setRestPopoverOpen(isOpen) {
+  const restBtn = document.getElementById("restBtn");
+  const popover = document.getElementById("restOptionsPopover");
+  if (!restBtn || !popover) return;
+  restBtn.setAttribute("aria-expanded", isOpen ? "true" : "false");
+  popover.hidden = !isOpen;
+}
+
 function getArchetypePermanentAptitudeSource(state, statKey, skillIndex) {
   const picks = state?.archetypeProgress?.permanentAptitudeSelections;
   if (!Array.isArray(picks)) return null;
@@ -484,7 +524,12 @@ export function applyCharacterStateToUI() {
 
   document.getElementById("charName").value = state.charName || "";
   document.getElementById("ageInput").value = state.age || "";
-  document.getElementById("ctInput").value = state.ct || "";
+  const ctInput = document.getElementById("ctInput");
+  if (ctInput) {
+    ctInput.value = getDisplayedTechniqueName(state);
+    ctInput.readOnly = true;
+    ctInput.title = "Managed from the Jujutsu tab";
+  }
   document.getElementById("playerName").value = state.playerName || "";
   setInputValueWithPulse(document.getElementById("acInput"), state.ac || "");
   setInputValueWithPulse(document.getElementById("hpCurrent"), state.hpCurrent || "");
@@ -544,7 +589,6 @@ export function initCharacter({ getState: getStateFn, scheduleSave: scheduleSave
   bindField("charName", "charName");
   bindField("ageInput", "age");
   bindField("gradeSelect", "grade");
-  bindField("ctInput", "ct");
   bindField("playerName", "playerName");
   bindField("hpCurrent", "hpCurrent");
   bindField("ceCurrent", "ceCurrent");
@@ -567,6 +611,45 @@ export function initCharacter({ getState: getStateFn, scheduleSave: scheduleSave
 
   document.getElementById("addSecondArchetypeBtn").addEventListener("click", toggleSecondArchetype);
   document.getElementById("removeSecondArchetypeBtn").addEventListener("click", toggleSecondArchetype);
+
+  const restBtn = document.getElementById("restBtn");
+  const quickRestBtn = document.getElementById("quickRestBtn");
+  const shortRestBtn = document.getElementById("shortRestBtn");
+  const fullRestBtn = document.getElementById("fullRestBtn");
+
+  if (restBtn) {
+    restBtn.addEventListener("click", e => {
+      e.stopPropagation();
+      const popover = document.getElementById("restOptionsPopover");
+      const isOpen = popover ? !popover.hidden : false;
+      setRestPopoverOpen(isOpen);
+    });
+  }
+
+  [
+    [quickRestBtn, "quick"],
+    [shortRestBtn, "short"],
+    [fullRestBtn, "full"],
+  ].forEach(([button, kind]) => {
+    if (!button) return;
+    button.addEventListener("click", e => {
+      e.stopPropagation();
+      const state = getState();
+      if (!state) return;
+      applyRestRecovery(state, kind);
+      setRestPopoverOpen(false);
+      applyCharacterStateToUI();
+      scheduleSave();
+    });
+  });
+
+  document.addEventListener("click", e => {
+    const popover = document.getElementById("restOptionsPopover");
+    const wrap = document.querySelector(".rest-control-wrap");
+    if (!popover || popover.hidden) return;
+    if (wrap && wrap.contains(e.target)) return;
+    setRestPopoverOpen(false);
+  });
 
   _initialized = true;
   applyCharacterStateToUI();
