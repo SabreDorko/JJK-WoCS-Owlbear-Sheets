@@ -60,10 +60,12 @@ function formatSignedValue(value) {
   return value >= 0 ? `+${value}` : `${value}`;
 }
 
-function formatRollBody(entry) {
-  const base = `${entry.diceCount}d6: [${entry.rolls.join(", ")}]`;
+function formatRollFormula(entry, forcedRolls, forcedTotal) {
+  const rolls = Array.isArray(forcedRolls) ? forcedRolls : entry.rolls;
+  const total = Number.isFinite(forcedTotal) ? forcedTotal : entry.total;
+  const base = `${entry.diceCount}d6: [${rolls.join(", ")}]`;
   const breakdown = entry.breakdown;
-  if (!breakdown) return `${base} = <strong>${entry.total}</strong>`;
+  if (!breakdown) return `${base} = <strong>${total}</strong>`;
 
   let formula = base;
   if (Number.isFinite(breakdown.skillModifier)) {
@@ -76,7 +78,31 @@ function formatRollBody(entry) {
     formula += ` + ${part.label} (${formatSignedValue(part.value)})`;
   });
 
-  return `${formula} = <strong>${entry.total}</strong>`;
+  return `${formula} = <strong>${total}</strong>`;
+}
+
+function rollModeLabel(rollMode) {
+  if (rollMode === "advantage") return "Advantage";
+  if (rollMode === "disadvantage") return "Disadvantage";
+  return "";
+}
+
+function formatRollBody(entry) {
+  const breakdown = entry.breakdown;
+  const comparedRolls = Array.isArray(breakdown?.comparedRolls) ? breakdown.comparedRolls : null;
+  const comparedTotals = Array.isArray(breakdown?.comparedTotals) ? breakdown.comparedTotals : null;
+  const selectedIndex = Number.isFinite(breakdown?.selectedRollIndex) ? breakdown.selectedRollIndex : 0;
+  const modeLabel = rollModeLabel(entry.rollMode || breakdown?.rollMode);
+
+  if (modeLabel && comparedRolls?.length === 2 && comparedTotals?.length === 2) {
+    const firstLine = formatRollFormula(entry, comparedRolls[0], comparedTotals[0]);
+    const secondLine = formatRollFormula(entry, comparedRolls[1], comparedTotals[1]);
+    const keptLabel = selectedIndex === 0 ? "first" : "second";
+    const verb = modeLabel === "Advantage" ? "keeping higher" : "keeping lower";
+    return `${modeLabel}: ${verb} (${keptLabel})<br>${firstLine}<br>${secondLine}`;
+  }
+
+  return formatRollFormula(entry);
 }
 
 // ── RENDER PERSONAL ROLL HISTORY ──────────────────────────────────────────────
@@ -90,10 +116,12 @@ export function renderRollHistory() {
   }
   list.innerHTML = history.map(item => {
     const label = item.skillName ? `${item.statLabel} › ${item.skillName}` : item.statLabel;
+    const modeLabel = rollModeLabel(item.rollMode);
+    const modeSuffix = modeLabel ? ` (${modeLabel})` : "";
     const badge = critBadgeHTML(item.critStatus);
     return `
       <div class="roll-history-item">
-        <div class="roll-history-item-title">${item.time} • ${label}</div>
+        <div class="roll-history-item-title">${item.time} • ${label}${modeSuffix}</div>
         <div class="roll-history-item-body">${formatRollBody(item)}</div>
         ${badge ? `<div class="roll-history-item-badge">${badge}</div>` : ""}
       </div>
@@ -112,6 +140,8 @@ export function renderGroupRollHistory() {
   }
   list.innerHTML = groupRollHistory.map(item => {
     const label = item.skillName ? `${item.statLabel} › ${item.skillName}` : item.statLabel;
+    const modeLabel = rollModeLabel(item.rollMode);
+    const modeSuffix = modeLabel ? ` (${modeLabel})` : "";
     const whoParts = [item.charName, item.playerName].filter(v => typeof v === "string" && v.trim());
     const whoDisplay = whoParts.length
       ? `<span style="font-weight:600;color:var(--ink);">${whoParts.join(" • ")}</span> • `
@@ -119,7 +149,7 @@ export function renderGroupRollHistory() {
     const badge = critBadgeHTML(item.critStatus);
     return `
       <div class="roll-history-item">
-        <div class="roll-history-item-title">${item.time} • ${whoDisplay}${label}</div>
+        <div class="roll-history-item-title">${item.time} • ${whoDisplay}${label}${modeSuffix}</div>
         <div class="roll-history-item-body">${formatRollBody(item)}</div>
         ${badge ? `<div class="roll-history-item-badge">${badge}</div>` : ""}
       </div>
@@ -139,21 +169,21 @@ export function switchRollTab(tab) {
 }
 
 // ── PUSH TO PERSONAL + GROUP HISTORY AND BROADCAST ───────────────────────────
-export function pushRollHistory(statLabel, diceCount, rolls, total, critStatus, skillName, breakdown) {
+export function pushRollHistory(statLabel, diceCount, rolls, total, critStatus, skillName, breakdown, rollMode) {
   const state = _getState();
   const now  = new Date();
   const time = now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 
   state.rollHistory = [
     ...(state.rollHistory || []),
-    { statLabel, diceCount, rolls, total, time, critStatus: critStatus || null, skillName: skillName || null, breakdown: breakdown || null },
+    { statLabel, diceCount, rolls, total, time, critStatus: critStatus || null, skillName: skillName || null, breakdown: breakdown || null, rollMode: rollMode || null },
   ].slice(-MAX_ROLL_HISTORY);
   renderRollHistory();
   _scheduleSave();
 
   const charName   = (state.charName || "").trim();
   const playerName = _getPreferredPlayerName();
-  const groupEntry = { charName, playerName, statLabel, diceCount, rolls, total, time, critStatus: critStatus || null, skillName: skillName || null, breakdown: breakdown || null };
+  const groupEntry = { charName, playerName, statLabel, diceCount, rolls, total, time, critStatus: critStatus || null, skillName: skillName || null, breakdown: breakdown || null, rollMode: rollMode || null };
   groupRollHistory = [...groupRollHistory, groupEntry].slice(-MAX_GROUP_ROLL_HISTORY);
   if (activeRollTab === "group") renderGroupRollHistory();
 
@@ -163,13 +193,15 @@ export function pushRollHistory(statLabel, diceCount, rolls, total, critStatus, 
 }
 
 // ── SHOW ROLL TOAST ───────────────────────────────────────────────────────────
-export function showRollToast(statLabel, diceCount, rolls, total, critStatus, skillName, breakdown) {
+export function showRollToast(statLabel, diceCount, rolls, total, critStatus, skillName, breakdown, rollMode) {
   const container = document.getElementById("rollToastContainer");
   if (!container) return;
 
-  pushRollHistory(statLabel, diceCount, rolls, total, critStatus, skillName, breakdown);
+  pushRollHistory(statLabel, diceCount, rolls, total, critStatus, skillName, breakdown, rollMode);
 
   const label = skillName ? `${statLabel} › ${skillName}` : statLabel;
+  const modeLabel = rollModeLabel(rollMode || breakdown?.rollMode);
+  const modeSuffix = modeLabel ? ` (${modeLabel})` : "";
   let critLine = "";
   if (critStatus === "success")
     critLine = `<div style="font-family:'Cinzel',serif;font-size:10px;letter-spacing:1px;color:#2a6e2a;margin-top:3px;">✦ CRITICAL SUCCESS</div>`;
@@ -181,8 +213,8 @@ export function showRollToast(statLabel, diceCount, rolls, total, critStatus, sk
   const toast = document.createElement("div");
   toast.className = "roll-toast" + (critStatus === "success" ? " crit-success" : critStatus === "fail" ? " crit-fail" : critStatus === "pass" ? " pass" : "");
   toast.innerHTML = `
-    <div class="roll-toast-title">${label} Roll</div>
-    <div class="roll-toast-body">${formatRollBody({ diceCount, rolls, total, breakdown })}</div>
+    <div class="roll-toast-title">${label} Roll${modeSuffix}</div>
+    <div class="roll-toast-body">${formatRollBody({ diceCount, rolls, total, breakdown, rollMode })}</div>
     ${critLine}
   `;
 

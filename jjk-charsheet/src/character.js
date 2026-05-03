@@ -7,6 +7,8 @@ let _scheduleSave = null;
 let _showRollToast = null;
 let _initialized = false;
 let _isOverrideMode = false;
+let _rollModeMenu = null;
+let _pendingRollModeAction = null;
 
 function getState() {
   return _getState ? _getState() : null;
@@ -70,10 +72,112 @@ function getNextAptitudeActionLabel(currentAptitude) {
   return "Clear Aptitude";
 }
 
-function showRollToast(statLabel, diceCount, rolls, total, critStatus, skillName, breakdown) {
+function showRollToast(statLabel, diceCount, rolls, total, critStatus, skillName, breakdown, rollMode) {
   if (_showRollToast) {
-    _showRollToast(statLabel, diceCount, rolls, total, critStatus, skillName, breakdown);
+    _showRollToast(statLabel, diceCount, rolls, total, critStatus, skillName, breakdown, rollMode);
   }
+}
+
+function rollDicePool(diceCount) {
+  return Array.from({ length: diceCount }, () => Math.floor(Math.random() * 6) + 1);
+}
+
+function buildComparedBreakdown(baseBreakdown, rollMode, firstRolls, firstTotal, secondRolls, secondTotal, selectedIndex) {
+  if (rollMode !== "advantage" && rollMode !== "disadvantage") return baseBreakdown;
+  return {
+    ...baseBreakdown,
+    rollMode,
+    comparedRolls: [firstRolls, secondRolls],
+    comparedTotals: [firstTotal, secondTotal],
+    selectedRollIndex: selectedIndex,
+  };
+}
+
+function rollWithMode(diceCount, computeTotal, rollMode = "normal") {
+  const firstRolls = rollDicePool(diceCount);
+  const firstTotal = computeTotal(firstRolls);
+  if (rollMode !== "advantage" && rollMode !== "disadvantage") {
+    return {
+      rolls: firstRolls,
+      total: firstTotal,
+      selectedRollIndex: 0,
+      firstRolls,
+      firstTotal,
+      secondRolls: null,
+      secondTotal: null,
+    };
+  }
+
+  const secondRolls = rollDicePool(diceCount);
+  const secondTotal = computeTotal(secondRolls);
+  const selectedRollIndex = rollMode === "advantage"
+    ? (firstTotal >= secondTotal ? 0 : 1)
+    : (firstTotal <= secondTotal ? 0 : 1);
+
+  return {
+    rolls: selectedRollIndex === 0 ? firstRolls : secondRolls,
+    total: selectedRollIndex === 0 ? firstTotal : secondTotal,
+    selectedRollIndex,
+    firstRolls,
+    firstTotal,
+    secondRolls,
+    secondTotal,
+  };
+}
+
+function closeRollModeMenu() {
+  if (!_rollModeMenu) return;
+  _rollModeMenu.hidden = true;
+  _pendingRollModeAction = null;
+}
+
+function ensureRollModeMenu() {
+  if (_rollModeMenu) return _rollModeMenu;
+
+  const menu = document.createElement("div");
+  menu.className = "roll-mode-menu";
+  menu.hidden = true;
+  menu.innerHTML = `
+    <button type="button" class="roll-mode-item" data-roll-mode="advantage">Roll with Advantage</button>
+    <button type="button" class="roll-mode-item" data-roll-mode="disadvantage">Roll with Disadvantage</button>
+    <button type="button" class="roll-mode-item" data-roll-mode="normal">Normal Roll</button>
+  `;
+
+  menu.addEventListener("click", e => {
+    const button = e.target.closest("[data-roll-mode]");
+    if (!button) return;
+    const selectedMode = button.dataset.rollMode;
+    const action = _pendingRollModeAction;
+    closeRollModeMenu();
+    if (action && selectedMode) action(selectedMode);
+  });
+
+  document.body.appendChild(menu);
+  document.addEventListener("click", closeRollModeMenu);
+  document.addEventListener("scroll", closeRollModeMenu, true);
+  document.addEventListener("keydown", e => {
+    if (e.key === "Escape") closeRollModeMenu();
+  });
+
+  _rollModeMenu = menu;
+  return menu;
+}
+
+function openRollModeMenu(event, onSelectMode) {
+  event.preventDefault();
+  event.stopPropagation();
+
+  const menu = ensureRollModeMenu();
+  _pendingRollModeAction = onSelectMode;
+
+  menu.hidden = false;
+  const viewportWidth = window.innerWidth;
+  const viewportHeight = window.innerHeight;
+  const rect = menu.getBoundingClientRect();
+  const left = Math.max(8, Math.min(event.clientX, viewportWidth - rect.width - 8));
+  const top = Math.max(8, Math.min(event.clientY, viewportHeight - rect.height - 8));
+  menu.style.left = `${left}px`;
+  menu.style.top = `${top}px`;
 }
 
 function getBlackFlashRange(techniqueScore) {
@@ -310,16 +414,31 @@ function buildStatBlocks(defs, container) {
              id="score_${def.key}" value="${sd.score}" min="0" />
       <button class="roll-btn" type="button" title="Roll ${def.label.charAt(0).toUpperCase() + def.label.slice(1).toLowerCase()}">Roll</button>
     `;
-    scoreSide.querySelector(".roll-btn").addEventListener("click", () => {
+
+    const runStatRoll = (rollMode = "normal") => {
       const currentEffects = computeActiveModifierEffects(state);
       const n = getEffectiveStatLevel(state, currentEffects, def.key);
       if (!n || n < 1) return;
-      const rolls = Array.from({ length: n }, () => Math.floor(Math.random() * 6) + 1);
       const rollBonus = currentEffects.rollBonuses[def.key] || 0;
-      const total = rolls.reduce((a, b) => a + b, 0) + rollBonus;
-      showRollToast(def.label, n, rolls, total, null, null, {
+      const rollResult = rollWithMode(n, rolls => rolls.reduce((a, b) => a + b, 0) + rollBonus, rollMode);
+      const breakdown = buildComparedBreakdown(
+        {
         equipmentBonuses: getRollModifierSources(state, def.key),
-      });
+        },
+        rollMode,
+        rollResult.firstRolls,
+        rollResult.firstTotal,
+        rollResult.secondRolls,
+        rollResult.secondTotal,
+        rollResult.selectedRollIndex,
+      );
+      showRollToast(def.label, n, rollResult.rolls, rollResult.total, null, null, breakdown, rollMode === "normal" ? null : rollMode);
+    };
+
+    const statRollBtn = scoreSide.querySelector(".roll-btn");
+    statRollBtn.addEventListener("click", () => runStatRoll("normal"));
+    statRollBtn.addEventListener("contextmenu", event => {
+      openRollModeMenu(event, selectedMode => runStatRoll(selectedMode));
     });
 
     const skillsSide = document.createElement("div");
@@ -391,22 +510,50 @@ function buildStatBlocks(defs, container) {
         applyCharacterStateToUI();
         scheduleSave();
       });
-      row.querySelector(".skill-roll-btn").addEventListener("click", () => {
+      const runSkillRoll = (rollMode = "normal") => {
         const currentEffects = computeActiveModifierEffects(state);
         const n = getEffectiveStatLevel(state, currentEffects, def.key);
         if (!n || n < 1) return;
-        const rolls = Array.from({ length: n }, () => Math.floor(Math.random() * 6) + 1);
-        const rawTotal = rolls.reduce((a, b) => a + b, 0);
         const subskillBonus = getSubskillValue(state, currentEffects, def.key, i);
         const statRollBonus = currentEffects.rollBonuses[def.key] || 0;
-        const total = rawTotal + subskillBonus + statRollBonus;
+        const rollResult = rollWithMode(
+          n,
+          rolls => rolls.reduce((a, b) => a + b, 0) + subskillBonus + statRollBonus,
+          rollMode,
+        );
+        const rolls = rollResult.rolls;
+        const total = rollResult.total;
         const maxPossible = n * 6;
         const allOnes = rolls.every(r => r === 1);
         const critStatus = allOnes ? "fail" : total >= maxPossible ? "success" : null;
-        showRollToast(def.label, n, rolls, total, critStatus, skill, {
-          skillModifier: subskillBonus,
-          equipmentBonuses: getRollModifierSources(state, def.key),
-        });
+        const breakdown = buildComparedBreakdown(
+          {
+            skillModifier: subskillBonus,
+            equipmentBonuses: getRollModifierSources(state, def.key),
+          },
+          rollMode,
+          rollResult.firstRolls,
+          rollResult.firstTotal,
+          rollResult.secondRolls,
+          rollResult.secondTotal,
+          rollResult.selectedRollIndex,
+        );
+        showRollToast(
+          def.label,
+          n,
+          rolls,
+          total,
+          critStatus,
+          skill,
+          breakdown,
+          rollMode === "normal" ? null : rollMode,
+        );
+      };
+
+      const skillRollBtn = row.querySelector(".skill-roll-btn");
+      skillRollBtn.addEventListener("click", () => runSkillRoll("normal"));
+      skillRollBtn.addEventListener("contextmenu", event => {
+        openRollModeMenu(event, selectedMode => runSkillRoll(selectedMode));
       });
     });
 
