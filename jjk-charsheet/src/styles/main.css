@@ -998,6 +998,20 @@
       gap: 4px;
       margin-bottom: 6px;
     }
+    .techniques-app-card-edit-btn {
+      position: absolute;
+      top: 4px;
+      right: 4px;
+      background: none;
+      border: none;
+      color: var(--ink-faint);
+      font-size: 13px;
+      line-height: 1;
+      cursor: pointer;
+      padding: 0;
+      transform: scaleX(-1);
+    }
+    .techniques-app-card-edit-btn:hover { color: var(--accent); }
     .techniques-app-card-footer {
       display: flex;
       align-items: center;
@@ -1123,7 +1137,7 @@
       gap: 8px;
     }
     .binding-vows-header {
-      justify-content: flex-end;
+      justify-content: space-between;
     }
     .techniques-app-editor-list {
       display: grid;
