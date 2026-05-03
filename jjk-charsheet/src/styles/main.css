@@ -1626,40 +1626,25 @@
       margin-bottom: 4px;
       line-height: 1.2;
     }
-    .techniques-app-card-cost {
+    .techniques-app-metrics {
+      display: grid;
+      gap: 3px;
+      margin-bottom: 6px;
+      padding: 4px 5px;
+      border: 1px solid rgba(58, 48, 38, 0.28);
+      background: rgba(255, 252, 246, 0.72);
+    }
+    .techniques-app-metric {
       font-family: 'Cinzel', serif;
-      font-size: 9px;
-      letter-spacing: 0.6px;
+      font-size: 11px;
+      letter-spacing: 0.5px;
+      color: var(--ink);
+      line-height: 1.25;
       text-transform: uppercase;
-      color: var(--ink-faint);
-      margin-bottom: 4px;
-      line-height: 1.2;
     }
-    .techniques-app-range {
-      font-family: 'Cinzel', serif;
-      font-size: 9px;
-      letter-spacing: 0.55px;
-      text-transform: uppercase;
-      color: var(--ink-faint);
-      margin-bottom: 4px;
-      line-height: 1.2;
-    }
-    .techniques-app-aoe-row {
-      display: flex;
-      align-items: center;
-      gap: 5px;
-      margin-bottom: 4px;
-    }
-    .techniques-app-aoe-icon {
-      width: 16px;
-      height: 16px;
+    .techniques-app-metric strong {
       color: var(--accent);
-      flex: 0 0 auto;
-    }
-    .techniques-app-aoe-icon svg {
-      width: 100%;
-      height: 100%;
-      display: block;
+      font-weight: 700;
     }
     .techniques-app-effect {
       font-family: 'Crimson Text', serif;

@@ -10,7 +10,7 @@ let _pendingNewApplicationIndex = null;
 let _pendingNewVowIndex = null;
 
 const JUJUTSU_SUBTABS = new Set(["technique", "vows", "training"]);
-const APPLICATION_RANGE_TYPES = new Set(["self", "range", "aoe"]);
+const APPLICATION_RANGE_TYPES = new Set(["self", "melee", "range", "aoe"]);
 const APPLICATION_AOE_SHAPES = ["cone", "cube", "sphere", "cylinder", "line"];
 
 function getState() {
@@ -41,7 +41,7 @@ function createDefaultApplication(index) {
     rangeType: "self",
     rangeValue: "",
     aoeShape: "cone",
-    aoeSize: 0,
+    aoeSize: "",
   };
 }
 
@@ -65,7 +65,7 @@ function normalizeApplication(raw, index) {
   const rangeValue = String(raw?.rangeValue || "").trim();
   const aoeShapeRaw = String(raw?.aoeShape || "").trim().toLowerCase();
   const aoeShape = APPLICATION_AOE_SHAPES.includes(aoeShapeRaw) ? aoeShapeRaw : "cone";
-  const aoeSize = parseNonNegativeInt(raw?.aoeSize);
+  const aoeSize = String(raw?.aoeSize || "").trim();
   return {
     title: title || fallbackTitle,
     description,
@@ -87,47 +87,19 @@ function getAoeShapeLabel(shape) {
   return "Cone";
 }
 
-function getAoeShapeSvg(shape) {
-  if (shape === "cube") {
-    return '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><rect x="5" y="5" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>';
-  }
-  if (shape === "sphere") {
-    return '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><circle cx="12" cy="12" r="7" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>';
-  }
-  if (shape === "cylinder") {
-    return '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><ellipse cx="12" cy="6" rx="6" ry="3" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M6 6v9c0 1.7 2.7 3 6 3s6-1.3 6-3V6" fill="none" stroke="currentColor" stroke-width="1.6"/><ellipse cx="12" cy="15" rx="6" ry="3" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>';
-  }
-  if (shape === "line") {
-    return '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M4 16L20 8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="4" cy="16" r="1.5" fill="currentColor"/><circle cx="20" cy="8" r="1.5" fill="currentColor"/></svg>';
-  }
-  return '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path d="M4 18L12 5l8 13Z" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>';
-}
-
 function getRangeSummary(app) {
+  if (app.rangeType === "melee") {
+    return "Range: Melee";
+  }
   if (app.rangeType === "range") {
-    return {
-      text: app.rangeValue ? `Range: ${app.rangeValue}` : "Range: -",
-      isAoe: false,
-      shapeLabel: "",
-      shapeSvg: "",
-    };
+    return app.rangeValue ? `Range: ${app.rangeValue}` : "Range: -";
   }
   if (app.rangeType === "aoe") {
     const shapeLabel = getAoeShapeLabel(app.aoeShape);
-    const sizeLabel = app.aoeSize > 0 ? `${app.aoeSize} ft` : "-";
-    return {
-      text: `AOE: ${shapeLabel} ${sizeLabel}`,
-      isAoe: true,
-      shapeLabel,
-      shapeSvg: getAoeShapeSvg(app.aoeShape),
-    };
+    const sizeLabel = app.aoeSize || "-";
+    return `AOE: ${shapeLabel} (${sizeLabel})`;
   }
-  return {
-    text: "Range: Self",
-    isAoe: false,
-    shapeLabel: "",
-    shapeSvg: "",
-  };
+  return "Range: Self";
 }
 
 function normalizeBindingVow(raw, index) {
@@ -301,6 +273,7 @@ function renderApplicationsSummary(state) {
             <span class="field-label">Range Type</span>
             <select id="appCardRangeType${idx}" class="meta-select techniques-app-card-field" data-app-range-type-inline="${idx}">
               <option value="self"${normalized.rangeType === "self" ? " selected" : ""}>Self</option>
+              <option value="melee"${normalized.rangeType === "melee" ? " selected" : ""}>Melee</option>
               <option value="range"${normalized.rangeType === "range" ? " selected" : ""}>Range</option>
               <option value="aoe"${normalized.rangeType === "aoe" ? " selected" : ""}>AOE</option>
             </select>
@@ -319,8 +292,8 @@ function renderApplicationsSummary(state) {
             </select>
           </label>
           <label class="techniques-field" for="appCardAoeSize${idx}">
-            <span class="field-label">AOE Size (ft)</span>
-            <input id="appCardAoeSize${idx}" class="meta-input techniques-app-card-field" type="number" min="0" step="1" inputmode="numeric" data-app-aoe-size-inline="${idx}" value="${normalized.aoeSize || 0}" />
+            <span class="field-label">AOE Size</span>
+            <input id="appCardAoeSize${idx}" class="meta-input techniques-app-card-field" data-app-aoe-size-inline="${idx}" value="${normalized.aoeSize}" placeholder="15 ft radius" />
           </label>
           ` : ""}
           </div>
@@ -346,21 +319,19 @@ function renderApplicationsSummary(state) {
       `;
     }
     const description = normalized.description || "No description yet.";
-    const costText = normalized.ceCost > 0 ? `CE: ${normalized.ceCost}` : "CE: -";
-    const dcText = normalized.dc > 0 ? `DC: ${normalized.dc}` : "DC: -";
+    const costText = normalized.ceCost > 0 ? String(normalized.ceCost) : "-";
+    const dcText = normalized.dc > 0 ? String(normalized.dc) : "-";
     const range = getRangeSummary(normalized);
     const effectText = normalized.effect || "No effect listed.";
     return `
       <article class="techniques-app-card" data-app-idx="${idx}">
         <button type="button" class="techniques-app-card-edit-btn" data-app-edit-toggle="${idx}" aria-label="Edit application" title="Edit">&#9998;</button>
         <h4 class="techniques-app-card-title">${normalized.title}</h4>
-        <div class="techniques-app-card-cost">${costText} · ${dcText}</div>
-        ${range.isAoe ? `
-          <div class="techniques-app-aoe-row">
-            <span class="techniques-app-aoe-icon">${range.shapeSvg}</span>
-            <span class="techniques-app-range">${range.text}</span>
-          </div>
-        ` : `<div class="techniques-app-range">${range.text}</div>`}
+        <div class="techniques-app-metrics">
+          <span class="techniques-app-metric"><strong>CE Cost:</strong> ${costText}</span>
+          <span class="techniques-app-metric"><strong>DC:</strong> ${dcText}</span>
+          <span class="techniques-app-metric"><strong>${range.startsWith("AOE") ? "AOE" : "Range"}:</strong> ${range.replace(/^AOE:\s*|^Range:\s*/, "")}</span>
+        </div>
         <div class="techniques-app-effect"><strong>Effect:</strong> ${effectText}</div>
         <p class="techniques-app-card-desc">${description}</p>
       </article>
@@ -406,6 +377,7 @@ function renderApplicationsEditor(state) {
           <span class="field-label">Range Type</span>
           <select id="techniqueAppRangeType${idx}" class="meta-select" data-app-range-type="${idx}">
             <option value="self"${normalized.rangeType === "self" ? " selected" : ""}>Self</option>
+            <option value="melee"${normalized.rangeType === "melee" ? " selected" : ""}>Melee</option>
             <option value="range"${normalized.rangeType === "range" ? " selected" : ""}>Range</option>
             <option value="aoe"${normalized.rangeType === "aoe" ? " selected" : ""}>AOE</option>
           </select>
@@ -424,8 +396,8 @@ function renderApplicationsEditor(state) {
           </select>
         </label>
         <label class="techniques-field" for="techniqueAppAoeSize${idx}">
-          <span class="field-label">AOE Size (ft)</span>
-          <input id="techniqueAppAoeSize${idx}" class="meta-input" type="number" min="0" step="1" inputmode="numeric" data-app-aoe-size="${idx}" value="${normalized.aoeSize || 0}" />
+          <span class="field-label">AOE Size</span>
+          <input id="techniqueAppAoeSize${idx}" class="meta-input" data-app-aoe-size="${idx}" value="${normalized.aoeSize}" placeholder="15 ft radius" />
         </label>
         ` : ""}
         <label class="techniques-field" for="techniqueAppEffect${idx}">
@@ -811,7 +783,7 @@ export function initTechniques({ getState: getStateFn, scheduleSave: scheduleSav
       const aoeSizeAttr = e.target?.dataset?.appAoeSizeInline;
       if (aoeSizeAttr !== undefined) {
         const idx = parseNonNegativeInt(aoeSizeAttr);
-        if (state.techniques.applications[idx]) state.techniques.applications[idx].aoeSize = parseNonNegativeInt(e.target.value);
+        if (state.techniques.applications[idx]) state.techniques.applications[idx].aoeSize = String(e.target.value || "").trim();
       }
       const effectAttr = e.target?.dataset?.appEffectInline;
       if (effectAttr !== undefined) {
@@ -832,7 +804,7 @@ export function initTechniques({ getState: getStateFn, scheduleSave: scheduleSav
         if (state.techniques.applications[idx]) {
           state.techniques.applications[idx].rangeType = String(e.target.value || "self").toLowerCase();
           if (state.techniques.applications[idx].rangeType !== "range") state.techniques.applications[idx].rangeValue = "";
-          if (state.techniques.applications[idx].rangeType !== "aoe") state.techniques.applications[idx].aoeSize = 0;
+          if (state.techniques.applications[idx].rangeType !== "aoe") state.techniques.applications[idx].aoeSize = "";
           refreshApplicationCards(state);
         }
         scheduleSave();
@@ -933,7 +905,7 @@ export function initTechniques({ getState: getStateFn, scheduleSave: scheduleSav
       if (e.target?.dataset?.appRangeType !== undefined && state.techniques.applications[rangeTypeIdx]) {
         state.techniques.applications[rangeTypeIdx].rangeType = String(e.target.value || "self").toLowerCase();
         if (state.techniques.applications[rangeTypeIdx].rangeType !== "range") state.techniques.applications[rangeTypeIdx].rangeValue = "";
-        if (state.techniques.applications[rangeTypeIdx].rangeType !== "aoe") state.techniques.applications[rangeTypeIdx].aoeSize = 0;
+        if (state.techniques.applications[rangeTypeIdx].rangeType !== "aoe") state.techniques.applications[rangeTypeIdx].aoeSize = "";
         renderApplicationsEditor(state);
       }
       if (e.target?.dataset?.appRangeValue !== undefined && state.techniques.applications[rangeValueIdx]) {
@@ -943,7 +915,7 @@ export function initTechniques({ getState: getStateFn, scheduleSave: scheduleSav
         state.techniques.applications[aoeShapeIdx].aoeShape = String(e.target.value || "cone").toLowerCase();
       }
       if (e.target?.dataset?.appAoeSize !== undefined && state.techniques.applications[aoeSizeIdx]) {
-        state.techniques.applications[aoeSizeIdx].aoeSize = parseNonNegativeInt(e.target.value);
+        state.techniques.applications[aoeSizeIdx].aoeSize = String(e.target.value || "").trim();
       }
       if (e.target?.dataset?.appEffect !== undefined && state.techniques.applications[effectIdx]) {
         state.techniques.applications[effectIdx].effect = String(e.target.value || "");
