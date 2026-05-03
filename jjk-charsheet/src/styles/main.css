@@ -173,6 +173,18 @@
       display: inline-flex;
       margin-top: 6px;
     }
+    .rest-quick-wrap {
+      position: fixed;
+      right: 180px;
+      bottom: 12px;
+      z-index: 31;
+      margin-top: 0;
+    }
+    .rest-quick-btn {
+      right: auto;
+      bottom: auto;
+      position: static;
+    }
     .rest-options-popover {
       position: absolute;
       top: calc(100% + 4px);
@@ -208,6 +220,14 @@
       opacity: 0.45;
       cursor: not-allowed;
       filter: grayscale(0.15);
+    }
+    .rest-options-popover--quick {
+      top: auto;
+      bottom: calc(100% + 4px);
+      left: auto;
+      right: 0;
+      transform-origin: bottom right;
+      z-index: 32;
     }
     .stat-derived-pulse {
       animation: statDerivedPulse 260ms ease;

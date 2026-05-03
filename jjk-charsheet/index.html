@@ -17,7 +17,6 @@
     <div class="tab" data-tab="inventory">Inventory</div>
     <div class="tab disabled" data-tab="combat">Combat<span class="tab-soon">soon</span></div>
     <div class="tab" data-tab="jujutsu">Jujutsu</div>
-    <div class="tab" data-tab="party">Party</div>
   </div>
 
   <div class="tab-content">
@@ -76,15 +75,6 @@
           <div class="meta-field" style="grid-column:1/-1;">
             <div class="field-label">Cursed Technique</div>
             <input class="meta-input" id="ctInput" placeholder="—" />
-            <div class="rest-control-wrap">
-              <button class="inventory-mini-btn" id="restBtn" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="restOptionsPopover">Rest</button>
-              <div id="restOptionsPopover" class="rest-options-popover" hidden>
-                <div class="rest-options-title">Choose Rest Type</div>
-                <button class="inventory-mini-btn" id="quickRestBtn" type="button">Quick Rest (25%)</button>
-                <button class="inventory-mini-btn" id="shortRestBtn" type="button">Short Rest (50%)</button>
-                <button class="inventory-mini-btn" id="fullRestBtn" type="button">Full Rest (100%)</button>
-              </div>
-            </div>
           </div>
         </div>
       </div>
@@ -592,6 +582,15 @@
 </div>
 
 <div id="rollToastContainer" class="roll-toast-container"></div>
+<div class="rest-control-wrap rest-quick-wrap">
+  <button id="restBtn" class="roll-history-btn rest-quick-btn" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="restOptionsPopover">Rest</button>
+  <div id="restOptionsPopover" class="rest-options-popover rest-options-popover--quick" hidden>
+    <div class="rest-options-title">Choose Rest Type</div>
+    <button class="inventory-mini-btn" id="quickRestBtn" type="button">Quick Rest (25%)</button>
+    <button class="inventory-mini-btn" id="shortRestBtn" type="button">Short Rest (50%)</button>
+    <button class="inventory-mini-btn" id="fullRestBtn" type="button">Full Rest (100%)</button>
+  </div>
+</div>
 <button id="partyQuickBtn" class="roll-history-btn party-quick-btn" type="button">Party</button>
 <button id="rollHistoryBtn" class="roll-history-btn" type="button">Roll Log</button>
 <div id="rollHistoryPanel" class="roll-history-panel">

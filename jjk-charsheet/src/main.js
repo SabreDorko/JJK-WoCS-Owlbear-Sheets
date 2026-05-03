@@ -158,10 +158,11 @@ function applyStateToUI() {
 function activateMainTab(tabName) {
   const target = document.querySelector(`.tab[data-tab="${tabName}"]`);
   const panel  = document.getElementById("panel-" + tabName);
-  if (!target || !panel || target.classList.contains("disabled")) return;
+  if (!panel) return;
+  if (target && target.classList.contains("disabled")) return;
   document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
   document.querySelectorAll(".tab-panel").forEach(p => p.classList.remove("active"));
-  target.classList.add("active");
+  if (target) target.classList.add("active");
   panel.classList.add("active");
 }
 
