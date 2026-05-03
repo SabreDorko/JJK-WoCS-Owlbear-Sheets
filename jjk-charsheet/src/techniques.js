@@ -28,6 +28,11 @@ function refreshCharacterStats() {
   if (_refreshCharacterStats) _refreshCharacterStats();
 }
 
+function syncCeCurrentField(value) {
+  const ceCurrentInput = document.getElementById("ceCurrent");
+  if (ceCurrentInput) ceCurrentInput.value = String(value ?? "");
+}
+
 function performApplicationCast(state, techniqueIndex, applicationIndex) {
   if (!state) return;
   ensureTechniquesState(state);
@@ -46,13 +51,9 @@ function performApplicationCast(state, techniqueIndex, applicationIndex) {
 
   // Check if auto-pass (DC < XP Threshold = technique score × 2)
   if (xpThreshold > 0 && dc < xpThreshold) {
-    // Auto-pass: log as "Pass" without rolling
-    if (_showRollToast) {
-      _showRollToast(label, 0, [], 0, "pass", null, null);
-    }
     // Deduct CE
     state.ceCurrent = String(Math.max(0, ceCurrent - ceCost));
-    refreshCharacterStats();
+    syncCeCurrentField(state.ceCurrent);
     scheduleSave();
     return;
   }
@@ -97,7 +98,7 @@ function performApplicationCast(state, techniqueIndex, applicationIndex) {
   
   // Deduct CE
   state.ceCurrent = String(Math.max(0, ceCurrent - ceCost));
-  refreshCharacterStats();
+  syncCeCurrentField(state.ceCurrent);
   scheduleSave();
 }
 
@@ -126,6 +127,23 @@ function getApplicationButtonState(state, applicationIndex) {
   }
   
   return { disabled: false, isAutoPass: false, tooltip: "Roll talent check" };
+}
+
+function syncApplicationButtonStates(state) {
+  const summaryGrid = document.getElementById("techniqueApplicationsSummary");
+  if (!summaryGrid || !state) return;
+
+  const apps = Array.isArray(state?.techniques?.applications) ? state.techniques.applications : [];
+  apps.forEach((_, idx) => {
+    const button = summaryGrid.querySelector(`[data-app-cast="${idx}"]`);
+    if (!button) return;
+
+    const btnState = getApplicationButtonState(state, idx);
+    button.classList.toggle("techniques-app-cast-btn--auto-pass", btnState.isAutoPass);
+    button.disabled = btnState.disabled;
+    button.title = btnState.tooltip;
+    button.textContent = `${btnState.isAutoPass ? "✦ " : ""}Use`;
+  });
 }
 
 function parseNonNegativeInt(rawValue) {
@@ -529,10 +547,15 @@ function renderBindingVowsEditor(state) {
     return;
   }
 
-  list.innerHTML = vows.map((vow, idx) => {
-    const normalized = normalizeBindingVow(vow, idx);
-    return `
-      <div class="techniques-app-editor-item${_pendingNewVowIndex === idx ? " vow-enter" : ""}">
+  list.innerHTML = vows.map((vow, idx) => renderBindingVowEditorItem(vow, idx, _pendingNewVowIndex === idx)).join("");
+
+  _pendingNewVowIndex = null;
+}
+
+function renderBindingVowEditorItem(vow, idx, isNew = false) {
+  const normalized = normalizeBindingVow(vow, idx);
+  return `
+      <div class="techniques-app-editor-item${isNew ? " vow-enter" : ""}">
         <label class="techniques-field" for="bindingVowTitle${idx}">
           <span class="field-label">Title</span>
           <input id="bindingVowTitle${idx}" class="meta-input" data-vow-title="${idx}" value="${normalized.title}" />
@@ -555,9 +578,6 @@ function renderBindingVowsEditor(state) {
         </div>
       </div>
     `;
-  }).join("");
-
-  _pendingNewVowIndex = null;
 }
 
 function setEditorVisibility() {
@@ -620,9 +640,9 @@ export function updateTechniquesDerivedUI(stateArg = null) {
   const xpThreshold = techScore * 2;
   const thresholdEl = document.getElementById("techniqueXpThreshold");
   if (thresholdEl) {
-    const hasApps = Array.isArray(state?.techniques?.applications) && state.techniques.applications.length > 0;
-    if (hasApps && techScore > 0) {
-      thresholdEl.textContent = `XP Threshold: ${xpThreshold} (Technique ${techScore} × 2) — DC below this auto-passes`;
+    const hasActiveTechnique = state.techniques.mode !== "none";
+    if (hasActiveTechnique) {
+      thresholdEl.textContent = `Sorcerer Experience Threshold: ${xpThreshold}`;
       thresholdEl.style.display = "";
     } else {
       thresholdEl.style.display = "none";
@@ -632,18 +652,6 @@ export function updateTechniquesDerivedUI(stateArg = null) {
   renderApplicationsSummary(state);
 
   const hasActiveTechnique = state.techniques.mode !== "none";
-
-  const xpThresholdEl = document.getElementById("techniqueXpThreshold");
-  if (xpThresholdEl) {
-    if (hasActiveTechnique) {
-      const techScore = parseInt(state?.stats?.technique?.score, 10) || 0;
-      const threshold = techScore * 2;
-      xpThresholdEl.textContent = `Sorcerer Experience Threshold: ${threshold}`;
-      xpThresholdEl.style.display = "";
-    } else {
-      xpThresholdEl.style.display = "none";
-    }
-  }
 
   const summaryFooter = document.getElementById("techniqueSummaryFooter");
   if (summaryFooter) summaryFooter.style.display = hasActiveTechnique ? "" : "none";
@@ -883,7 +891,7 @@ export function initTechniques({ getState: getStateFn, scheduleSave: scheduleSav
         if (!state) return;
         const idx = parseNonNegativeInt(castTrigger.dataset.appCast);
         performApplicationCast(state, 0, idx);
-        refreshApplicationCards(state);
+        syncApplicationButtonStates(state);
       }
     });
     summaryGrid.addEventListener("input", e => {
@@ -1103,8 +1111,16 @@ export function initTechniques({ getState: getStateFn, scheduleSave: scheduleSav
       ensureTechniquesState(state);
       const newIndex = state.techniques.bindingVows.length;
       state.techniques.bindingVows.push(createDefaultBindingVow(newIndex));
-      _pendingNewVowIndex = newIndex;
-      renderBindingVowsEditor(state);
+      const list = document.getElementById("bindingVowsList");
+      const emptyState = list?.querySelector?.(".techniques-app-empty");
+      if (emptyState) emptyState.remove();
+      if (list) {
+        list.insertAdjacentHTML("beforeend", renderBindingVowEditorItem(state.techniques.bindingVows[newIndex], newIndex, true));
+      } else {
+        _pendingNewVowIndex = newIndex;
+        renderBindingVowsEditor(state);
+      }
+      _pendingNewVowIndex = null;
       scheduleSave();
     });
   }

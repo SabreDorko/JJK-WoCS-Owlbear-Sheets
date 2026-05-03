@@ -567,7 +567,6 @@ export function applyCharacterStateToUI() {
   setInputValueWithPulse(document.getElementById("ceMax"), state.ceMax || "");
   const ceNoteEl = document.getElementById("ceNote");
   if (ceNoteEl) ceNoteEl.value = state.ceNote || "";
-  setInputValueWithPulse(document.getElementById("sorcererXpInput"), state.sorcererXp || "");
 
   const arcSel = document.getElementById("archetypeSelect");
   arcSel.value = state.archetype || "";
@@ -623,16 +622,9 @@ export function initCharacter({ getState: getStateFn, scheduleSave: scheduleSave
   bindField("hpCurrent", "hpCurrent");
   bindField("ceCurrent", "ceCurrent");
   bindField("ceNote", "ceNote");
-  bindField("sorcererXpInput", "sorcererXp");
   bindField("subArchetypeSelect", "subArchetype");
   bindField("subArchetypeSelect2", "subArchetype2");
 
-  // Special handling for sorcererXp and ceCurrent to refresh application cards
-  const sorcererXpInput = document.getElementById("sorcererXpInput");
-  if (sorcererXpInput) {
-    sorcererXpInput.addEventListener("input", () => updateTechniquesDerivedUI());
-    sorcererXpInput.addEventListener("change", () => updateTechniquesDerivedUI());
-  }
   const ceCurrentInput = document.getElementById("ceCurrent");
   if (ceCurrentInput) {
     ceCurrentInput.addEventListener("input", () => updateTechniquesDerivedUI());
