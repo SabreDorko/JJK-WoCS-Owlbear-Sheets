@@ -22,6 +22,7 @@ let openYenAdjustMode = null;
 let openOverflowChoice = null;
 let draftItemModifiers = [];
 let editingModifierIndex = null;
+let isModifierEditMode = false;
 
 function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
@@ -260,12 +261,29 @@ function renderDraftModifierList() {
   listEl.innerHTML = draftItemModifiers.map((modifier, index) => `
     <div class="inventory-modifier-row" data-modifier-index="${index}">
       <div class="inventory-modifier-row-text">${escapeHtml(describeModifier(modifier))}</div>
+      ${isModifierEditMode ? `
       <div class="inventory-modifier-row-actions">
         <button type="button" class="inventory-mini-btn" data-action="editDraftModifier" data-index="${index}">Edit</button>
         <button type="button" class="inventory-mini-btn danger" data-action="removeDraftModifier" data-index="${index}">Remove</button>
       </div>
+      ` : ""}
     </div>
   `).join("");
+}
+
+function setModifierEditMode(isEditing) {
+  isModifierEditMode = Boolean(isEditing);
+  const editBtn = document.getElementById("itemEditModifiersBtn");
+  const addBtn = document.getElementById("itemAddModifierBtn");
+  const editor = document.getElementById("itemModifiersEditor");
+  if (editBtn) editBtn.textContent = isModifierEditMode ? "Done" : "Edit";
+  if (addBtn) addBtn.hidden = !isModifierEditMode;
+  if (editor) editor.hidden = false;
+  if (!isModifierEditMode) {
+    editingModifierIndex = null;
+    setModifierFormVisibility(false);
+  }
+  renderDraftModifierList();
 }
 
 function setModifierFormVisibility(isVisible) {
@@ -290,7 +308,7 @@ function syncModifierFieldVisibility() {
   if (!kindSelect || !statField || !skillField) return;
 
   const kind = kindSelect.value;
-  const needsStat = ["stat", "skills", "rolls", "skill"].includes(kind);
+  const needsStat = ["stat", "rolls", "skill"].includes(kind);
   const needsSkill = kind === "skill";
   statField.hidden = !needsStat;
   skillField.hidden = !needsSkill;
@@ -323,28 +341,22 @@ function getModifierDraftFromForm() {
     value,
   };
 
-  if (["stat", "skills", "rolls", "skill"].includes(kind)) draft.statKey = statKey;
+  if (["stat", "rolls", "skill"].includes(kind)) draft.statKey = statKey;
   if (kind === "skill") draft.skillIndex = skillIndex;
   return normalizeModifierList([draft])[0] || null;
 }
 
 function openModifierEditor() {
-  const editor = document.getElementById("itemModifiersEditor");
-  if (!editor) return;
-  editor.hidden = false;
-  renderDraftModifierList();
+  setModifierEditMode(true);
   refreshModifierSummary();
 }
 
 function closeModifierEditor() {
-  const editor = document.getElementById("itemModifiersEditor");
-  if (!editor) return;
-  editor.hidden = true;
-  setModifierFormVisibility(false);
-  editingModifierIndex = null;
+  setModifierEditMode(false);
 }
 
 function handleDraftModifierListClick(event) {
+  if (!isModifierEditMode) return;
   const button = event.target.closest("button[data-action]");
   if (!button) return;
 
@@ -383,20 +395,22 @@ function initModifierEditorUI() {
   const cancelBtn = document.getElementById("itemModifierCancelBtn");
   if (!editBtn || !addBtn || !list || !kindSelect || !statSelect || !saveBtn || !cancelBtn) return;
 
+  const editor = document.getElementById("itemModifiersEditor");
   const statDefinitions = getStatDefinitions();
   statSelect.innerHTML = statDefinitions.map(def => `<option value="${def.key}">${escapeHtml(def.label)}</option>`).join("");
+  if (editor) editor.hidden = false;
   resetModifierDraftForm();
   renderDraftModifierList();
   refreshModifierSummary();
+  setModifierEditMode(false);
 
   editBtn.addEventListener("click", () => {
-    const editor = document.getElementById("itemModifiersEditor");
-    if (!editor) return;
-    if (editor.hidden) openModifierEditor();
+    if (!isModifierEditMode) openModifierEditor();
     else closeModifierEditor();
   });
 
   addBtn.addEventListener("click", () => {
+    if (!isModifierEditMode) return;
     editingModifierIndex = null;
     resetModifierDraftForm();
     setModifierFormVisibility(true);
@@ -1126,8 +1140,9 @@ function resetItemEditor() {
   setItemTypeFieldsVisibility("clothing");
   document.getElementById("saveItemBtn").textContent = "Save Item";
   document.getElementById("cancelEditItemBtn").style.display = "none";
-  document.getElementById("itemModifiersEditor").hidden = true;
+  document.getElementById("itemModifiersEditor").hidden = false;
   resetModifierDraftForm();
+  setModifierEditMode(false);
   renderDraftModifierList();
   refreshModifierSummary();
   setItemFormError("");
@@ -1144,8 +1159,9 @@ function startItemEdit(itemId) {
   document.getElementById("itemDescriptionInput").value = item.description;
   draftItemModifiers = cloneDraftModifiers(item.modifiers);
   editingModifierIndex = null;
-  document.getElementById("itemModifiersEditor").hidden = true;
+  document.getElementById("itemModifiersEditor").hidden = false;
   resetModifierDraftForm();
+  setModifierEditMode(false);
   renderDraftModifierList();
   refreshModifierSummary();
   setActiveItemType(normalizeItemType(item.itemType));

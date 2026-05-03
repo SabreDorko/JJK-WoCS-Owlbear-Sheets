@@ -16,7 +16,8 @@ export function normalizeModifierList(rawList) {
 
   return rawList
     .map((entry, idx) => {
-      const kind = String(entry?.kind || "").trim();
+      const rawKind = String(entry?.kind || "").trim();
+      const kind = rawKind === "skills" ? "rolls" : rawKind;
       const statKey = String(entry?.statKey || "").trim();
       const skillIndex = Number.isInteger(entry?.skillIndex) ? entry.skillIndex : parseInt(entry?.skillIndex, 10);
       const value = parseModifierValue(entry?.value);
@@ -27,7 +28,7 @@ export function normalizeModifierList(rawList) {
         value,
       };
 
-      if (["stat", "skills", "rolls", "skill"].includes(kind)) {
+      if (["stat", "rolls", "skill"].includes(kind)) {
         if (!STAT_KEYS.has(statKey)) return null;
         normalized.statKey = statKey;
       }
@@ -38,7 +39,7 @@ export function normalizeModifierList(rawList) {
         normalized.skillIndex = skillIndex;
       }
 
-      if (!["stat", "skills", "rolls", "skill", "ac", "movement", "storage"].includes(kind)) return null;
+      if (!["stat", "rolls", "skill", "ac", "movement", "storage"].includes(kind)) return null;
       if (value === 0) return null;
       return normalized;
     })
@@ -63,9 +64,8 @@ export function describeModifier(modifier) {
   if (modifier?.kind === "movement") return `${valueWithSign(value)} Movement`;
   if (modifier?.kind === "storage") return `${valueWithSign(value)} Storage Slot${Math.abs(value) === 1 ? "" : "s"}`;
   if (modifier?.kind === "stat") return `${valueWithSign(value)} ${statLabel}`;
-  if (modifier?.kind === "skills") return `${valueWithSign(value)} ${statLabel} skills`;
-  if (modifier?.kind === "rolls") return `${valueWithSign(value)} ${statLabel} rolls`;
-  if (modifier?.kind === "skill") return `${valueWithSign(value)} ${getSkillName(statKey, modifier?.skillIndex)}`;
+  if (modifier?.kind === "rolls") return `${valueWithSign(value)} ${statLabel} Rolls`;
+  if (modifier?.kind === "skill") return `${valueWithSign(value)} ${getSkillName(statKey, modifier?.skillIndex)} Substat`;
   return "";
 }
 
@@ -130,4 +130,29 @@ export function getSkillOptions(statKey) {
 
 export function getStatDefinitions() {
   return STAT_DEFS.map(def => ({ key: def.key, label: STAT_LABELS[def.key], skills: [...def.skills] }));
+}
+
+export function getRollModifierSources(state, statKey) {
+  if (!state?.inventoryItems || !state?.equippedSlots) return [];
+
+  const equippedIds = [...new Set(Object.values(state.equippedSlots).filter(Boolean))];
+  const sources = [];
+
+  equippedIds.forEach(itemId => {
+    const item = state.inventoryItems.find(entry => entry.id === itemId);
+    if (!item) return;
+
+    const amount = normalizeModifierList(item.modifiers)
+      .filter(modifier => modifier.kind === "rolls" && modifier.statKey === statKey)
+      .reduce((sum, modifier) => sum + parseModifierValue(modifier.value), 0);
+
+    if (amount !== 0) {
+      sources.push({
+        label: item.name || "Item",
+        value: amount,
+      });
+    }
+  });
+
+  return sources;
 }

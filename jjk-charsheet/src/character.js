@@ -1,5 +1,5 @@
 import { ARCHETYPES, CENTER_STATS, RIGHT_STATS } from "./state/store.js";
-import { computeActiveModifierEffects } from "./modifiers.js";
+import { computeActiveModifierEffects, getRollModifierSources } from "./modifiers.js";
 
 let _getState = null;
 let _scheduleSave = null;
@@ -63,9 +63,9 @@ function getNextAptitudeActionLabel(currentAptitude) {
   return "Clear Aptitude";
 }
 
-function showRollToast(statLabel, diceCount, rolls, total, critStatus, skillName) {
+function showRollToast(statLabel, diceCount, rolls, total, critStatus, skillName, breakdown) {
   if (_showRollToast) {
-    _showRollToast(statLabel, diceCount, rolls, total, critStatus, skillName);
+    _showRollToast(statLabel, diceCount, rolls, total, critStatus, skillName, breakdown);
   }
 }
 
@@ -217,7 +217,9 @@ function buildStatBlocks(defs, container) {
       const rolls = Array.from({ length: n }, () => Math.floor(Math.random() * 6) + 1);
       const rollBonus = currentEffects.rollBonuses[def.key] || 0;
       const total = rolls.reduce((a, b) => a + b, 0) + rollBonus;
-      showRollToast(def.label, n, rolls, total);
+      showRollToast(def.label, n, rolls, total, null, null, {
+        equipmentBonuses: getRollModifierSources(state, def.key),
+      });
     });
 
     const skillsSide = document.createElement("div");
@@ -281,7 +283,10 @@ function buildStatBlocks(defs, container) {
         const maxPossible = n * 6;
         const allOnes = rolls.every(r => r === 1);
         const critStatus = allOnes ? "fail" : total >= maxPossible ? "success" : null;
-        showRollToast(def.label, n, rolls, total, critStatus, skill);
+        showRollToast(def.label, n, rolls, total, critStatus, skill, {
+          skillModifier: subskillBonus,
+          equipmentBonuses: getRollModifierSources(state, def.key),
+        });
       });
     });
 

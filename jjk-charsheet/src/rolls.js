@@ -54,6 +54,29 @@ function critBadgeHTML(critStatus) {
   return "";
 }
 
+function formatSignedValue(value) {
+  return value >= 0 ? `+${value}` : `${value}`;
+}
+
+function formatRollBody(entry) {
+  const base = `${entry.diceCount}d6: [${entry.rolls.join(", ")}]`;
+  const breakdown = entry.breakdown;
+  if (!breakdown) return `${base} = <strong>${entry.total}</strong>`;
+
+  let formula = base;
+  if (Number.isFinite(breakdown.skillModifier)) {
+    formula += ` + ${breakdown.skillModifier}`;
+  }
+
+  const bonuses = Array.isArray(breakdown.equipmentBonuses) ? breakdown.equipmentBonuses : [];
+  bonuses.forEach(part => {
+    if (!part || !Number.isFinite(part.value)) return;
+    formula += ` + ${part.label} (${formatSignedValue(part.value)})`;
+  });
+
+  return `${formula} = <strong>${entry.total}</strong>`;
+}
+
 // ── RENDER PERSONAL ROLL HISTORY ──────────────────────────────────────────────
 export function renderRollHistory() {
   const list = document.getElementById("rollHistoryList");
@@ -68,7 +91,7 @@ export function renderRollHistory() {
     return `
       <div class="roll-history-item">
         <div class="roll-history-item-title">${item.time} • ${label}${critBadgeHTML(item.critStatus)}</div>
-        <div class="roll-history-item-body">${item.diceCount}d6: [${item.rolls.join(", ")}] = <strong>${item.total}</strong></div>
+        <div class="roll-history-item-body">${formatRollBody(item)}</div>
       </div>
     `;
   }).join("");
@@ -92,7 +115,7 @@ export function renderGroupRollHistory() {
     return `
       <div class="roll-history-item">
         <div class="roll-history-item-title">${item.time} • ${whoDisplay}${label}${critBadgeHTML(item.critStatus)}</div>
-        <div class="roll-history-item-body">${item.diceCount}d6: [${item.rolls.join(", ")}] = <strong>${item.total}</strong></div>
+        <div class="roll-history-item-body">${formatRollBody(item)}</div>
       </div>
     `;
   }).join("");
@@ -110,21 +133,21 @@ export function switchRollTab(tab) {
 }
 
 // ── PUSH TO PERSONAL + GROUP HISTORY AND BROADCAST ───────────────────────────
-export function pushRollHistory(statLabel, diceCount, rolls, total, critStatus, skillName) {
+export function pushRollHistory(statLabel, diceCount, rolls, total, critStatus, skillName, breakdown) {
   const state = _getState();
   const now  = new Date();
   const time = now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 
   state.rollHistory = [
     ...(state.rollHistory || []),
-    { statLabel, diceCount, rolls, total, time, critStatus: critStatus || null, skillName: skillName || null },
+    { statLabel, diceCount, rolls, total, time, critStatus: critStatus || null, skillName: skillName || null, breakdown: breakdown || null },
   ].slice(-MAX_ROLL_HISTORY);
   renderRollHistory();
   _scheduleSave();
 
   const charName   = (state.charName || "").trim();
   const playerName = _getPreferredPlayerName();
-  const groupEntry = { charName, playerName, statLabel, diceCount, rolls, total, time, critStatus: critStatus || null, skillName: skillName || null };
+  const groupEntry = { charName, playerName, statLabel, diceCount, rolls, total, time, critStatus: critStatus || null, skillName: skillName || null, breakdown: breakdown || null };
   groupRollHistory = [...groupRollHistory, groupEntry].slice(-MAX_GROUP_ROLL_HISTORY);
   if (activeRollTab === "group") renderGroupRollHistory();
 
@@ -134,11 +157,11 @@ export function pushRollHistory(statLabel, diceCount, rolls, total, critStatus, 
 }
 
 // ── SHOW ROLL TOAST ───────────────────────────────────────────────────────────
-export function showRollToast(statLabel, diceCount, rolls, total, critStatus, skillName) {
+export function showRollToast(statLabel, diceCount, rolls, total, critStatus, skillName, breakdown) {
   const container = document.getElementById("rollToastContainer");
   if (!container) return;
 
-  pushRollHistory(statLabel, diceCount, rolls, total, critStatus, skillName);
+  pushRollHistory(statLabel, diceCount, rolls, total, critStatus, skillName, breakdown);
 
   const label = skillName ? `${statLabel} › ${skillName}` : statLabel;
   let critLine = "";
@@ -151,7 +174,7 @@ export function showRollToast(statLabel, diceCount, rolls, total, critStatus, sk
   toast.className = "roll-toast" + (critStatus === "success" ? " crit-success" : critStatus === "fail" ? " crit-fail" : "");
   toast.innerHTML = `
     <div class="roll-toast-title">${label} Roll</div>
-    <div class="roll-toast-body">Rolled ${diceCount}d6${skillName && total !== rolls.reduce((a, b) => a + b, 0) ? " + bonus" : ""}: [${rolls.join(", ")}] = <strong>${total}</strong></div>
+    <div class="roll-toast-body">${formatRollBody({ diceCount, rolls, total, breakdown })}</div>
     ${critLine}
   `;
 
