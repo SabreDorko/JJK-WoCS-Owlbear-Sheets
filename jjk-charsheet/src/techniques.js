@@ -86,6 +86,7 @@ function performApplicationCast(state, techniqueIndex, applicationIndex) {
   if (xpThreshold > 0 && dc < xpThreshold) {
     // Deduct CE
     state.ceCurrent = String(Math.max(0, ceCurrent - ceCost));
+    if (normalized.scalingEnabled && normalized.currentStep > 0) state.techniques.applications[applicationIndex].currentStep = 0;
     syncCeCurrentField(state.ceCurrent);
     syncTechniqueThresholdLine(state);
     scheduleSave();
@@ -132,6 +133,7 @@ function performApplicationCast(state, techniqueIndex, applicationIndex) {
   
   // Deduct CE
   state.ceCurrent = String(Math.max(0, ceCurrent - ceCost));
+  if (normalized.scalingEnabled && normalized.currentStep > 0) state.techniques.applications[applicationIndex].currentStep = 0;
   syncCeCurrentField(state.ceCurrent);
   syncTechniqueThresholdLine(state);
   scheduleSave();
