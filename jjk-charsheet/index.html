@@ -13,6 +13,7 @@
 
   <div class="tab-bar">
     <div class="tab active" data-tab="character">Character</div>
+    <div class="tab" data-tab="archetype">Archetype</div>
     <div class="tab" data-tab="inventory">Inventory</div>
     <div class="tab disabled" data-tab="combat">Combat<span class="tab-soon">soon</span></div>
     <div class="tab" data-tab="jujutsu">Jujutsu</div>
@@ -384,6 +385,48 @@
         </div>
       </div>
     </div>
+
+    <div class="tab-panel" id="panel-archetype">
+      <div class="archetype-shell">
+        <div class="archetype-layout">
+          <section class="archetype-card">
+            <div class="archetype-card-title">Archetype Summary</div>
+            <div class="archetype-summary-grid">
+              <div class="archetype-summary-row">
+                <span class="field-label">Primary Archetype</span>
+                <span id="archetypePrimaryValue" class="archetype-summary-value">Unselected</span>
+              </div>
+              <div class="archetype-summary-row">
+                <span class="field-label">Primary Sub-Archetype</span>
+                <span id="archetypePrimarySubValue" class="archetype-summary-value">Unselected</span>
+              </div>
+              <div class="archetype-summary-row" id="archetypeSecondaryRow" style="display:none;">
+                <span class="field-label">Second Archetype</span>
+                <span id="archetypeSecondaryValue" class="archetype-summary-value">Unselected</span>
+              </div>
+              <div class="archetype-summary-row" id="archetypeSecondarySubRow" style="display:none;">
+                <span class="field-label">Second Sub-Archetype</span>
+                <span id="archetypeSecondarySubValue" class="archetype-summary-value">Unselected</span>
+              </div>
+            </div>
+            <div class="archetype-selected-paths" id="archetypeSelectedPaths"></div>
+            <div class="archetype-rules-summary" id="archetypeRulesSummary"></div>
+          </section>
+
+          <section class="archetype-card">
+            <div class="archetype-card-title">Archetype Benefits</div>
+            <div class="archetype-benefits-list" id="archetypeBenefitsList"></div>
+          </section>
+
+          <section class="archetype-card archetype-card-wide">
+            <div class="archetype-card-title">Archetype Abilities</div>
+            <div class="techniques-muted">Abilities unlock in order. You must meet stat requirements and have an open ability slot.</div>
+            <div class="archetype-ability-list" id="archetypeAbilityTreeList"></div>
+          </section>
+        </div>
+      </div>
+    </div>
+
     <div class="tab-panel" id="panel-combat">
       <div class="soon-panel">
         <div class="soon-kanji">戦</div>

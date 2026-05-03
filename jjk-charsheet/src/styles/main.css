@@ -911,6 +911,209 @@
     }
     .jujutsu-subpanel { display: none; }
     .jujutsu-subpanel.active { display: block; padding-top: 8px; }
+
+    .archetype-shell {
+      display: grid;
+      gap: 10px;
+      padding-top: 2px;
+    }
+    .archetype-layout {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+      align-items: start;
+    }
+    .archetype-card {
+      border: 1px solid var(--border);
+      background: rgba(240, 235, 224, 0.65);
+      padding: 8px;
+      display: grid;
+      gap: 7px;
+    }
+    .archetype-card-title {
+      font-family: 'Cinzel', serif;
+      font-size: 10px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--ink);
+    }
+    .archetype-summary-grid {
+      display: grid;
+      gap: 6px;
+    }
+    .archetype-summary-row {
+      display: grid;
+      gap: 2px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 4px;
+    }
+    .archetype-summary-value {
+      font-family: 'Crimson Text', serif;
+      font-size: 14px;
+      color: var(--ink);
+      line-height: 1.2;
+    }
+    .archetype-selected-paths {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      min-height: 18px;
+    }
+    .archetype-path-chip {
+      border: 1px solid var(--border-strong);
+      background: rgba(240, 235, 224, 0.85);
+      padding: 2px 7px;
+      font-family: 'Cinzel', serif;
+      font-size: 9px;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      color: var(--ink-light);
+    }
+    .archetype-rules-summary {
+      display: grid;
+      gap: 4px;
+      margin-top: 2px;
+    }
+    .archetype-slot-pill {
+      display: inline-flex;
+      width: fit-content;
+      border: 1px solid var(--border-strong);
+      background: rgba(240, 235, 224, 0.92);
+      padding: 2px 7px;
+      font-family: 'Cinzel', serif;
+      font-size: 9px;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      color: var(--ink);
+    }
+    .archetype-rule-note {
+      font-family: 'Crimson Text', serif;
+      font-size: 13px;
+      color: var(--ink-light);
+      line-height: 1.25;
+    }
+    .archetype-warning {
+      border: 1px solid rgba(139, 26, 26, 0.45);
+      background: rgba(139, 26, 26, 0.08);
+      color: var(--accent);
+      font-family: 'Crimson Text', serif;
+      font-size: 13px;
+      padding: 4px 6px;
+    }
+    .archetype-card-wide {
+      grid-column: 1 / -1;
+    }
+    .archetype-benefits-list {
+      display: grid;
+      gap: 8px;
+    }
+    .archetype-benefit-card {
+      border: 1px solid var(--border);
+      background: rgba(240, 235, 224, 0.65);
+      padding: 6px 7px;
+      display: grid;
+      gap: 5px;
+    }
+    .archetype-benefit-title {
+      font-family: 'Cinzel', serif;
+      font-size: 10px;
+      letter-spacing: 0.9px;
+      text-transform: uppercase;
+      color: var(--ink);
+    }
+    .archetype-benefit-sub {
+      font-family: 'Crimson Text', serif;
+      font-size: 13px;
+      color: var(--ink-light);
+      margin-top: -1px;
+    }
+    .archetype-benefit-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+    }
+    .archetype-mini-list {
+      margin: 2px 0 0 0;
+      padding-left: 14px;
+      font-family: 'Crimson Text', serif;
+      font-size: 13px;
+      color: var(--ink-light);
+      line-height: 1.3;
+    }
+    .archetype-ability-list {
+      display: grid;
+      gap: 8px;
+      margin-top: 2px;
+    }
+    .archetype-ability-item {
+      border: 1px solid var(--border);
+      background: rgba(240, 235, 224, 0.65);
+      padding: 6px 7px;
+      display: grid;
+      gap: 5px;
+    }
+    .archetype-ability-title {
+      font-family: 'Cinzel', serif;
+      font-size: 10px;
+      letter-spacing: 0.9px;
+      text-transform: uppercase;
+      color: var(--ink);
+    }
+    .archetype-ability-sub {
+      font-family: 'Crimson Text', serif;
+      font-size: 13px;
+      color: var(--ink-light);
+    }
+    .archetype-ability-tree {
+      display: grid;
+      gap: 6px;
+      margin-top: 2px;
+    }
+    .archetype-ability-row {
+      border: 1px solid var(--border);
+      background: rgba(240, 235, 224, 0.72);
+      padding: 6px;
+      display: grid;
+      gap: 3px;
+    }
+    .archetype-ability-row.unlocked {
+      border-color: rgba(26, 20, 16, 0.48);
+      background: rgba(226, 217, 200, 0.75);
+    }
+    .archetype-ability-row-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .archetype-ability-name {
+      font-family: 'Cinzel', serif;
+      font-size: 10px;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      color: var(--ink);
+    }
+    .archetype-ability-meta,
+    .archetype-ability-status,
+    .archetype-ability-notes {
+      font-family: 'Crimson Text', serif;
+      font-size: 13px;
+      color: var(--ink-light);
+      line-height: 1.25;
+    }
+    .archetype-ability-controls .meta-toggle-btn,
+    .archetype-ability-controls .inventory-secondary-btn {
+      min-width: 78px;
+    }
+
+    @media (max-width: 860px) {
+      .archetype-layout {
+        grid-template-columns: 1fr;
+      }
+      .archetype-benefit-grid {
+        grid-template-columns: 1fr;
+      }
+    }
     #techniqueSummaryCard {
       position: relative;
     }

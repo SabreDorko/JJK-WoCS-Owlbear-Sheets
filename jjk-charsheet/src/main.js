@@ -25,6 +25,10 @@ import {
   applyTechniquesStateToUI,
 } from "./techniques.js";
 import {
+  initArchetype,
+  applyArchetypeStateToUI,
+} from "./archetype.js";
+import {
   initParty,
   getPartySnapshot,
   renderPartyList,
@@ -78,6 +82,7 @@ function scheduleSave() {
 function applyStateToUI() {
   applyCharacterStateToUI();
   applyTechniquesStateToUI();
+  applyArchetypeStateToUI();
 
   renderRollHistory();
   renderPartyList();
@@ -113,6 +118,11 @@ async function init() {
     getState: () => state,
     scheduleSave,
     refreshCharacterStats: applyCharacterStateToUI,
+  });
+
+  initArchetype({
+    getState: () => state,
+    scheduleSave,
   });
 
   // Wire up the rolls module with its dependencies

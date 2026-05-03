@@ -75,6 +75,10 @@ export function defaultState() {
       notes: "",
       bindingVowsNotes: "",
     },
+    archetypeProgress: {
+      unlockedAbilityIds: [],
+    },
+    archetypeGrantedAbilities: [],
     archetype2: "", subArchetype2: "", hasSecondArchetype: false,
     ac: "", hpCurrent: "", hpMax: "",
     movement: "", ceCurrent: "", ceMax: "", ceNote: "",
