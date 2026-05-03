@@ -239,6 +239,29 @@
       width: 13px;
       height: 13px;
     }
+    .save-status-badge {
+      margin-top: 8px;
+      display: inline-flex;
+      align-items: center;
+      padding: 2px 8px;
+      border: 1px solid var(--border);
+      background: rgba(255, 255, 255, 0.3);
+      color: var(--ink-light);
+      font-family: 'Cinzel', serif;
+      font-size: 9px;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+    }
+    .save-status-badge.is-pending {
+      color: #7b4c00;
+      border-color: rgba(123, 76, 0, 0.35);
+      background: rgba(255, 233, 188, 0.35);
+    }
+    .save-status-badge.is-error {
+      color: #7c1f1f;
+      border-color: rgba(124, 31, 31, 0.35);
+      background: rgba(255, 220, 220, 0.35);
+    }
 
     /* ── INFO MODAL ── */
     .info-overlay {

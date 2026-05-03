@@ -52,6 +52,49 @@ let localPlayerId = null;
 let localPlayerName = "";
 let obrReady = false;
 
+function formatSavedAt(savedAt) {
+  const parsed = parseInt(savedAt, 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) return "Never";
+  const dt = new Date(parsed);
+  return dt.toLocaleTimeString([], { hour: "numeric", minute: "2-digit", second: "2-digit" });
+}
+
+function getSaveSourceLabel(source) {
+  if (source === "room+local") return "Room + Local";
+  if (source === "room") return "Room";
+  if (source === "local") return "Local";
+  return "Unknown";
+}
+
+function setSaveStatusBadge({ text, pending = false, error = false }) {
+  const badge = document.getElementById("saveStatusBadge");
+  if (!badge) return;
+  badge.textContent = text;
+  badge.classList.toggle("is-pending", Boolean(pending));
+  badge.classList.toggle("is-error", Boolean(error));
+}
+
+function showSavePendingStatus() {
+  setSaveStatusBadge({ text: "Last Saved: saving...", pending: true });
+}
+
+function showSavedStatus(info) {
+  const timeText = formatSavedAt(info?.savedAt);
+  const sourceText = getSaveSourceLabel(info?.source);
+  setSaveStatusBadge({ text: `Last Saved: ${timeText} (${sourceText})` });
+}
+
+function showLoadedStatus(info) {
+  if (!info || info.source === "none") {
+    setSaveStatusBadge({ text: "Last Saved: no prior save", error: true });
+    return;
+  }
+
+  const timeText = formatSavedAt(info?.savedAt);
+  const sourceText = getSaveSourceLabel(info?.source);
+  setSaveStatusBadge({ text: `Last Saved: ${timeText} (${sourceText})` });
+}
+
 function getPreferredPlayerName() {
   const sheetPlayerName = (state.playerName || "").trim();
   const owlbearPlayerName = (localPlayerName || "").trim();
@@ -70,8 +113,17 @@ const persistence = createPersistenceRuntime({
   storageKeyBase: STORAGE_KEY_BASE,
   getState: () => state,
   getLocalPlayerId: () => localPlayerId,
-  onSchedule: () => renderPartyList(),
-  onAfterSave: () => broadcastPartySnapshot(),
+  onSchedule: () => {
+    renderPartyList();
+    showSavePendingStatus();
+  },
+  onAfterSave: (info) => {
+    broadcastPartySnapshot();
+    showSavedStatus(info);
+  },
+  onAfterLoad: (info) => {
+    showLoadedStatus(info);
+  },
 });
 
 function scheduleSave() {
@@ -102,6 +154,8 @@ function activateMainTab(tabName) {
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
 async function init() {
+  setSaveStatusBadge({ text: "Last Saved: waiting...", pending: true });
+
   initParty({
     getState: () => state,
     getPreferredPlayerName,
