@@ -1054,6 +1054,7 @@
       margin-top: 2px;
     }
     .archetype-slot-item {
+      position: relative;
       border: 1px solid var(--border);
       background: rgba(240, 235, 224, 0.72);
       padding: 6px;
@@ -1087,10 +1088,23 @@
       color: var(--ink-light);
       line-height: 1.2;
     }
-    .archetype-slot-remove {
-      margin-top: auto;
-      min-width: 0;
-      width: 100%;
+    .archetype-slot-trash {
+      position: absolute;
+      top: 4px;
+      right: 4px;
+      margin: 0;
+    }
+    .archetype-add-btn {
+      width: 22px;
+      height: 22px;
+      min-width: 22px;
+      border-width: 1px;
+      background: var(--parchment);
+      align-self: auto;
+    }
+    .archetype-add-btn .inventory-plus-icon {
+      width: 14px;
+      height: 14px;
     }
     .archetype-ability-list {
       display: grid;

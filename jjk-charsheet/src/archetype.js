@@ -389,13 +389,25 @@ function renderAbilitySlots(state) {
     const rule = ARCHETYPE_RULES[archKey];
     const def = getAbilityDefinition(archKey, abilityId);
     const canRemove = def ? !hasHigherTierInSlots(new Set(unlocked), archKey, def.tier) : true;
+    const descKey = `slot:${globalId}`;
+    const isExpanded = _expandedAbilityDescriptions.has(descKey);
 
     cards.push(`
       <article class="archetype-slot-item">
+        <button type="button" class="inventory-mini-btn inventory-icon-btn danger archetype-slot-trash" data-slot-remove="${globalId}" aria-label="Remove ability" title="Remove ability"${canRemove ? "" : " disabled"}>
+          <svg class="inventory-icon-trash" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path fill="currentColor" d="M9 3h6a1 1 0 0 1 1 1v1h4v2h-1l-1 12a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 7H4V5h4V4a1 1 0 0 1 1-1Zm1 2v0h4V5h-4Zm-1 4h2v9H9V9Zm4 0h2v9h-2V9Z"/>
+            <path fill="none" stroke="currentColor" stroke-width="1.5" d="M6 7.5h12"/>
+          </svg>
+        </button>
         <div class="archetype-slot-index">Slot ${i + 1}</div>
         <div class="archetype-slot-name">${def?.name || abilityId}</div>
         <div class="archetype-slot-meta">${rule?.label || toTitleCase(archKey)} · Tier ${def?.tier || "?"}</div>
-        <button type="button" class="inventory-secondary-btn archetype-slot-remove" data-slot-remove="${globalId}"${canRemove ? "" : " disabled"}>Remove</button>
+        <button type="button" class="archetype-desc-toggle" data-slot-desc-toggle="${descKey}" aria-expanded="${isExpanded ? "true" : "false"}">
+          <span class="archetype-desc-chevron">${isExpanded ? "▾" : "▸"}</span>
+          <span>Description</span>
+        </button>
+        <div class="archetype-ability-notes${isExpanded ? " open" : ""}">${def?.notes || ""}</div>
       </article>
     `);
   }
@@ -455,7 +467,7 @@ function renderAbilityTree(state) {
               ? "Locked: no open ability slot"
               : added
                 ? "Added"
-                : "Ready to add";
+                : "";
 
       return `
         <div class="archetype-ability-row${added ? " unlocked" : ""}">
@@ -465,12 +477,17 @@ function renderAbilityTree(state) {
               <div class="archetype-ability-meta">${toTitleCase(rule.scaleStat)} ${ability.minStat}+${ability.tier === 1 || ability.tier === 5 ? " · Sub-Archetype" : " · Shared"}</div>
             </div>
             <div class="archetype-ability-controls">
-              ${added
-                ? `<button type="button" class="inventory-secondary-btn" disabled>Added</button>`
-                : `<button type="button" class="meta-toggle-btn" data-ability-add="${globalId}"${canAdd ? "" : " disabled"}>Add</button>`}
+              ${canAdd
+                ? `<button type="button" class="inventory-plus-btn archetype-add-btn" data-ability-add="${globalId}" aria-label="Add ability" title="Add ability">
+                  <svg class="inventory-plus-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                    <path class="inventory-plus-icon-line inventory-plus-icon-line-horizontal" fill="currentColor" d="M5 11h14v2H5z"/>
+                    <path class="inventory-plus-icon-line inventory-plus-icon-line-vertical" fill="currentColor" d="M11 5h2v14h-2z"/>
+                  </svg>
+                </button>`
+                : ``}
             </div>
           </div>
-          <div class="archetype-ability-status">${statusText}</div>
+          ${statusText ? `<div class="archetype-ability-status">${statusText}</div>` : ""}
           <button type="button" class="archetype-desc-toggle" data-ability-desc-toggle="${descKey}" aria-expanded="${isExpanded ? "true" : "false"}">
             <span class="archetype-desc-chevron">${isExpanded ? "▾" : "▸"}</span>
             <span>Description</span>
@@ -599,8 +616,18 @@ export function initArchetype({ getState: getStateFn, scheduleSave: scheduleSave
   if (slotGrid) {
     slotGrid.addEventListener("click", e => {
       const removeTrigger = e.target?.closest?.("[data-slot-remove]");
-      if (!removeTrigger) return;
-      removeAbilityFromSlots(removeTrigger.dataset.slotRemove);
+      if (removeTrigger) {
+        removeAbilityFromSlots(removeTrigger.dataset.slotRemove);
+        return;
+      }
+
+      const descTrigger = e.target?.closest?.("[data-slot-desc-toggle]");
+      if (!descTrigger) return;
+      const key = String(descTrigger.dataset.slotDescToggle || "");
+      if (!key) return;
+      if (_expandedAbilityDescriptions.has(key)) _expandedAbilityDescriptions.delete(key);
+      else _expandedAbilityDescriptions.add(key);
+      renderAbilitySlots(getState());
     });
   }
 
