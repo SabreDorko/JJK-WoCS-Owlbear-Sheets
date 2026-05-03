@@ -5,6 +5,10 @@ let _getState = null;
 let _scheduleSave = null;
 let _initialized = false;
 const _expandedAbilityDescriptions = new Set();
+const _collapsedArchetypeSections = {
+  benefits: false,
+  permanentAptitudes: false,
+};
 
 const MAX_ABILITY_SLOTS = 5;
 
@@ -1805,6 +1809,19 @@ function setCustomFieldValue(state, fieldPath, value) {
   target[path[path.length - 1]] = value;
 }
 
+function applyCollapseState(buttonId, panelId, collapsed) {
+  const button = document.getElementById(buttonId);
+  const panel = document.getElementById(panelId);
+  if (!button || !panel) return;
+  button.setAttribute("aria-expanded", collapsed ? "false" : "true");
+  panel.classList.toggle("collapsed", collapsed);
+}
+
+function syncArchetypeCollapseUI() {
+  applyCollapseState("archetypeBenefitsToggleBtn", "archetypeBenefitsPanel", _collapsedArchetypeSections.benefits);
+  applyCollapseState("archetypePermanentAptitudesToggleBtn", "archetypePermanentAptitudesPanel", _collapsedArchetypeSections.permanentAptitudes);
+}
+
 export function applyArchetypeStateToUI() {
   const state = getState();
   if (!state) return;
@@ -1823,6 +1840,7 @@ export function applyArchetypeStateToUI() {
   renderCustomBuilder(state);
   renderAbilitySlots(state);
   renderAbilityTree(state);
+  syncArchetypeCollapseUI();
   applyCharacterStateToUI();
 }
 
@@ -1932,6 +1950,27 @@ export function initArchetype({ getState: getStateFn, scheduleSave: scheduleSave
       const fieldEl = e.target?.closest?.("[data-custom-field]");
       if (fieldEl) {
         setCustomFieldValue(state, fieldEl.dataset.customField, fieldEl.value);
+        scheduleSave();
+        return;
+      }
+
+      const abilityEl = e.target?.closest?.("[data-custom-ability][data-custom-prop]");
+      if (!abilityEl) return;
+      const abilityKey = abilityEl.dataset.customAbility;
+      const prop = abilityEl.dataset.customProp;
+      ensureCustomArchetypeState(state);
+      if (!state.customArchetype.abilities[abilityKey]) state.customArchetype.abilities[abilityKey] = {};
+      state.customArchetype.abilities[abilityKey][prop] = abilityEl.value;
+      scheduleSave();
+    });
+
+    customBuilder.addEventListener("change", e => {
+      const state = getState();
+      if (!state) return;
+
+      const fieldEl = e.target?.closest?.("[data-custom-field]");
+      if (fieldEl) {
+        setCustomFieldValue(state, fieldEl.dataset.customField, fieldEl.value);
         applyArchetypeStateToUI();
         scheduleSave();
         return;
@@ -1947,16 +1986,21 @@ export function initArchetype({ getState: getStateFn, scheduleSave: scheduleSave
       applyArchetypeStateToUI();
       scheduleSave();
     });
+  }
 
-    customBuilder.addEventListener("change", e => {
-      if (!e.target?.closest?.("select")) return;
-      const state = getState();
-      if (!state) return;
-      const fieldEl = e.target?.closest?.("[data-custom-field]");
-      if (!fieldEl) return;
-      setCustomFieldValue(state, fieldEl.dataset.customField, fieldEl.value);
-      applyArchetypeStateToUI();
-      scheduleSave();
+  const benefitsToggle = document.getElementById("archetypeBenefitsToggleBtn");
+  if (benefitsToggle) {
+    benefitsToggle.addEventListener("click", () => {
+      _collapsedArchetypeSections.benefits = !_collapsedArchetypeSections.benefits;
+      syncArchetypeCollapseUI();
+    });
+  }
+
+  const permanentAptitudesToggle = document.getElementById("archetypePermanentAptitudesToggleBtn");
+  if (permanentAptitudesToggle) {
+    permanentAptitudesToggle.addEventListener("click", () => {
+      _collapsedArchetypeSections.permanentAptitudes = !_collapsedArchetypeSections.permanentAptitudes;
+      syncArchetypeCollapseUI();
     });
   }
 

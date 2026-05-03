@@ -41,6 +41,31 @@ function formatTrack(current, max) {
   return `${cur} / ${mx}`;
 }
 
+function getPartyStatIcon(type) {
+  if (type === "hp") {
+    return `
+      <svg class="party-stat-icon" viewBox="0 0 28 28" aria-hidden="true" focusable="false">
+        <path fill="currentColor" d="M14 24c-.2 0-.4-.1-.6-.2C8.5 21 4 17 4 11.8 4 8.6 6.3 6.2 9.2 6.2c2.1 0 3.8 1.1 4.8 2.8 1-1.7 2.7-2.8 4.8-2.8C21.7 6.2 24 8.6 24 11.8c0 5.2-4.5 9.2-9.4 12-.2.1-.4.2-.6.2Z"/>
+        <text x="14" y="14">HP</text>
+      </svg>
+    `;
+  }
+  if (type === "ce") {
+    return `
+      <svg class="party-stat-icon" viewBox="0 0 28 28" aria-hidden="true" focusable="false">
+        <path fill="currentColor" d="M14 3c.6 3.2-1.7 4.8-2.8 6.9-.6 1.1-.8 2.2-.8 3.3 0 1.7.9 3.3 2.5 4.2-1.4.1-2.8-.3-4-1.1.2 3.8 2.5 7.7 5.1 8.7 4.1-1.1 6.4-4.8 6.4-8.3 0-3.4-2.2-6.1-6.4-13.5Z"/>
+        <text x="14" y="15">CE</text>
+      </svg>
+    `;
+  }
+  return `
+    <svg class="party-stat-icon" viewBox="0 0 28 28" aria-hidden="true" focusable="false">
+      <path fill="currentColor" d="M14 2 23 6v7c0 5.4-3.4 9.8-9 13-5.6-3.2-9-7.6-9-13V6l9-4Z"/>
+      <text x="14" y="14">AC</text>
+    </svg>
+  `;
+}
+
 export function getPartySnapshot() {
   const state = getState();
   const playerName = getPreferredPlayerName();
@@ -91,15 +116,15 @@ export function renderPartyList() {
       </div>
       <div class="party-stats">
         <div class="party-stat">
-          <div class="party-stat-label">HP</div>
+          ${getPartyStatIcon("hp")}
           <div class="party-stat-value">${formatTrack(entry.hpCurrent, entry.hpMax)}</div>
         </div>
         <div class="party-stat">
-          <div class="party-stat-label">CE</div>
+          ${getPartyStatIcon("ce")}
           <div class="party-stat-value">${formatTrack(entry.ceCurrent, entry.ceMax)}</div>
         </div>
         <div class="party-stat">
-          <div class="party-stat-label">AC</div>
+          ${getPartyStatIcon("ac")}
           <div class="party-stat-value">${entry.ac === "" ? "—" : entry.ac}</div>
         </div>
       </div>

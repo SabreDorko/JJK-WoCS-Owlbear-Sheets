@@ -7,6 +7,7 @@ let _editorStep = "mode";
 let _editSnapshot = null;
 const _expandedAppIndices = new Map();
 let _pendingNewApplicationIndex = null;
+let _pendingNewVowIndex = null;
 
 const JUJUTSU_SUBTABS = new Set(["technique", "vows", "training"]);
 
@@ -173,6 +174,7 @@ function setTechniqueAddButtonState() {
   if (!addBtn) return;
 
   const isCancelMode = Number.isFinite(_pendingNewApplicationIndex);
+  addBtn.classList.toggle("is-open", isCancelMode);
   addBtn.setAttribute("aria-label", isCancelMode ? "Cancel New Application" : "Add Application");
   addBtn.setAttribute("title", isCancelMode ? "Cancel New Application" : "Add Application");
 
@@ -290,7 +292,7 @@ function renderBindingVowsEditor(state) {
   list.innerHTML = vows.map((vow, idx) => {
     const normalized = normalizeBindingVow(vow, idx);
     return `
-      <div class="techniques-app-editor-item">
+      <div class="techniques-app-editor-item${_pendingNewVowIndex === idx ? " vow-enter" : ""}">
         <label class="techniques-field" for="bindingVowTitle${idx}">
           <span class="field-label">Title</span>
           <input id="bindingVowTitle${idx}" class="meta-input" data-vow-title="${idx}" value="${normalized.title}" />
@@ -314,6 +316,8 @@ function renderBindingVowsEditor(state) {
       </div>
     `;
   }).join("");
+
+  _pendingNewVowIndex = null;
 }
 
 function setEditorVisibility() {
@@ -572,7 +576,7 @@ export function initTechniques({ getState: getStateFn, scheduleSave: scheduleSav
         const idx = parseNonNegativeInt(openTrigger.dataset.appEditToggle);
         const snap = JSON.parse(JSON.stringify(state.techniques.applications[idx] || {}));
         _expandedAppIndices.set(idx, snap);
-        renderApplicationsSummary(state);
+        updateTechniquesDerivedUI(state);
         return;
       }
       // Save (collapse, keep changes already written on input)
@@ -759,7 +763,9 @@ export function initTechniques({ getState: getStateFn, scheduleSave: scheduleSav
       const state = getState();
       if (!state) return;
       ensureTechniquesState(state);
-      state.techniques.bindingVows.push(createDefaultBindingVow(state.techniques.bindingVows.length));
+      const newIndex = state.techniques.bindingVows.length;
+      state.techniques.bindingVows.push(createDefaultBindingVow(newIndex));
+      _pendingNewVowIndex = newIndex;
       renderBindingVowsEditor(state);
       scheduleSave();
     });

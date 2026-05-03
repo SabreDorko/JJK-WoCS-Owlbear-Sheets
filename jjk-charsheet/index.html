@@ -398,13 +398,17 @@
           </section>
 
           <section class="archetype-card">
-            <div class="archetype-card-title">Archetype Benefits</div>
-            <div class="archetype-benefits-list" id="archetypeBenefitsList"></div>
+            <button type="button" class="archetype-card-title archetype-collapse-btn" id="archetypeBenefitsToggleBtn" aria-expanded="true" aria-controls="archetypeBenefitsPanel">Archetype Benefits</button>
+            <div class="archetype-collapse-panel" id="archetypeBenefitsPanel">
+              <div class="archetype-benefits-list" id="archetypeBenefitsList"></div>
+            </div>
           </section>
 
           <section class="archetype-card">
-            <div class="archetype-card-title">Permanent Aptitude Picks</div>
-            <div class="archetype-benefits-list" id="archetypePermanentAptitudes"></div>
+            <button type="button" class="archetype-card-title archetype-collapse-btn" id="archetypePermanentAptitudesToggleBtn" aria-expanded="true" aria-controls="archetypePermanentAptitudesPanel">Permanent Aptitude Picks</button>
+            <div class="archetype-collapse-panel" id="archetypePermanentAptitudesPanel">
+              <div class="archetype-benefits-list" id="archetypePermanentAptitudes"></div>
+            </div>
           </section>
 
           <section class="archetype-card archetype-card-wide" id="customArchetypeBuilder" style="display:none;">
