@@ -33,6 +33,38 @@ function syncCeCurrentField(value) {
   if (ceCurrentInput) ceCurrentInput.value = String(value ?? "");
 }
 
+function syncTechniqueThresholdLine(state) {
+  const thresholdEl = document.getElementById("techniqueXpThreshold");
+  if (!thresholdEl || !state) return;
+
+  const hasActiveTechnique = state?.techniques?.mode !== "none";
+  if (!hasActiveTechnique) {
+    thresholdEl.style.display = "none";
+    return;
+  }
+
+  const techScore = parseNonNegativeInt(state?.stats?.technique?.score);
+  const xpThreshold = techScore * 2;
+  const ceCurrent = parseNonNegativeInt(state.ceCurrent);
+  const ceMax = parseNonNegativeInt(state.ceMax);
+  thresholdEl.textContent = `Sorcerer Experience Threshold: ${xpThreshold} • CE: ${ceCurrent}/${ceMax}`;
+  thresholdEl.style.display = "";
+}
+
+function getScaledApplicationValues(app) {
+  const currentStep = app.scalingEnabled ? parseNonNegativeInt(app.currentStep) : 0;
+  return {
+    currentStep,
+    ceCost: app.ceCost + (app.scalingEnabled ? app.scalingCeStep * currentStep : 0),
+    dc: app.dc + (app.scalingEnabled ? app.scalingDcStep * currentStep : 0),
+  };
+}
+
+function getScalingSummary(app) {
+  if (!app.scalingEnabled) return "Not scaling";
+  return `+${app.scalingCeStep} CE / +${app.scalingDcStep} DC per step`;
+}
+
 function performApplicationCast(state, techniqueIndex, applicationIndex) {
   if (!state) return;
   ensureTechniquesState(state);
@@ -42,18 +74,20 @@ function performApplicationCast(state, techniqueIndex, applicationIndex) {
   if (!app) return;
   
   const normalized = normalizeApplication(app, applicationIndex);
-  const dc = normalized.dc || 0;
-  const ceCost = normalized.ceCost || 0;
+  const scaled = getScaledApplicationValues(normalized);
+  const dc = scaled.dc;
+  const ceCost = scaled.ceCost;
   const techScore = parseNonNegativeInt(state?.stats?.technique?.score);
   const xpThreshold = techScore * 2;
   const ceCurrent = parseNonNegativeInt(state.ceCurrent);
-  const label = `${techniqueName} › ${normalized.title}`;
+  const label = `${techniqueName} › ${normalized.title}${scaled.currentStep > 0 ? ` (Step ${scaled.currentStep})` : ""}`;
 
   // Check if auto-pass (DC < XP Threshold = technique score × 2)
   if (xpThreshold > 0 && dc < xpThreshold) {
     // Deduct CE
     state.ceCurrent = String(Math.max(0, ceCurrent - ceCost));
     syncCeCurrentField(state.ceCurrent);
+    syncTechniqueThresholdLine(state);
     scheduleSave();
     return;
   }
@@ -99,6 +133,7 @@ function performApplicationCast(state, techniqueIndex, applicationIndex) {
   // Deduct CE
   state.ceCurrent = String(Math.max(0, ceCurrent - ceCost));
   syncCeCurrentField(state.ceCurrent);
+  syncTechniqueThresholdLine(state);
   scheduleSave();
 }
 
@@ -110,8 +145,9 @@ function getApplicationButtonState(state, applicationIndex) {
   if (!app) return { disabled: false, isAutoPass: false, tooltip: "Cast" };
   
   const normalized = normalizeApplication(app, applicationIndex);
-  const dc = normalized.dc || 0;
-  const ceCost = normalized.ceCost || 0;
+  const scaled = getScaledApplicationValues(normalized);
+  const dc = scaled.dc;
+  const ceCost = scaled.ceCost;
   const ceCurrent = parseNonNegativeInt(state.ceCurrent);
   const techScore = parseNonNegativeInt(state?.stats?.technique?.score);
   const xpThreshold = techScore * 2;
@@ -134,15 +170,31 @@ function syncApplicationButtonStates(state) {
   if (!summaryGrid || !state) return;
 
   const apps = Array.isArray(state?.techniques?.applications) ? state.techniques.applications : [];
-  apps.forEach((_, idx) => {
-    const button = summaryGrid.querySelector(`[data-app-cast="${idx}"]`);
-    if (!button) return;
+  apps.forEach((app, idx) => {
+    const card = summaryGrid.querySelector(`[data-app-idx="${idx}"]`);
+    if (!card || card.classList.contains("techniques-app-card--editing")) return;
+
+    const normalized = normalizeApplication(app, idx);
+    const scaled = getScaledApplicationValues(normalized);
+    const button = card.querySelector(`[data-app-cast="${idx}"]`);
+    const costValue = card.querySelector(`[data-app-metric-cost-value="${idx}"]`);
+    const dcValue = card.querySelector(`[data-app-metric-dc-value="${idx}"]`);
+    const scalingValue = card.querySelector(`[data-app-scaling-summary="${idx}"]`);
+    const stepLabel = card.querySelector(`[data-app-step-label="${idx}"]`);
+    const stepDown = card.querySelector(`[data-app-step-down="${idx}"]`);
 
     const btnState = getApplicationButtonState(state, idx);
-    button.classList.toggle("techniques-app-cast-btn--auto-pass", btnState.isAutoPass);
-    button.disabled = btnState.disabled;
-    button.title = btnState.tooltip;
-    button.textContent = `${btnState.isAutoPass ? "✦ " : ""}Use`;
+    if (costValue) costValue.textContent = scaled.ceCost > 0 ? String(scaled.ceCost) : "-";
+    if (dcValue) dcValue.textContent = scaled.dc > 0 ? String(scaled.dc) : "-";
+    if (scalingValue) scalingValue.textContent = getScalingSummary(normalized);
+    if (stepLabel) stepLabel.textContent = `Step ${scaled.currentStep}`;
+    if (stepDown) stepDown.disabled = scaled.currentStep <= 0;
+    if (button) {
+      button.classList.toggle("techniques-app-cast-btn--auto-pass", btnState.isAutoPass);
+      button.disabled = btnState.disabled;
+      button.title = btnState.tooltip;
+      button.textContent = `${btnState.isAutoPass ? "✦ " : ""}Use`;
+    }
   });
 }
 
@@ -163,6 +215,10 @@ function createDefaultApplication(index) {
     rangeValue: "",
     aoeShape: "cone",
     aoeSize: "",
+    scalingEnabled: false,
+    scalingCeStep: 0,
+    scalingDcStep: 0,
+    currentStep: 0,
   };
 }
 
@@ -187,6 +243,10 @@ function normalizeApplication(raw, index) {
   const aoeShapeRaw = String(raw?.aoeShape || "").trim().toLowerCase();
   const aoeShape = APPLICATION_AOE_SHAPES.includes(aoeShapeRaw) ? aoeShapeRaw : "cone";
   const aoeSize = String(raw?.aoeSize || "").trim();
+  const scalingEnabled = Boolean(raw?.scalingEnabled);
+  const scalingCeStep = parseNonNegativeInt(raw?.scalingCeStep);
+  const scalingDcStep = parseNonNegativeInt(raw?.scalingDcStep);
+  const currentStep = scalingEnabled ? parseNonNegativeInt(raw?.currentStep) : 0;
   return {
     title: title || fallbackTitle,
     description,
@@ -197,6 +257,10 @@ function normalizeApplication(raw, index) {
     rangeValue,
     aoeShape,
     aoeSize,
+    scalingEnabled,
+    scalingCeStep,
+    scalingDcStep,
+    currentStep,
   };
 }
 
@@ -390,6 +454,20 @@ function renderApplicationsSummary(state) {
             <span class="field-label">DC</span>
             <input id="appCardDc${idx}" class="meta-input techniques-app-card-field" type="number" min="0" step="1" inputmode="numeric" data-app-dc-inline="${idx}" value="${normalized.dc || 0}" />
           </label>
+          <label class="techniques-field techniques-field--checkbox" for="appCardScaling${idx}">
+            <span class="field-label">Scaling</span>
+            <input id="appCardScaling${idx}" class="techniques-checkbox" type="checkbox" data-app-scaling-inline="${idx}"${normalized.scalingEnabled ? " checked" : ""} />
+          </label>
+          ${normalized.scalingEnabled ? `
+          <label class="techniques-field" for="appCardScalingCe${idx}">
+            <span class="field-label">CE / Step</span>
+            <input id="appCardScalingCe${idx}" class="meta-input techniques-app-card-field" type="number" min="0" step="1" inputmode="numeric" data-app-scaling-ce-inline="${idx}" value="${normalized.scalingCeStep || 0}" />
+          </label>
+          <label class="techniques-field" for="appCardScalingDc${idx}">
+            <span class="field-label">DC / Step</span>
+            <input id="appCardScalingDc${idx}" class="meta-input techniques-app-card-field" type="number" min="0" step="1" inputmode="numeric" data-app-scaling-dc-inline="${idx}" value="${normalized.scalingDcStep || 0}" />
+          </label>
+          ` : ""}
           <label class="techniques-field" for="appCardRangeType${idx}">
             <span class="field-label">Range Type</span>
             <select id="appCardRangeType${idx}" class="meta-select techniques-app-card-field" data-app-range-type-inline="${idx}">
@@ -440,8 +518,9 @@ function renderApplicationsSummary(state) {
       `;
     }
     const description = normalized.description || "No description yet.";
-    const costText = normalized.ceCost > 0 ? String(normalized.ceCost) : "-";
-    const dcText = normalized.dc > 0 ? String(normalized.dc) : "-";
+    const scaled = getScaledApplicationValues(normalized);
+    const costText = scaled.ceCost > 0 ? String(scaled.ceCost) : "-";
+    const dcText = scaled.dc > 0 ? String(scaled.dc) : "-";
     const range = getRangeSummary(normalized);
     const effectText = normalized.effect || "No effect listed.";
     const btnState = getApplicationButtonState(state, idx);
@@ -453,13 +532,21 @@ function renderApplicationsSummary(state) {
         <button type="button" class="techniques-app-card-edit-btn" data-app-edit-toggle="${idx}" aria-label="Edit application" title="Edit">&#9998;</button>
         <h4 class="techniques-app-card-title">${normalized.title}</h4>
         <div class="techniques-app-metrics">
-          <span class="techniques-app-metric"><strong>CE Cost:</strong> ${costText}</span>
-          <span class="techniques-app-metric"><strong>DC:</strong> ${dcText}</span>
+          <span class="techniques-app-metric"><strong>CE Cost:</strong> <span data-app-metric-cost-value="${idx}">${costText}</span></span>
+          <span class="techniques-app-metric"><strong>DC:</strong> <span data-app-metric-dc-value="${idx}">${dcText}</span></span>
           <span class="techniques-app-metric"><strong>${range.startsWith("AOE") ? "AOE" : "Range"}:</strong> ${range.replace(/^AOE:\s*|^Range:\s*/, "")}</span>
+          ${normalized.scalingEnabled ? `<span class="techniques-app-metric"><strong>Scaling:</strong> <span data-app-scaling-summary="${idx}">${getScalingSummary(normalized)}</span></span>` : ""}
         </div>
         <div class="techniques-app-effect"><strong>Effect:</strong> ${effectText}</div>
         <p class="techniques-app-card-desc">${description}</p>
         <div class="techniques-app-card-footer">
+          ${normalized.scalingEnabled ? `
+          <div class="techniques-app-stepper">
+            <button type="button" class="techniques-app-step-btn" data-app-step-down="${idx}"${scaled.currentStep <= 0 ? " disabled" : ""}>-</button>
+            <span class="techniques-app-step-label" data-app-step-label="${idx}">Step ${scaled.currentStep}</span>
+            <button type="button" class="techniques-app-step-btn" data-app-step-up="${idx}">+</button>
+          </div>
+          ` : ""}
           <button type="button" class="techniques-app-cast-btn ${btnClass}" data-app-cast="${idx}" title="${btnState.tooltip}"${btnDisabled}>${starMarkup}Use</button>
         </div>
       </article>
@@ -501,6 +588,20 @@ function renderApplicationsEditor(state) {
           <span class="field-label">DC</span>
           <input id="techniqueAppDc${idx}" class="meta-input" type="number" min="0" step="1" inputmode="numeric" data-app-dc="${idx}" value="${normalized.dc || 0}" />
         </label>
+        <label class="techniques-field techniques-field--checkbox" for="techniqueAppScaling${idx}">
+          <span class="field-label">Scaling</span>
+          <input id="techniqueAppScaling${idx}" class="techniques-checkbox" type="checkbox" data-app-scaling="${idx}"${normalized.scalingEnabled ? " checked" : ""} />
+        </label>
+        ${normalized.scalingEnabled ? `
+        <label class="techniques-field" for="techniqueAppScalingCe${idx}">
+          <span class="field-label">CE / Step</span>
+          <input id="techniqueAppScalingCe${idx}" class="meta-input" type="number" min="0" step="1" inputmode="numeric" data-app-scaling-ce="${idx}" value="${normalized.scalingCeStep || 0}" />
+        </label>
+        <label class="techniques-field" for="techniqueAppScalingDc${idx}">
+          <span class="field-label">DC / Step</span>
+          <input id="techniqueAppScalingDc${idx}" class="meta-input" type="number" min="0" step="1" inputmode="numeric" data-app-scaling-dc="${idx}" value="${normalized.scalingDcStep || 0}" />
+        </label>
+        ` : ""}
         <label class="techniques-field" for="techniqueAppRangeType${idx}">
           <span class="field-label">Range Type</span>
           <select id="techniqueAppRangeType${idx}" class="meta-select" data-app-range-type="${idx}">
@@ -636,18 +737,7 @@ export function updateTechniquesDerivedUI(stateArg = null) {
   const typeEl = document.getElementById("techniqueTypeSummary");
   if (typeEl) typeEl.innerHTML = `<em>${getTechniqueTypeText(state.techniques.mode)}</em>`;
 
-  const techScore = parseNonNegativeInt(state?.stats?.technique?.score);
-  const xpThreshold = techScore * 2;
-  const thresholdEl = document.getElementById("techniqueXpThreshold");
-  if (thresholdEl) {
-    const hasActiveTechnique = state.techniques.mode !== "none";
-    if (hasActiveTechnique) {
-      thresholdEl.textContent = `Sorcerer Experience Threshold: ${xpThreshold}`;
-      thresholdEl.style.display = "";
-    } else {
-      thresholdEl.style.display = "none";
-    }
-  }
+  syncTechniqueThresholdLine(state);
 
   renderApplicationsSummary(state);
 
@@ -884,6 +974,32 @@ export function initTechniques({ getState: getStateFn, scheduleSave: scheduleSav
         refreshApplicationCards(state);
         scheduleSave();
       }
+      const stepDownTrigger = e.target?.closest?.("[data-app-step-down]");
+      if (stepDownTrigger) {
+        const state = getState();
+        if (!state) return;
+        const idx = parseNonNegativeInt(stepDownTrigger.dataset.appStepDown);
+        const normalized = normalizeApplication(state.techniques.applications[idx], idx);
+        if (state.techniques.applications[idx] && normalized.scalingEnabled) {
+          state.techniques.applications[idx].currentStep = Math.max(0, normalized.currentStep - 1);
+          syncApplicationButtonStates(state);
+          scheduleSave();
+        }
+        return;
+      }
+      const stepUpTrigger = e.target?.closest?.("[data-app-step-up]");
+      if (stepUpTrigger) {
+        const state = getState();
+        if (!state) return;
+        const idx = parseNonNegativeInt(stepUpTrigger.dataset.appStepUp);
+        const normalized = normalizeApplication(state.techniques.applications[idx], idx);
+        if (state.techniques.applications[idx] && normalized.scalingEnabled) {
+          state.techniques.applications[idx].currentStep = normalized.currentStep + 1;
+          syncApplicationButtonStates(state);
+          scheduleSave();
+        }
+        return;
+      }
       // Cast/Use Application
       const castTrigger = e.target?.closest?.("[data-app-cast]");
       if (castTrigger) {
@@ -901,6 +1017,8 @@ export function initTechniques({ getState: getStateFn, scheduleSave: scheduleSav
       const titleAttr = e.target?.dataset?.appTitleInline;
       const descAttr = e.target?.dataset?.appDescInline;
       const costAttr = e.target?.dataset?.appCostInline;
+      const scalingCeAttr = e.target?.dataset?.appScalingCeInline;
+      const scalingDcAttr = e.target?.dataset?.appScalingDcInline;
       if (titleAttr !== undefined) {
         const idx = parseNonNegativeInt(titleAttr);
         if (state.techniques.applications[idx]) state.techniques.applications[idx].title = String(e.target.value || "");
@@ -912,6 +1030,14 @@ export function initTechniques({ getState: getStateFn, scheduleSave: scheduleSav
       if (costAttr !== undefined) {
         const idx = parseNonNegativeInt(costAttr);
         if (state.techniques.applications[idx]) state.techniques.applications[idx].ceCost = parseNonNegativeInt(e.target.value);
+      }
+      if (scalingCeAttr !== undefined) {
+        const idx = parseNonNegativeInt(scalingCeAttr);
+        if (state.techniques.applications[idx]) state.techniques.applications[idx].scalingCeStep = parseNonNegativeInt(e.target.value);
+      }
+      if (scalingDcAttr !== undefined) {
+        const idx = parseNonNegativeInt(scalingDcAttr);
+        if (state.techniques.applications[idx]) state.techniques.applications[idx].scalingDcStep = parseNonNegativeInt(e.target.value);
       }
       const dcAttr = e.target?.dataset?.appDcInline;
       if (dcAttr !== undefined) {
@@ -942,6 +1068,17 @@ export function initTechniques({ getState: getStateFn, scheduleSave: scheduleSav
       ensureTechniquesState(state);
 
       const rangeTypeAttr = e.target?.dataset?.appRangeTypeInline;
+      const scalingToggleAttr = e.target?.dataset?.appScalingInline;
+      if (scalingToggleAttr !== undefined) {
+        const idx = parseNonNegativeInt(scalingToggleAttr);
+        if (state.techniques.applications[idx]) {
+          state.techniques.applications[idx].scalingEnabled = Boolean(e.target.checked);
+          if (!state.techniques.applications[idx].scalingEnabled) state.techniques.applications[idx].currentStep = 0;
+          refreshApplicationCards(state);
+        }
+        scheduleSave();
+        return;
+      }
       if (rangeTypeAttr !== undefined) {
         const idx = parseNonNegativeInt(rangeTypeAttr);
         if (state.techniques.applications[idx]) {
@@ -1032,6 +1169,9 @@ export function initTechniques({ getState: getStateFn, scheduleSave: scheduleSav
       const aoeShapeIdx = parseNonNegativeInt(e.target?.dataset?.appAoeShape);
       const aoeSizeIdx = parseNonNegativeInt(e.target?.dataset?.appAoeSize);
       const effectIdx = parseNonNegativeInt(e.target?.dataset?.appEffect);
+      const scalingIdx = parseNonNegativeInt(e.target?.dataset?.appScaling);
+      const scalingCeIdx = parseNonNegativeInt(e.target?.dataset?.appScalingCe);
+      const scalingDcIdx = parseNonNegativeInt(e.target?.dataset?.appScalingDc);
 
       if (e.target?.dataset?.appTitle !== undefined && state.techniques.applications[titleIdx]) {
         state.techniques.applications[titleIdx].title = String(e.target.value || "");
@@ -1044,6 +1184,17 @@ export function initTechniques({ getState: getStateFn, scheduleSave: scheduleSav
       }
       if (e.target?.dataset?.appDc !== undefined && state.techniques.applications[dcIdx]) {
         state.techniques.applications[dcIdx].dc = parseNonNegativeInt(e.target.value);
+      }
+      if (e.target?.dataset?.appScaling !== undefined && state.techniques.applications[scalingIdx]) {
+        state.techniques.applications[scalingIdx].scalingEnabled = Boolean(e.target.checked);
+        if (!state.techniques.applications[scalingIdx].scalingEnabled) state.techniques.applications[scalingIdx].currentStep = 0;
+        renderApplicationsEditor(state);
+      }
+      if (e.target?.dataset?.appScalingCe !== undefined && state.techniques.applications[scalingCeIdx]) {
+        state.techniques.applications[scalingCeIdx].scalingCeStep = parseNonNegativeInt(e.target.value);
+      }
+      if (e.target?.dataset?.appScalingDc !== undefined && state.techniques.applications[scalingDcIdx]) {
+        state.techniques.applications[scalingDcIdx].scalingDcStep = parseNonNegativeInt(e.target.value);
       }
       if (e.target?.dataset?.appRangeType !== undefined && state.techniques.applications[rangeTypeIdx]) {
         state.techniques.applications[rangeTypeIdx].rangeType = String(e.target.value || "self").toLowerCase();

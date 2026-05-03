@@ -1686,11 +1686,42 @@
     }
     .techniques-app-card-footer {
       display: flex;
-      justify-content: flex-end;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
       gap: 6px;
       margin-top: 8px;
       padding-top: 6px;
       border-top: 1px solid rgba(58, 48, 38, 0.12);
+    }
+    .techniques-app-stepper {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .techniques-app-step-btn {
+      width: 24px;
+      height: 24px;
+      border: 1px solid var(--border-strong);
+      background: rgba(240, 235, 224, 0.9);
+      color: var(--ink);
+      font-family: 'Cinzel', serif;
+      font-size: 13px;
+      line-height: 1;
+      cursor: pointer;
+    }
+    .techniques-app-step-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    .techniques-app-step-label {
+      font-family: 'Cinzel', serif;
+      font-size: 10px;
+      letter-spacing: 0.6px;
+      text-transform: uppercase;
+      color: var(--ink);
+      min-width: 52px;
+      text-align: center;
     }
     .techniques-app-cast-btn {
       padding: 5px 12px;
@@ -1761,6 +1792,14 @@
       flex-direction: column;
       gap: 2px;
       margin-bottom: 6px;
+    }
+    .techniques-field--checkbox {
+      justify-content: flex-end;
+    }
+    .techniques-checkbox {
+      width: 16px;
+      height: 16px;
+      accent-color: var(--accent);
     }
     .techniques-mode-grid {
       display: grid;
