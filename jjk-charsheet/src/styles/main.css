@@ -3015,6 +3015,8 @@
       transform: translateY(0);
       overflow: hidden;
       transition: max-height 220ms ease, opacity 180ms ease, transform 220ms ease;
+      width: 100%;
+      box-sizing: border-box;
     }
     .notes-content-wrap--collapsed {
       max-height: 0;
@@ -3027,6 +3029,9 @@
       line-height: 1.28;
       min-height: 72px;
       resize: vertical;
+      display: block;
+      width: 100%;
+      box-sizing: border-box;
     }
     .notes-empty {
       border: 1px dashed var(--border);
