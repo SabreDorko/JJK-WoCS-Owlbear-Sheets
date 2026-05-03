@@ -1114,6 +1114,19 @@ function ensureCustomArchetypeState(state) {
   if (!STAT_KEYS.includes(normalizeStatKey(custom.scaleStat))) custom.scaleStat = "power";
   if (!custom.subArchetypeA) custom.subArchetypeA = "Custom A";
   if (!custom.subArchetypeB) custom.subArchetypeB = "Custom B";
+  if (!Array.isArray(custom.permanentAptitudeStatPicks)) {
+    const legacyStats = Array.isArray(custom.permanentAptitudeRules)
+      ? custom.permanentAptitudeRules
+        .map(line => normalizeStatKey(String(line || "").match(/power|speed|technique|intelligence|cooperation/i)?.[0] || ""))
+        .filter(stat => STAT_KEYS.includes(stat))
+      : [];
+    custom.permanentAptitudeStatPicks = [legacyStats[0] || "power", legacyStats[1] || "technique"];
+  }
+  while (custom.permanentAptitudeStatPicks.length < 2) custom.permanentAptitudeStatPicks.push("power");
+  custom.permanentAptitudeStatPicks = custom.permanentAptitudeStatPicks
+    .slice(0, 2)
+    .map(stat => STAT_KEYS.includes(normalizeStatKey(stat)) ? normalizeStatKey(stat) : "power");
+
   if (!Array.isArray(custom.permanentAptitudeRules)) {
     custom.permanentAptitudeRules = [
       "Choose 1 permanent aptitude from Power",
@@ -1145,6 +1158,21 @@ function ensureCustomArchetypeState(state) {
   });
 }
 
+function buildCustomPermanentAptitudeRules(custom) {
+  const picks = Array.isArray(custom?.permanentAptitudeStatPicks)
+    ? custom.permanentAptitudeStatPicks.slice(0, 2).map(value => normalizeStatKey(value))
+    : [];
+  const validPicks = picks.filter(stat => STAT_KEYS.includes(stat));
+  if (!validPicks.length) return ["Choose 1 permanent aptitude from Power", "Choose 1 permanent aptitude from Technique"];
+
+  const counts = new Map();
+  validPicks.forEach(stat => counts.set(stat, (counts.get(stat) || 0) + 1));
+  return [...counts.entries()].map(([stat, count]) => {
+    const noun = count === 1 ? "aptitude" : "aptitudes";
+    return `Choose ${count} permanent ${noun} from ${toTitleCase(stat)}`;
+  });
+}
+
 function getCustomRule(state) {
   ensureCustomArchetypeState(state);
   const custom = state?.customArchetype;
@@ -1152,11 +1180,12 @@ function getCustomRule(state) {
 
   const subA = String(custom.subArchetypeA || "Custom A").trim() || "Custom A";
   const subB = String(custom.subArchetypeB || "Custom B").trim() || "Custom B";
+  const generatedPermanentAptitudes = buildCustomPermanentAptitudeRules(custom);
   const abilities = custom.abilities || {};
   return {
     label: String(custom.name || "Custom Archetype"),
     scaleStat: normalizeStatKey(custom.scaleStat || "power"),
-    permanentAptitudes: [...(custom.permanentAptitudeRules || [])].filter(Boolean),
+    permanentAptitudes: generatedPermanentAptitudes,
     startingEquipment: [...(custom.startingEquipment || [])].filter(Boolean),
     sharedAbilities: [
       { tier: 2, ...abilities.tier2 },
@@ -1518,6 +1547,7 @@ function renderCustomBuilder(state) {
 
   ensureCustomArchetypeState(state);
   const custom = state.customArchetype;
+  const generatedPermanentAptitudes = buildCustomPermanentAptitudeRules(custom);
   const abilityFields = [
     ["tier1A", "Tier 1 (Sub A)"],
     ["tier1B", "Tier 1 (Sub B)"],
@@ -1550,12 +1580,20 @@ function renderCustomBuilder(state) {
         <input class="meta-input" data-custom-field="subArchetypeB" value="${custom.subArchetypeB || ""}" />
       </div>
       <div class="meta-field">
-        <div class="field-label">Permanent Aptitude Rule 1</div>
-        <input class="meta-input" data-custom-field="permanentAptitudeRules.0" value="${custom.permanentAptitudeRules?.[0] || ""}" />
+        <div class="field-label">Permanent Aptitude Stat 1</div>
+        <select class="meta-select" data-custom-field="permanentAptitudeStatPicks.0">
+          ${STAT_KEYS.map(key => `<option value="${key}"${normalizeStatKey(custom.permanentAptitudeStatPicks?.[0]) === key ? " selected" : ""}>${toTitleCase(key)}</option>`).join("")}
+        </select>
       </div>
       <div class="meta-field">
-        <div class="field-label">Permanent Aptitude Rule 2</div>
-        <input class="meta-input" data-custom-field="permanentAptitudeRules.1" value="${custom.permanentAptitudeRules?.[1] || ""}" />
+        <div class="field-label">Permanent Aptitude Stat 2</div>
+        <select class="meta-select" data-custom-field="permanentAptitudeStatPicks.1">
+          ${STAT_KEYS.map(key => `<option value="${key}"${normalizeStatKey(custom.permanentAptitudeStatPicks?.[1]) === key ? " selected" : ""}>${toTitleCase(key)}</option>`).join("")}
+        </select>
+      </div>
+      <div class="meta-field" style="grid-column:1/-1;">
+        <div class="field-label">Generated Permanent Aptitude Rule</div>
+        <ul class="archetype-mini-list">${generatedPermanentAptitudes.map(line => `<li>${line}</li>`).join("")}</ul>
       </div>
       <div class="meta-field">
         <div class="field-label">Starting Equipment 1</div>
@@ -1666,6 +1704,7 @@ function renderAbilityTree(state) {
       const statMet = currentStat >= (ability.minStat || 0);
       const slotsMet = added || slotSummary.openSlots > 0;
       const canAdd = ability.id && !added && previousMet && statMet && slotsMet;
+      const canRemove = ability.id && added && !hasHigherTierUnlocked(state, entry.key, selectedSub, ability.tier);
       const descKey = ability.id
         ? `${entry.key}:${ability.id}`
         : `${entry.key}:tier-${ability.tier}:${selectedSub || "none"}`;
@@ -1698,7 +1737,13 @@ function renderAbilityTree(state) {
                     <path class="inventory-plus-icon-line inventory-plus-icon-line-vertical" fill="currentColor" d="M11 5h2v14h-2z"/>
                   </svg>
                 </button>`
-                : ``}
+                : canRemove
+                  ? `<button type="button" class="inventory-plus-btn archetype-add-btn archetype-remove-btn" data-ability-remove="${globalId}" aria-label="Remove ability" title="Remove ability">
+                    <svg class="inventory-plus-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                      <path class="inventory-plus-icon-line inventory-plus-icon-line-horizontal" fill="currentColor" d="M5 11h14v2H5z"/>
+                    </svg>
+                  </button>`
+                  : ``}
             </div>
           </div>
           ${statusText ? `<div class="archetype-ability-status">${statusText}</div>` : ""}
@@ -1809,6 +1854,31 @@ function setCustomFieldValue(state, fieldPath, value) {
   target[path[path.length - 1]] = value;
 }
 
+function rerenderPreservingCustomInput(inputEl) {
+  if (!inputEl) {
+    applyArchetypeStateToUI();
+    return;
+  }
+
+  const fieldPath = inputEl.dataset.customField || "";
+  const abilityKey = inputEl.dataset.customAbility || "";
+  const abilityProp = inputEl.dataset.customProp || "";
+  const selectionStart = typeof inputEl.selectionStart === "number" ? inputEl.selectionStart : null;
+  const selectionEnd = typeof inputEl.selectionEnd === "number" ? inputEl.selectionEnd : null;
+
+  applyArchetypeStateToUI();
+
+  const rebuilt = fieldPath
+    ? document.querySelector(`#customArchetypeBuilderBody [data-custom-field="${fieldPath}"]`)
+    : document.querySelector(`#customArchetypeBuilderBody [data-custom-ability="${abilityKey}"][data-custom-prop="${abilityProp}"]`);
+
+  if (!rebuilt) return;
+  rebuilt.focus();
+  if (selectionStart !== null && selectionEnd !== null && typeof rebuilt.setSelectionRange === "function") {
+    rebuilt.setSelectionRange(selectionStart, selectionEnd);
+  }
+}
+
 function applyCollapseState(buttonId, panelId, collapsed) {
   const button = document.getElementById(buttonId);
   const panel = document.getElementById(panelId);
@@ -1861,6 +1931,12 @@ export function initArchetype({ getState: getStateFn, scheduleSave: scheduleSave
       const addTrigger = e.target?.closest?.("[data-ability-add]");
       if (addTrigger) {
         addAbilityToSlots(addTrigger.dataset.abilityAdd);
+        return;
+      }
+
+      const removeTrigger = e.target?.closest?.("[data-ability-remove]");
+      if (removeTrigger) {
+        removeAbilityFromSlots(removeTrigger.dataset.abilityRemove);
         return;
       }
 
@@ -1950,6 +2026,9 @@ export function initArchetype({ getState: getStateFn, scheduleSave: scheduleSave
       const fieldEl = e.target?.closest?.("[data-custom-field]");
       if (fieldEl) {
         setCustomFieldValue(state, fieldEl.dataset.customField, fieldEl.value);
+        if (fieldEl.dataset.customField === "name") {
+          rerenderPreservingCustomInput(fieldEl);
+        }
         scheduleSave();
         return;
       }

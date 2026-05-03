@@ -184,6 +184,11 @@ function setTechniqueAddButtonState() {
   }
 }
 
+function refreshApplicationCards(state) {
+  renderApplicationsSummary(state);
+  setTechniqueAddButtonState();
+}
+
 function renderApplicationsSummary(state) {
   const grid = document.getElementById("techniqueApplicationsSummary");
   if (!grid) return;
@@ -550,7 +555,7 @@ export function initTechniques({ getState: getStateFn, scheduleSave: scheduleSav
         }
         _pendingNewApplicationIndex = null;
         _expandedAppIndices.clear();
-        updateTechniquesDerivedUI(state);
+        refreshApplicationCards(state);
         scheduleSave();
         return;
       }
@@ -560,7 +565,7 @@ export function initTechniques({ getState: getStateFn, scheduleSave: scheduleSav
       const newSnap = JSON.parse(JSON.stringify(state.techniques.applications[newIdx]));
       _expandedAppIndices.set(newIdx, newSnap);
       _pendingNewApplicationIndex = newIdx;
-      updateTechniquesDerivedUI(state);
+      refreshApplicationCards(state);
       scheduleSave();
     });
   }
@@ -576,7 +581,7 @@ export function initTechniques({ getState: getStateFn, scheduleSave: scheduleSav
         const idx = parseNonNegativeInt(openTrigger.dataset.appEditToggle);
         const snap = JSON.parse(JSON.stringify(state.techniques.applications[idx] || {}));
         _expandedAppIndices.set(idx, snap);
-        updateTechniquesDerivedUI(state);
+        refreshApplicationCards(state);
         return;
       }
       // Save (collapse, keep changes already written on input)
@@ -586,7 +591,7 @@ export function initTechniques({ getState: getStateFn, scheduleSave: scheduleSav
         _expandedAppIndices.delete(idx);
         if (_pendingNewApplicationIndex === idx) _pendingNewApplicationIndex = null;
         const state = getState();
-        if (state) updateTechniquesDerivedUI(state);
+        if (state) refreshApplicationCards(state);
         return;
       }
       // Cancel (collapse, revert to snapshot)
@@ -602,7 +607,7 @@ export function initTechniques({ getState: getStateFn, scheduleSave: scheduleSav
           state.techniques.applications[idx] = { ...snap };
         }
         if (_pendingNewApplicationIndex === idx) _pendingNewApplicationIndex = null;
-        updateTechniquesDerivedUI(state);
+        refreshApplicationCards(state);
         scheduleSave();
         return;
       }
@@ -617,7 +622,7 @@ export function initTechniques({ getState: getStateFn, scheduleSave: scheduleSav
         state.techniques.applications = state.techniques.applications.map((entry, i) => normalizeApplication(entry, i));
         if (_pendingNewApplicationIndex !== null) _pendingNewApplicationIndex = null;
         _expandedAppIndices.clear();
-        updateTechniquesDerivedUI(state);
+        refreshApplicationCards(state);
         scheduleSave();
       }
     });
@@ -690,7 +695,6 @@ export function initTechniques({ getState: getStateFn, scheduleSave: scheduleSav
       ensureTechniquesState(state);
       state.techniques.applications.push(createDefaultApplication(state.techniques.applications.length));
       renderApplicationsEditor(state);
-      updateTechniquesDerivedUI(state);
       scheduleSave();
     });
   }
@@ -716,7 +720,6 @@ export function initTechniques({ getState: getStateFn, scheduleSave: scheduleSav
         state.techniques.applications[costIdx].ceCost = parseNonNegativeInt(e.target.value);
       }
 
-      updateTechniquesDerivedUI(state);
       scheduleSave();
     });
 
@@ -730,7 +733,6 @@ export function initTechniques({ getState: getStateFn, scheduleSave: scheduleSav
       state.techniques.applications.splice(removeIdx, 1);
       state.techniques.applications = state.techniques.applications.map((entry, idx) => normalizeApplication(entry, idx));
       renderApplicationsEditor(state);
-      updateTechniquesDerivedUI(state);
       scheduleSave();
     });
   }

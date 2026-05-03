@@ -968,7 +968,7 @@
     }
     .archetype-collapse-btn::after {
       content: "▾";
-      font-size: 10px;
+      font-size: 14px;
       color: var(--ink-faint);
       transition: transform 180ms ease;
     }
@@ -1158,6 +1158,15 @@
       width: 14px;
       height: 14px;
     }
+    .archetype-remove-btn {
+      color: var(--accent);
+      border-color: var(--accent);
+    }
+    .archetype-remove-btn:hover {
+      background: rgba(139, 26, 26, 0.1);
+      color: var(--accent);
+      border-color: var(--accent);
+    }
     .archetype-ability-list {
       display: grid;
       gap: 8px;
@@ -1238,10 +1247,11 @@
       color: var(--ink);
     }
     .archetype-desc-chevron {
-      width: 8px;
+      width: 10px;
       text-align: center;
       line-height: 1;
       color: var(--accent);
+      font-size: 12px;
     }
     .archetype-ability-notes {
       display: none;
@@ -1426,10 +1436,9 @@
       animation: appCardIn 220ms ease both;
     }
     .techniques-app-card--editing {
-      grid-column: 1 / -1;
       aspect-ratio: auto;
       height: auto;
-      min-height: 0;
+      min-height: 110px;
       animation: appEditorIn 240ms ease both;
     }
     .techniques-app-card-actions {
@@ -2523,7 +2532,7 @@
     .party-stats {
       display: grid;
       grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 10px;
+      gap: 7px;
     }
     .party-meta {
       display: flex;
@@ -2546,7 +2555,7 @@
     .party-stat {
       display: flex;
       align-items: center;
-      gap: 6px;
+      gap: 4px;
       min-height: 26px;
     }
     .party-stat-label {
@@ -2558,22 +2567,22 @@
     }
     .party-stat-value {
       font-family: 'Cinzel', serif;
-      font-size: 13px;
+      font-size: 14px;
       color: var(--ink);
       margin-top: 0;
       white-space: nowrap;
     }
     .party-stat-icon {
-      width: 28px;
-      height: 28px;
+      width: 36px;
+      height: 36px;
       flex: 0 0 auto;
-      color: rgba(26, 20, 16, 0.22);
+      color: var(--parchment-darker);
     }
     .party-stat-icon text {
-      fill: var(--ink-faint);
+      fill: var(--ink-light);
       font-family: 'Cinzel', serif;
-      font-size: 6px;
-      letter-spacing: 0.5px;
+      font-size: 8px;
+      letter-spacing: 0.8px;
       text-anchor: middle;
       dominant-baseline: middle;
     }

@@ -85,6 +85,7 @@ export function defaultState() {
       scaleStat: "power",
       subArchetypeA: "Custom A",
       subArchetypeB: "Custom B",
+      permanentAptitudeStatPicks: ["power", "technique"],
       permanentAptitudeRules: [
         "Choose 1 permanent aptitude from Power",
         "Choose 1 permanent aptitude from Technique",
