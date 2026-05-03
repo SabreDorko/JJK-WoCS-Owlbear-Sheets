@@ -746,6 +746,11 @@
     .party-quick-btn {
       right: 96px;
     }
+    .roll-history-btn.rest-quick-btn {
+      position: static;
+      right: auto;
+      bottom: auto;
+    }
     .roll-history-panel {
       position: fixed;
       right: 12px;
