@@ -971,11 +971,16 @@
     }
     .technique-xp-threshold {
       font-family: 'Cinzel', serif;
-      font-size: 10px;
-      letter-spacing: 0.7px;
-      text-transform: uppercase;
-      color: var(--ink-faint);
-      margin-bottom: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      color: var(--ink);
+      background: rgba(240, 235, 224, 0.9);
+      border: 1px solid var(--border-strong);
+      border-radius: 2px;
+      padding: 4px 8px;
+      margin-bottom: 8px;
+      text-align: center;
     }
     .techniques-app-card-grid {
       display: grid;

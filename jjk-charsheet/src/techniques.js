@@ -366,7 +366,7 @@ export function updateTechniquesDerivedUI(stateArg = null) {
     if (hasActiveTechnique) {
       const techScore = parseInt(state?.stats?.technique?.score, 10) || 0;
       const threshold = techScore * 2;
-      xpThresholdEl.textContent = `Sorcerer XP Threshold: ${threshold}`;
+      xpThresholdEl.textContent = `Sorcerer Experience Threshold: ${threshold}`;
       xpThresholdEl.style.display = "";
     } else {
       xpThresholdEl.style.display = "none";
