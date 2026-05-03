@@ -969,6 +969,14 @@
       color: var(--ink-faint);
       margin-bottom: 8px;
     }
+    .technique-xp-threshold {
+      font-family: 'Cinzel', serif;
+      font-size: 10px;
+      letter-spacing: 0.7px;
+      text-transform: uppercase;
+      color: var(--ink-faint);
+      margin-bottom: 6px;
+    }
     .techniques-app-card-grid {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));

@@ -360,6 +360,19 @@ export function updateTechniquesDerivedUI(stateArg = null) {
   renderApplicationsSummary(state);
 
   const hasActiveTechnique = state.techniques.mode !== "none";
+
+  const xpThresholdEl = document.getElementById("techniqueXpThreshold");
+  if (xpThresholdEl) {
+    if (hasActiveTechnique) {
+      const techScore = parseInt(state?.stats?.technique?.score, 10) || 0;
+      const threshold = techScore * 2;
+      xpThresholdEl.textContent = `Sorcerer XP Threshold: ${threshold}`;
+      xpThresholdEl.style.display = "";
+    } else {
+      xpThresholdEl.style.display = "none";
+    }
+  }
+
   const summaryFooter = document.getElementById("techniqueSummaryFooter");
   if (summaryFooter) summaryFooter.style.display = hasActiveTechnique ? "" : "none";
 
