@@ -49,13 +49,17 @@ function renderNotes(state) {
   }
 
   list.innerHTML = notes.map(note => {
-    const caret = note.collapsed ? "&#9658;" : "&#9662;";
     const isNew = note.id === _newlyAddedNoteId ? " notes-item--new" : "";
     const collapsedClass = note.collapsed ? " notes-content-wrap--collapsed" : "";
+    const toggleCollapsedClass = note.collapsed ? " is-collapsed" : "";
     return `
       <article class="notes-item${isNew}" data-note-id="${escapeHtml(note.id)}">
         <div class="notes-item-head">
-          <button type="button" class="notes-toggle-btn" data-note-toggle="${escapeHtml(note.id)}" aria-label="Toggle note">${caret}</button>
+          <button type="button" class="notes-toggle-btn${toggleCollapsedClass}" data-note-toggle="${escapeHtml(note.id)}" aria-label="Toggle note">
+            <svg class="notes-toggle-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <path fill="currentColor" d="M7 10.5 12 15.5 17 10.5l-1.4-1.4-3.6 3.6-3.6-3.6z"/>
+            </svg>
+          </button>
           <input class="meta-input notes-title-input" data-note-title="${escapeHtml(note.id)}" value="${escapeHtml(note.title)}" placeholder="Untitled Note" />
           <button type="button" class="notes-delete-btn" data-note-delete="${escapeHtml(note.id)}" aria-label="Delete note" title="Delete">
             <svg class="notes-delete-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
@@ -140,7 +144,7 @@ export function initNotes({ getState: getStateFn, scheduleSave: scheduleSaveFn }
         if (idx >= 0) {
           const nextCollapsed = !Boolean(state.notes[idx].collapsed);
           state.notes[idx].collapsed = nextCollapsed;
-          toggleBtn.innerHTML = nextCollapsed ? "&#9658;" : "&#9662;";
+          toggleBtn.classList.toggle("is-collapsed", nextCollapsed);
           const wrap = list.querySelector(`[data-note-content-wrap="${noteId}"]`);
           if (wrap) wrap.classList.toggle("notes-content-wrap--collapsed", nextCollapsed);
           scheduleSave();
