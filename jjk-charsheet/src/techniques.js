@@ -6,7 +6,7 @@ let _isEditing = false;
 let _editorStep = "mode";
 let _editSnapshot = null;
 
-const JUJUTSU_SUBTABS = new Set(["technique", "training"]);
+const JUJUTSU_SUBTABS = new Set(["technique", "vows", "training"]);
 
 function getState() {
   return _getState ? _getState() : null;
@@ -30,9 +30,11 @@ function normalizeApplication(raw, index) {
   const fallbackTitle = `Application ${index + 1}`;
   const title = String(raw?.title || "").trim();
   const description = String(raw?.description || "").trim();
+  const ceCost = parseNonNegativeInt(raw?.ceCost);
   return {
     title: title || fallbackTitle,
     description,
+    ceCost,
   };
 }
 
@@ -58,6 +60,7 @@ function ensureTechniquesState(state) {
   techniques.applications = techniques.applications.map((entry, idx) => normalizeApplication(entry, idx));
   techniques.noCtPath = String(techniques.noCtPath || "");
   techniques.notes = String(techniques.notes || "");
+  techniques.bindingVowsNotes = String(techniques.bindingVowsNotes || "");
 }
 
 function getActiveSubtab(state) {
@@ -137,9 +140,11 @@ function renderApplicationsSummary(state) {
   grid.innerHTML = apps.map((app, idx) => {
     const normalized = normalizeApplication(app, idx);
     const description = normalized.description || "No description yet.";
+    const costText = normalized.ceCost > 0 ? `CE Cost: ${normalized.ceCost}` : "CE Cost: -";
     return `
       <article class="techniques-app-card">
         <h4 class="techniques-app-card-title">${normalized.title}</h4>
+        <div class="techniques-app-card-cost">${costText}</div>
         <p class="techniques-app-card-desc">${description}</p>
       </article>
     `;
@@ -172,6 +177,10 @@ function renderApplicationsEditor(state) {
           <span class="field-label">Description</span>
           <textarea id="techniqueAppDesc${idx}" class="inventory-textarea" rows="3" maxlength="360" data-app-description="${idx}">${normalized.description}</textarea>
         </label>
+        <label class="techniques-field" for="techniqueAppCeCost${idx}">
+          <span class="field-label">CE Cost</span>
+          <input id="techniqueAppCeCost${idx}" class="meta-input" type="number" min="0" step="1" inputmode="numeric" data-app-ce-cost="${idx}" value="${normalized.ceCost || 0}" />
+        </label>
       </div>
     `;
   }).join("");
@@ -200,10 +209,12 @@ function setModeUI(mode) {
   const nameField = document.getElementById("techniquesNameField");
   const applicationsSection = document.getElementById("techniquesApplicationsSection");
   const noCtSection = document.getElementById("techniquesNoCtSection");
+  const noCtInfoCard = document.getElementById("techniquesNoCtInfoCard");
 
   if (nameField) nameField.style.display = isNone ? "none" : "";
   if (applicationsSection) applicationsSection.style.display = isNone ? "none" : "";
   if (noCtSection) noCtSection.style.display = isNone ? "" : "none";
+  if (noCtInfoCard) noCtInfoCard.style.display = isNone ? "" : "none";
 }
 
 function syncTechniqueNameInput() {
@@ -258,6 +269,9 @@ export function applyTechniquesStateToUI() {
 
   const notes = document.getElementById("techniqueNotesInput");
   if (notes) notes.value = state.techniques.notes || "";
+
+  const bindingVowsNotesInput = document.getElementById("bindingVowsNotesInput");
+  if (bindingVowsNotesInput) bindingVowsNotesInput.value = state.techniques.bindingVowsNotes || "";
 
   renderApplicationsEditor(state);
 
@@ -394,6 +408,7 @@ export function initTechniques({ getState: getStateFn, scheduleSave: scheduleSav
       state.techniques.applications.push({
         title: `Application ${state.techniques.applications.length + 1}`,
         description: "",
+        ceCost: 0,
       });
       renderApplicationsEditor(state);
       updateTechniquesDerivedUI(state);
@@ -410,12 +425,16 @@ export function initTechniques({ getState: getStateFn, scheduleSave: scheduleSav
 
       const titleIdx = parseNonNegativeInt(e.target?.dataset?.appTitle);
       const descIdx = parseNonNegativeInt(e.target?.dataset?.appDescription);
+      const costIdx = parseNonNegativeInt(e.target?.dataset?.appCeCost);
 
       if (e.target?.dataset?.appTitle !== undefined && state.techniques.applications[titleIdx]) {
         state.techniques.applications[titleIdx].title = String(e.target.value || "");
       }
       if (e.target?.dataset?.appDescription !== undefined && state.techniques.applications[descIdx]) {
         state.techniques.applications[descIdx].description = String(e.target.value || "");
+      }
+      if (e.target?.dataset?.appCeCost !== undefined && state.techniques.applications[costIdx]) {
+        state.techniques.applications[costIdx].ceCost = parseNonNegativeInt(e.target.value);
       }
 
       updateTechniquesDerivedUI(state);
@@ -455,6 +474,17 @@ export function initTechniques({ getState: getStateFn, scheduleSave: scheduleSav
       if (!state) return;
       ensureTechniquesState(state);
       state.techniques.notes = e.target.value;
+      scheduleSave();
+    });
+  }
+
+  const bindingVowsNotesInput = document.getElementById("bindingVowsNotesInput");
+  if (bindingVowsNotesInput) {
+    bindingVowsNotesInput.addEventListener("input", e => {
+      const state = getState();
+      if (!state) return;
+      ensureTechniquesState(state);
+      state.techniques.bindingVowsNotes = String(e.target.value || "");
       scheduleSave();
     });
   }

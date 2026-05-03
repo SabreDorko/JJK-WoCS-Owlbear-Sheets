@@ -926,8 +926,9 @@
     }
     .techniques-app-card-grid {
       display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
+      grid-template-columns: repeat(auto-fill, minmax(140px, 140px));
       gap: 7px;
+      justify-content: start;
       margin-bottom: 8px;
     }
     .techniques-app-card {
@@ -935,6 +936,8 @@
       background: rgba(240, 235, 224, 0.75);
       padding: 6px;
       min-height: 76px;
+      aspect-ratio: 1 / 1;
+      overflow: hidden;
     }
     .techniques-app-card-title {
       font-family: 'Cinzel', serif;
@@ -942,6 +945,15 @@
       letter-spacing: 0.9px;
       text-transform: uppercase;
       color: var(--ink);
+      margin-bottom: 4px;
+      line-height: 1.2;
+    }
+    .techniques-app-card-cost {
+      font-family: 'Cinzel', serif;
+      font-size: 9px;
+      letter-spacing: 0.6px;
+      text-transform: uppercase;
+      color: var(--ink-faint);
       margin-bottom: 4px;
       line-height: 1.2;
     }
@@ -1885,7 +1897,7 @@
       .inventory-form-grid { grid-template-columns: 1fr; }
       .slot-option-grid { grid-template-columns: 1fr; }
       .techniques-layout { grid-template-columns: 1fr; }
-      .techniques-app-card-grid { grid-template-columns: 1fr; }
+      .techniques-app-card-grid { grid-template-columns: repeat(auto-fill, minmax(124px, 124px)); }
     }
 
     /* ── PARTY TAB ── */

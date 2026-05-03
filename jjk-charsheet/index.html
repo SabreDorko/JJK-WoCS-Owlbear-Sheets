@@ -394,6 +394,7 @@
       <div class="jujutsu-shell">
         <div class="jujutsu-subtab-bar" role="tablist" aria-label="Jujutsu sections">
           <button class="jujutsu-subtab active" type="button" role="tab" data-subtab="technique" aria-controls="jujutsuSubpanelTechnique" aria-selected="true">Technique</button>
+          <button class="jujutsu-subtab" type="button" role="tab" data-subtab="vows" aria-controls="jujutsuSubpanelVows" aria-selected="false">Binding Vows</button>
           <button class="jujutsu-subtab" type="button" role="tab" data-subtab="training" aria-controls="jujutsuSubpanelTraining" aria-selected="false">Training</button>
         </div>
 
@@ -460,7 +461,7 @@
                 <div class="techniques-muted">Applications are shown as title + description cards in the summary view.</div>
               </div>
 
-              <div class="techniques-card">
+              <div class="techniques-card" id="techniquesNoCtInfoCard" style="display:none;">
                 <div class="techniques-card-title">No Cursed Technique Path</div>
                 <div class="techniques-muted">When this mode is selected, choose one starting benefit for your sheet.</div>
               </div>
@@ -483,6 +484,17 @@
           <div class="techniques-card">
             <div class="techniques-card-title">Training</div>
             <div class="techniques-muted">Training progression and practice tracking will go here next.</div>
+          </div>
+        </div>
+
+        <div class="jujutsu-subpanel" id="jujutsuSubpanelVows" data-subpanel="vows" role="tabpanel">
+          <div class="techniques-card">
+            <div class="techniques-card-title">Binding Vows</div>
+            <label class="techniques-field" for="bindingVowsNotesInput">
+              <span class="field-label">Vows / Restrictions / Conditions</span>
+              <textarea id="bindingVowsNotesInput" class="inventory-textarea" rows="6" maxlength="700" placeholder="Record your vow terms, conditions, and reward effects here."></textarea>
+            </label>
+            <div class="techniques-muted">Track both what is sacrificed and what benefit is gained.</div>
           </div>
         </div>
       </div>

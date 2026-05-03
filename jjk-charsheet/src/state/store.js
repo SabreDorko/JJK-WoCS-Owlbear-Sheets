@@ -72,6 +72,7 @@ export function defaultState() {
       applications: [],
       noCtPath: "",
       notes: "",
+      bindingVowsNotes: "",
     },
     archetype2: "", subArchetype2: "", hasSecondArchetype: false,
     ac: "", hpCurrent: "", hpMax: "",
