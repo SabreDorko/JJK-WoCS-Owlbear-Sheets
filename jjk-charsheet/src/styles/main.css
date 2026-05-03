@@ -872,6 +872,52 @@
     }
 
     /* ── TECHNIQUES TAB ── */
+    .jujutsu-shell {
+      display: flex;
+      flex-direction: column;
+      gap: 9px;
+    }
+    .jujutsu-subtab-bar {
+      display: flex;
+      gap: 0;
+      border-bottom: 1px solid var(--border-strong);
+      padding-bottom: 4px;
+    }
+    .jujutsu-subtab {
+      font-family: 'Cinzel', serif;
+      font-size: 9px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      background: var(--parchment-dark);
+      color: var(--ink-faint);
+      border: 1px solid var(--border-strong);
+      padding: 4px 10px;
+      cursor: pointer;
+      transition: color 120ms ease, border-color 120ms ease, background 120ms ease;
+    }
+    .jujutsu-subtab:hover {
+      color: var(--ink);
+      border-color: var(--ink-light);
+    }
+    .jujutsu-subtab:focus-visible {
+      outline: 1px solid var(--accent);
+      outline-offset: 1px;
+    }
+    .jujutsu-subtab.active {
+      color: var(--ink);
+      border-color: var(--ink);
+      background: var(--parchment);
+      font-weight: 600;
+    }
+    .jujutsu-subpanel { display: none; }
+    .jujutsu-subpanel.active { display: block; }
+    .technique-summary-text {
+      font-family: 'Crimson Text', serif;
+      font-size: 18px;
+      color: var(--ink);
+      margin-bottom: 8px;
+      line-height: 1.2;
+    }
     .techniques-layout {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -965,6 +1011,19 @@
       color: var(--ink-light);
       line-height: 1.35;
       font-style: italic;
+    }
+    .techniques-actions-row {
+      margin-top: 8px;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+    }
+    .techniques-actions-row .meta-toggle-btn,
+    .techniques-actions-row .inventory-secondary-btn {
+      width: auto;
+      min-width: 120px;
+      padding-left: 10px;
+      padding-right: 10px;
     }
 
     /* ── INVENTORY TAB ── */

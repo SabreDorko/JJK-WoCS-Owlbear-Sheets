@@ -67,7 +67,8 @@ export function defaultState() {
     charName: "", archetype: "", subArchetype: "", age: "",
     grade: "", ct: "", playerName: "",
     techniques: {
-      mode: "ct",
+      mode: "none",
+      activeSubtab: "technique",
       ctAbilities: ["", "", ""],
       domainAbilities: ["", "", ""],
       noCtPath: "",

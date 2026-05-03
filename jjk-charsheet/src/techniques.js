@@ -4,6 +4,11 @@ let _getState = null;
 let _scheduleSave = null;
 let _refreshCharacterStats = null;
 let _initialized = false;
+let _isEditing = false;
+let _editorStep = "mode";
+let _editSnapshot = null;
+
+const JUJUTSU_SUBTABS = new Set(["technique", "training"]);
 
 function getState() {
   return _getState ? _getState() : null;
@@ -28,7 +33,8 @@ function ensureTechniquesState(state) {
   if (!state.techniques || typeof state.techniques !== "object") state.techniques = {};
 
   const techniques = state.techniques;
-  if (!["ct", "domain", "none"].includes(techniques.mode)) techniques.mode = "ct";
+  if (!["ct", "domain", "none"].includes(techniques.mode)) techniques.mode = "none";
+  if (!JUJUTSU_SUBTABS.has(techniques.activeSubtab)) techniques.activeSubtab = "technique";
   if (!Array.isArray(techniques.ctAbilities)) techniques.ctAbilities = ["", "", ""];
   if (!Array.isArray(techniques.domainAbilities)) techniques.domainAbilities = ["", "", ""];
   while (techniques.ctAbilities.length < 3) techniques.ctAbilities.push("");
@@ -37,6 +43,71 @@ function ensureTechniquesState(state) {
   techniques.domainAbilities = techniques.domainAbilities.slice(0, 3).map(v => String(v || ""));
   techniques.noCtPath = String(techniques.noCtPath || "");
   techniques.notes = String(techniques.notes || "");
+}
+
+function getActiveSubtab(state) {
+  ensureTechniquesState(state);
+  return JUJUTSU_SUBTABS.has(state?.techniques?.activeSubtab)
+    ? state.techniques.activeSubtab
+    : "technique";
+}
+
+function setJujutsuSubtabUI(subtabKey) {
+  const target = JUJUTSU_SUBTABS.has(subtabKey) ? subtabKey : "technique";
+
+  document.querySelectorAll(".jujutsu-subtab").forEach(btn => {
+    const isActive = btn.dataset.subtab === target;
+    btn.classList.toggle("active", isActive);
+    btn.setAttribute("aria-selected", isActive ? "true" : "false");
+  });
+
+  document.querySelectorAll(".jujutsu-subpanel").forEach(panel => {
+    const isActive = panel.dataset.subpanel === target;
+    panel.classList.toggle("active", isActive);
+  });
+}
+
+function setActiveSubtab(state, subtabKey) {
+  ensureTechniquesState(state);
+  state.techniques.activeSubtab = JUJUTSU_SUBTABS.has(subtabKey) ? subtabKey : "technique";
+  setJujutsuSubtabUI(state.techniques.activeSubtab);
+}
+
+function createEditSnapshot(state) {
+  ensureTechniquesState(state);
+  return {
+    ct: String(state.ct || ""),
+    techniques: JSON.parse(JSON.stringify(state.techniques)),
+  };
+}
+
+function restoreEditSnapshot(state, snapshot) {
+  if (!state || !snapshot) return;
+  state.ct = String(snapshot.ct || "");
+  state.techniques = JSON.parse(JSON.stringify(snapshot.techniques || {}));
+  ensureTechniquesState(state);
+}
+
+function getTechniqueSummaryText(state) {
+  ensureTechniquesState(state);
+  const mode = state.techniques.mode;
+  const name = String(state.ct || "").trim();
+  if (mode === "none") return "No technique.";
+  if (!name) return mode === "domain" ? "Domain-based cursed technique." : "Cursed technique.";
+  if (mode === "domain") return `${name} (Domain-Based Cursed Technique)`;
+  return name;
+}
+
+function setEditorVisibility() {
+  const summaryCard = document.getElementById("techniqueSummaryCard");
+  const editor = document.getElementById("techniqueEditor");
+  const modeStep = document.getElementById("techniqueEditorStepMode");
+  const detailsStep = document.getElementById("techniqueEditorStepDetails");
+
+  if (summaryCard) summaryCard.style.display = _isEditing ? "none" : "";
+  if (editor) editor.style.display = _isEditing ? "" : "none";
+  if (modeStep) modeStep.style.display = _isEditing && _editorStep === "mode" ? "" : "none";
+  if (detailsStep) detailsStep.style.display = _isEditing && _editorStep === "details" ? "" : "none";
 }
 
 function getEffectiveTechniqueLevel(state) {
@@ -57,9 +128,8 @@ function getSelectedMode() {
 }
 
 function setModeUI(mode) {
-  const isCt = mode === "ct";
-  const isDomain = mode === "domain";
   const isNone = mode === "none";
+  const isDomain = mode === "domain";
 
   const ctSection = document.getElementById("techniquesCtSection");
   const domainSection = document.getElementById("techniquesDomainSection");
@@ -76,6 +146,13 @@ function syncTechniqueNameInput() {
   if (!nameInput || !headerInput) return;
   if (document.activeElement === nameInput) return;
   nameInput.value = headerInput.value;
+
+  const state = getState();
+  if (state) {
+    state.ct = headerInput.value;
+    const summaryEl = document.getElementById("techniqueSummaryText");
+    if (summaryEl) summaryEl.textContent = getTechniqueSummaryText(state);
+  }
 }
 
 function updateCapacityWarning(state, techniqueLevel) {
@@ -154,8 +231,64 @@ export function applyTechniquesStateToUI() {
   const notes = document.getElementById("techniqueNotesInput");
   if (notes) notes.value = state.techniques.notes || "";
 
+  const summaryEl = document.getElementById("techniqueSummaryText");
+  if (summaryEl) summaryEl.textContent = getTechniqueSummaryText(state);
+
+  setJujutsuSubtabUI(getActiveSubtab(state));
+
   setModeUI(mode);
   updateTechniquesDerivedUI(state);
+  setEditorVisibility();
+}
+
+function startTechniqueEditing() {
+  const state = getState();
+  if (!state) return;
+  _editSnapshot = createEditSnapshot(state);
+  _isEditing = true;
+  _editorStep = "mode";
+  applyTechniquesStateToUI();
+}
+
+function cancelTechniqueEditing() {
+  const state = getState();
+  if (!state) return;
+  restoreEditSnapshot(state, _editSnapshot);
+  _isEditing = false;
+  _editorStep = "mode";
+  refreshCharacterStats();
+  applyTechniquesStateToUI();
+  scheduleSave();
+}
+
+function continueTechniqueEditingFromMode() {
+  const state = getState();
+  if (!state) return;
+  ensureTechniquesState(state);
+  state.techniques.mode = getSelectedMode();
+  _editorStep = "details";
+  setModeUI(state.techniques.mode);
+  updateTechniquesDerivedUI(state);
+  refreshCharacterStats();
+  scheduleSave();
+  setEditorVisibility();
+}
+
+function backToModeStep() {
+  _editorStep = "mode";
+  setEditorVisibility();
+}
+
+function saveTechniqueEditing() {
+  const state = getState();
+  if (!state) return;
+  ensureTechniquesState(state);
+  _isEditing = false;
+  _editorStep = "mode";
+  _editSnapshot = null;
+  refreshCharacterStats();
+  applyTechniquesStateToUI();
+  scheduleSave();
 }
 
 export function initTechniques({ getState: getStateFn, scheduleSave: scheduleSaveFn, refreshCharacterStats: refreshCharacterStatsFn }) {
@@ -186,6 +319,31 @@ export function initTechniques({ getState: getStateFn, scheduleSave: scheduleSav
       scheduleSave();
     });
   });
+
+  document.querySelectorAll(".jujutsu-subtab").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const state = getState();
+      if (!state) return;
+      const next = String(btn.dataset.subtab || "technique");
+      setActiveSubtab(state, next);
+      scheduleSave();
+    });
+  });
+
+  const editBtn = document.getElementById("techniqueEditBtn");
+  if (editBtn) editBtn.addEventListener("click", startTechniqueEditing);
+
+  const modeContinueBtn = document.getElementById("techniqueModeContinueBtn");
+  if (modeContinueBtn) modeContinueBtn.addEventListener("click", continueTechniqueEditingFromMode);
+
+  const cancelEditBtn = document.getElementById("techniqueEditCancelBtn");
+  if (cancelEditBtn) cancelEditBtn.addEventListener("click", cancelTechniqueEditing);
+
+  const backBtn = document.getElementById("techniqueBackToModeBtn");
+  if (backBtn) backBtn.addEventListener("click", backToModeStep);
+
+  const saveBtn = document.getElementById("techniqueSaveBtn");
+  if (saveBtn) saveBtn.addEventListener("click", saveTechniqueEditing);
 
   const nameInput = document.getElementById("techniqueNameInput");
   if (nameInput) {
