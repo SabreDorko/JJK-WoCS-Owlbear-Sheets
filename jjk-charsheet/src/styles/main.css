@@ -1619,7 +1619,7 @@
     }
     .techniques-app-card-title {
       font-family: 'Cinzel', serif;
-      font-size: 10px;
+      font-size: 13px;
       letter-spacing: 0.9px;
       text-transform: uppercase;
       color: var(--ink);
@@ -1627,28 +1627,29 @@
       line-height: 1.2;
     }
     .techniques-app-metrics {
-      display: grid;
-      gap: 3px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
       margin-bottom: 6px;
-      padding: 4px 5px;
-      border: 1px solid rgba(58, 48, 38, 0.28);
-      background: rgba(255, 252, 246, 0.72);
+      padding: 0;
+      border: 0;
+      background: transparent;
     }
     .techniques-app-metric {
       font-family: 'Cinzel', serif;
       font-size: 11px;
       letter-spacing: 0.5px;
-      color: var(--ink);
+      color: #000;
       line-height: 1.25;
       text-transform: uppercase;
     }
     .techniques-app-metric strong {
-      color: var(--accent);
+      color: #000;
       font-weight: 700;
     }
     .techniques-app-effect {
       font-family: 'Crimson Text', serif;
-      font-size: 12px;
+      font-size: 14px;
       color: var(--ink);
       line-height: 1.25;
       margin-bottom: 4px;
