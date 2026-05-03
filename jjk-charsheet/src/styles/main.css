@@ -175,11 +175,11 @@
       top: calc(100% + 4px);
       left: 0;
       z-index: 15;
-      border: 1px solid var(--border-strong);
+      border: 1px solid var(--border);
       background: var(--parchment);
-      padding: 6px;
+      padding: 5px;
       display: grid;
-      gap: 5px;
+      gap: 4px;
       min-width: 178px;
       box-shadow: 1px 2px 0 rgba(26, 20, 16, 0.2);
       animation: inventorySurfaceSlideIn 180ms ease;
@@ -194,6 +194,17 @@
       letter-spacing: 0.9px;
       text-transform: uppercase;
       color: var(--ink-faint);
+    }
+    .rest-options-popover .inventory-mini-btn {
+      width: 100%;
+      text-align: left;
+      justify-content: flex-start;
+      padding: 4px 6px;
+    }
+    .rest-options-popover .inventory-mini-btn[disabled] {
+      opacity: 0.45;
+      cursor: not-allowed;
+      filter: grayscale(0.15);
     }
     .stat-derived-pulse {
       animation: statDerivedPulse 260ms ease;

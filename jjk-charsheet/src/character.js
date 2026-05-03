@@ -22,6 +22,12 @@ function ensureOverrideState(state) {
   if (!state.overrides.subskills || typeof state.overrides.subskills !== "object") state.overrides.subskills = {};
 }
 
+function ensureRestState(state) {
+  if (!state || typeof state !== "object") return;
+  if (!state.restState || typeof state.restState !== "object") state.restState = {};
+  state.restState.quickRestUsed = Boolean(state.restState.quickRestUsed);
+}
+
 function parseOptionalInt(rawValue) {
   const parsed = parseInt(rawValue, 10);
   return Number.isFinite(parsed) ? parsed : null;
@@ -102,6 +108,10 @@ function parseResourceValue(rawValue) {
 }
 
 function applyRestRecovery(state, kind) {
+  ensureRestState(state);
+
+  if (kind === "quick" && state.restState.quickRestUsed) return false;
+
   const hpCurrent = parseResourceValue(state.hpCurrent);
   const hpMax = parseResourceValue(state.hpMax);
   const ceCurrent = parseResourceValue(state.ceCurrent);
@@ -110,7 +120,8 @@ function applyRestRecovery(state, kind) {
   if (kind === "full") {
     state.hpCurrent = String(hpMax);
     state.ceCurrent = String(ceMax);
-    return;
+    state.restState.quickRestUsed = false;
+    return true;
   }
 
   const fraction = kind === "short" ? 0.5 : 0.25;
@@ -118,6 +129,8 @@ function applyRestRecovery(state, kind) {
   const ceRecovered = ceMax > 0 ? Math.max(1, Math.floor(ceMax * fraction)) : 0;
   state.hpCurrent = String(Math.min(hpMax, hpCurrent + hpRecovered));
   state.ceCurrent = String(Math.min(ceMax, ceCurrent + ceRecovered));
+  if (kind === "quick") state.restState.quickRestUsed = true;
+  return true;
 }
 
 function setRestPopoverOpen(isOpen) {
@@ -126,6 +139,18 @@ function setRestPopoverOpen(isOpen) {
   if (!restBtn || !popover) return;
   restBtn.setAttribute("aria-expanded", isOpen ? "true" : "false");
   popover.hidden = !isOpen;
+}
+
+function syncRestControlsUI(state) {
+  ensureRestState(state);
+  const quickRestBtn = document.getElementById("quickRestBtn");
+  if (!quickRestBtn) return;
+
+  const disabled = Boolean(state.restState.quickRestUsed);
+  quickRestBtn.disabled = disabled;
+  quickRestBtn.title = disabled
+    ? "Must full rest first"
+    : "Recover 25% HP and CE";
 }
 
 function getArchetypePermanentAptitudeSource(state, statKey, skillIndex) {
@@ -520,6 +545,7 @@ export function applyCharacterStateToUI() {
   if (!state) return;
 
   ensureOverrideState(state);
+  ensureRestState(state);
   applyDerivedCharacterFields({ preserveCurrent: true });
 
   document.getElementById("charName").value = state.charName || "";
@@ -562,6 +588,7 @@ export function applyCharacterStateToUI() {
   ensureDerivedOverrideMarker("hpMax", "hpMax");
   ensureDerivedOverrideMarker("ceMax", "ceMax");
   ensureDerivedOverrideMarker("moveInput", "movement");
+  syncRestControlsUI(state);
 }
 
 export function initCharacter({ getState: getStateFn, scheduleSave: scheduleSaveFn, showRollToast: showRollToastFn }) {
@@ -621,7 +648,7 @@ export function initCharacter({ getState: getStateFn, scheduleSave: scheduleSave
     restBtn.addEventListener("click", e => {
       e.stopPropagation();
       const popover = document.getElementById("restOptionsPopover");
-      const isOpen = popover ? !popover.hidden : false;
+      const isOpen = popover ? popover.hidden : false;
       setRestPopoverOpen(isOpen);
     });
   }
@@ -636,7 +663,11 @@ export function initCharacter({ getState: getStateFn, scheduleSave: scheduleSave
       e.stopPropagation();
       const state = getState();
       if (!state) return;
-      applyRestRecovery(state, kind);
+      const applied = applyRestRecovery(state, kind);
+      if (!applied) {
+        syncRestControlsUI(state);
+        return;
+      }
       setRestPopoverOpen(false);
       applyCharacterStateToUI();
       scheduleSave();
