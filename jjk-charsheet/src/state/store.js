@@ -110,6 +110,7 @@ export function defaultState() {
     inventoryItems: [],
     inventorySlots: [null, null, null, null, null],
     dormItemIds: [],
+    notes: [],
     equippedSlots: {
       head: null,
       body: null,

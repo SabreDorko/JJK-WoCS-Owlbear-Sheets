@@ -46,6 +46,7 @@ import {
   clearGroupRollHistory,
 } from "./rolls.js";
 import { initUiShell } from "./ui-shell.js";
+import { initNotes, applyNotesStateToUI } from "./notes.js";
 
 // ── RUNTIME STATE ─────────────────────────────────────────────────────────────
 let state           = defaultState();
@@ -148,6 +149,7 @@ function applyStateToUI() {
   applyCharacterStateToUI();
   applyTechniquesStateToUI();
   applyArchetypeStateToUI();
+  applyNotesStateToUI();
 
   renderRollHistory();
   renderPartyList();
@@ -206,6 +208,11 @@ async function init() {
     getState: () => state,
     scheduleSave,
     refreshCharacterStats: applyCharacterStateToUI,
+  });
+
+  initNotes({
+    getState: () => state,
+    scheduleSave,
   });
 
   initUiShell({
