@@ -289,6 +289,7 @@ function setModifierFormVisibility(isVisible) {
   const form = document.getElementById("itemModifierForm");
   if (!form) return;
   form.hidden = !isVisible;
+  form.style.display = isVisible ? "grid" : "none";
 }
 
 function syncModifierSkillOptions() {
@@ -311,6 +312,8 @@ function syncModifierFieldVisibility() {
   const needsSkill = kind === "skill";
   statField.hidden = !needsStat;
   skillField.hidden = !needsSkill;
+  statField.style.display = needsStat ? "flex" : "none";
+  skillField.style.display = needsSkill ? "flex" : "none";
   syncModifierSkillOptions();
 }
 
