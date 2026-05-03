@@ -1,6 +1,7 @@
 let _getState = null;
 let _scheduleSave = null;
 let _initialized = false;
+let _newlyAddedNoteId = null;
 
 function getState() {
   return _getState ? _getState() : null;
@@ -49,18 +50,35 @@ function renderNotes(state) {
 
   list.innerHTML = notes.map(note => {
     const caret = note.collapsed ? "&#9658;" : "&#9662;";
-    const contentHidden = note.collapsed ? " hidden" : "";
+    const isNew = note.id === _newlyAddedNoteId ? " notes-item--new" : "";
+    const collapsedClass = note.collapsed ? " notes-content-wrap--collapsed" : "";
     return `
-      <article class="notes-item" data-note-id="${escapeHtml(note.id)}">
+      <article class="notes-item${isNew}" data-note-id="${escapeHtml(note.id)}">
         <div class="notes-item-head">
           <button type="button" class="notes-toggle-btn" data-note-toggle="${escapeHtml(note.id)}" aria-label="Toggle note">${caret}</button>
           <input class="meta-input notes-title-input" data-note-title="${escapeHtml(note.id)}" value="${escapeHtml(note.title)}" placeholder="Untitled Note" />
-          <button type="button" class="notes-delete-btn" data-note-delete="${escapeHtml(note.id)}" aria-label="Delete note" title="Delete">&times;</button>
+          <button type="button" class="notes-delete-btn" data-note-delete="${escapeHtml(note.id)}" aria-label="Delete note" title="Delete">
+            <svg class="notes-delete-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <path fill="currentColor" d="M6.7 5.3L5.3 6.7 10.6 12l-5.3 5.3 1.4 1.4 5.3-5.3 5.3 5.3 1.4-1.4-5.3-5.3 5.3-5.3-1.4-1.4-5.3 5.3-5.3-5.3z"/>
+            </svg>
+          </button>
         </div>
-        <textarea class="inventory-textarea notes-content" data-note-content="${escapeHtml(note.id)}" rows="5" maxlength="3000" placeholder="Write your note here..."${contentHidden}>${escapeHtml(note.content)}</textarea>
+        <div class="notes-content-wrap${collapsedClass}" data-note-content-wrap="${escapeHtml(note.id)}">
+          <textarea class="inventory-textarea notes-content" data-note-content="${escapeHtml(note.id)}" rows="5" maxlength="3000" placeholder="Write your note here...">${escapeHtml(note.content)}</textarea>
+        </div>
       </article>
     `;
   }).join("");
+
+  if (_newlyAddedNoteId) {
+    const newEntry = list.querySelector(`[data-note-id="${_newlyAddedNoteId}"]`);
+    if (newEntry) {
+      requestAnimationFrame(() => {
+        newEntry.classList.add("notes-item--new-active");
+      });
+    }
+    _newlyAddedNoteId = null;
+  }
 }
 
 function findNoteIndexById(state, noteId) {
@@ -73,12 +91,14 @@ function createNewNote() {
   if (!state) return;
   ensureNotesState(state);
 
+  const newId = `note-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
   state.notes.unshift({
-    id: `note-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+    id: newId,
     title: "Untitled Note",
     content: "",
     collapsed: false,
   });
+  _newlyAddedNoteId = newId;
 
   renderNotes(state);
   scheduleSave();
@@ -118,8 +138,11 @@ export function initNotes({ getState: getStateFn, scheduleSave: scheduleSaveFn }
         const noteId = String(toggleBtn.dataset.noteToggle || "");
         const idx = findNoteIndexById(state, noteId);
         if (idx >= 0) {
-          state.notes[idx].collapsed = !Boolean(state.notes[idx].collapsed);
-          renderNotes(state);
+          const nextCollapsed = !Boolean(state.notes[idx].collapsed);
+          state.notes[idx].collapsed = nextCollapsed;
+          toggleBtn.innerHTML = nextCollapsed ? "&#9658;" : "&#9662;";
+          const wrap = list.querySelector(`[data-note-content-wrap="${noteId}"]`);
+          if (wrap) wrap.classList.toggle("notes-content-wrap--collapsed", nextCollapsed);
           scheduleSave();
         }
         return;
@@ -130,9 +153,14 @@ export function initNotes({ getState: getStateFn, scheduleSave: scheduleSaveFn }
         const noteId = String(deleteBtn.dataset.noteDelete || "");
         const idx = findNoteIndexById(state, noteId);
         if (idx >= 0) {
-          state.notes.splice(idx, 1);
-          renderNotes(state);
-          scheduleSave();
+          const row = deleteBtn.closest(".notes-item");
+          if (row) row.classList.add("notes-item--removing");
+          setTimeout(() => {
+            const nextIdx = findNoteIndexById(state, noteId);
+            if (nextIdx >= 0) state.notes.splice(nextIdx, 1);
+            renderNotes(state);
+            scheduleSave();
+          }, 220);
         }
       }
     });

@@ -2878,9 +2878,9 @@
 
     /* Notes tab */
     .notes-panel {
-      border: 1px solid var(--border-strong);
-      background: rgba(240, 235, 224, 0.8);
-      padding: 10px;
+      border: 0;
+      background: transparent;
+      padding: 0;
       display: flex;
       flex-direction: column;
       gap: 8px;
@@ -2913,6 +2913,30 @@
       display: flex;
       flex-direction: column;
       gap: 6px;
+      max-height: 420px;
+      opacity: 1;
+      transform: translateY(0) scale(1);
+      transform-origin: top center;
+      overflow: hidden;
+      transition: opacity 180ms ease, transform 220ms ease, max-height 220ms ease, margin 220ms ease, padding 220ms ease, border-width 220ms ease;
+    }
+    .notes-item--new {
+      opacity: 0;
+      transform: translateY(7px) scale(0.985);
+    }
+    .notes-item--new.notes-item--new-active {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+    .notes-item--removing {
+      opacity: 0;
+      transform: translateY(-6px) scale(0.985);
+      max-height: 0;
+      margin: 0;
+      padding-top: 0;
+      padding-bottom: 0;
+      border-width: 0;
+      pointer-events: none;
     }
     .notes-item-head {
       display: flex;
@@ -2920,15 +2944,15 @@
       gap: 6px;
     }
     .notes-toggle-btn {
-      width: 22px;
-      height: 22px;
-      min-width: 22px;
-      border: 1px solid var(--border-strong);
-      background: var(--parchment);
+      width: 20px;
+      height: 20px;
+      min-width: 20px;
+      border: 0;
+      background: transparent;
       color: var(--ink);
       cursor: pointer;
       font-family: 'Cinzel', serif;
-      font-size: 11px;
+      font-size: 12px;
       padding: 0;
       line-height: 1;
       display: inline-flex;
@@ -2936,7 +2960,6 @@
       justify-content: center;
     }
     .notes-toggle-btn:hover {
-      border-color: var(--ink);
       color: var(--accent);
     }
     .notes-title-input {
@@ -2951,21 +2974,35 @@
       width: 22px;
       height: 22px;
       min-width: 22px;
-      border-radius: 50%;
       padding: 0;
       line-height: 1;
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      border: 1px solid var(--border-strong);
-      background: var(--parchment);
+      border: 0;
+      background: transparent;
       color: var(--ink);
-      font-family: 'Cinzel', serif;
       cursor: pointer;
     }
     .notes-delete-btn:hover {
-      border-color: var(--danger, #7a1f1f);
       color: var(--danger, #7a1f1f);
+    }
+    .notes-delete-icon {
+      width: 14px;
+      height: 14px;
+      display: block;
+    }
+    .notes-content-wrap {
+      max-height: 260px;
+      opacity: 1;
+      transform: translateY(0);
+      overflow: hidden;
+      transition: max-height 220ms ease, opacity 180ms ease, transform 220ms ease;
+    }
+    .notes-content-wrap--collapsed {
+      max-height: 0;
+      opacity: 0;
+      transform: translateY(-4px);
     }
     .notes-content {
       font-family: 'Crimson Text', serif;
