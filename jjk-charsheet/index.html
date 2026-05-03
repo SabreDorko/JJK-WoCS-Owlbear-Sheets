@@ -409,7 +409,12 @@
             </div>
             <div class="techniques-app-card-grid" id="techniqueApplicationsSummary"></div>
             <div class="technique-summary-footer" id="techniqueSummaryFooter" style="display:none;">
-              <button class="inventory-mini-btn" id="techniqueAddAppSummaryBtn" type="button">+ Add Application</button>
+              <button class="inventory-mini-btn inventory-yen-adjust-btn" id="techniqueAddAppSummaryBtn" type="button" aria-label="Add Application" title="Add Application">
+                <svg class="inventory-yen-adjust-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <path fill="currentColor" d="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6V5z"/>
+                </svg>
+              </button>
+              <span class="field-label">Notes</span>
               <textarea id="techniqueInlineNotesInput" class="inventory-textarea technique-inline-notes" rows="3" maxlength="500" placeholder="Technique notes / DM rulings..."></textarea>
             </div>
           </div>
@@ -458,7 +463,7 @@
                   </select>
                 </div>
 
-                <div class="techniques-field" id="techniquesApplicationsSection">
+                <div class="techniques-field" id="techniquesApplicationsSection" style="display:none;">
                   <div class="techniques-app-editor-header">
                     <span class="field-label">Applications</span>
                     <button class="inventory-mini-btn" id="addTechniqueApplicationBtn" type="button">Add Application</button>

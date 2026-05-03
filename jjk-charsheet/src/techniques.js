@@ -5,6 +5,7 @@ let _initialized = false;
 let _isEditing = false;
 let _editorStep = "mode";
 let _editSnapshot = null;
+const _expandedAppIndices = new Set();
 
 const JUJUTSU_SUBTABS = new Set(["technique", "vows", "training"]);
 
@@ -37,7 +38,8 @@ function createDefaultApplication(index) {
 function createDefaultBindingVow(index) {
   return {
     title: `Vow ${index + 1}`,
-    details: "",
+    benefits: "",
+    conditions: "",
   };
 }
 
@@ -56,10 +58,14 @@ function normalizeApplication(raw, index) {
 function normalizeBindingVow(raw, index) {
   const fallbackTitle = `Vow ${index + 1}`;
   const title = String(raw?.title || "").trim();
-  const details = String(raw?.details || "").trim();
+  // Migrate legacy `details` field into `benefits`
+  const legacyDetails = String(raw?.details || "").trim();
+  const benefits = String(raw?.benefits || legacyDetails || "").trim();
+  const conditions = String(raw?.conditions || "").trim();
   return {
     title: title || fallbackTitle,
-    details,
+    benefits,
+    conditions,
   };
 }
 
@@ -98,7 +104,8 @@ function ensureTechniquesState(state) {
   if (!techniques.bindingVows.length && techniques.bindingVowsNotes.trim()) {
     techniques.bindingVows = [{
       title: "Vow 1",
-      details: techniques.bindingVowsNotes.trim(),
+      benefits: techniques.bindingVowsNotes.trim(),
+      conditions: "",
     }];
   }
 }
@@ -179,10 +186,29 @@ function renderApplicationsSummary(state) {
 
   grid.innerHTML = apps.map((app, idx) => {
     const normalized = normalizeApplication(app, idx);
+    if (_expandedAppIndices.has(idx)) {
+      return `
+        <article class="techniques-app-card techniques-app-card--editing" data-app-idx="${idx}">
+          <div class="techniques-app-card-actions">
+            <button type="button" class="inventory-mini-btn inventory-icon-btn danger" data-app-remove-inline="${idx}" aria-label="Delete application" title="Delete">
+              <svg class="inventory-icon-trash" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path fill="currentColor" d="M9 3h6a1 1 0 0 1 1 1v1h4v2h-1l-1 12a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 7H4V5h4V4a1 1 0 0 1 1-1Zm1 2v0h4V5h-4Zm-1 4h2v9H9V9Zm4 0h2v9h-2V9Z"/>
+                <path fill="none" stroke="currentColor" stroke-width="1.5" d="M6 7.5h12"/>
+              </svg>
+            </button>
+            <button type="button" class="techniques-app-card-done-btn" data-app-edit-toggle="${idx}" aria-label="Done editing" title="Done">&#10003;</button>
+          </div>
+          <input class="meta-input techniques-app-card-field" data-app-title-inline="${idx}" value="${normalized.title}" placeholder="Title" />
+          <input class="meta-input techniques-app-card-field" type="number" min="0" step="1" inputmode="numeric" data-app-cost-inline="${idx}" value="${normalized.ceCost || 0}" placeholder="CE Cost" />
+          <textarea class="inventory-textarea techniques-app-card-field" data-app-desc-inline="${idx}" rows="3" maxlength="360">${normalized.description}</textarea>
+        </article>
+      `;
+    }
     const description = normalized.description || "No description yet.";
     const costText = normalized.ceCost > 0 ? `CE Cost: ${normalized.ceCost}` : "CE Cost: -";
     return `
-      <article class="techniques-app-card">
+      <article class="techniques-app-card" data-app-idx="${idx}">
+        <button type="button" class="techniques-app-card-edit-btn" data-app-edit-toggle="${idx}" aria-label="Edit application" title="Edit">&#9998;</button>
         <h4 class="techniques-app-card-title">${normalized.title}</h4>
         <div class="techniques-app-card-cost">${costText}</div>
         <p class="techniques-app-card-desc">${description}</p>
@@ -240,7 +266,19 @@ function renderBindingVowsEditor(state) {
     const normalized = normalizeBindingVow(vow, idx);
     return `
       <div class="techniques-app-editor-item">
-        <div class="techniques-app-editor-item-head">
+        <label class="techniques-field" for="bindingVowTitle${idx}">
+          <span class="field-label">Title</span>
+          <input id="bindingVowTitle${idx}" class="meta-input" data-vow-title="${idx}" value="${normalized.title}" />
+        </label>
+        <label class="techniques-field" for="bindingVowBenefits${idx}">
+          <span class="field-label">Benefits</span>
+          <textarea id="bindingVowBenefits${idx}" class="inventory-textarea" rows="3" maxlength="700" data-vow-benefits="${idx}">${normalized.benefits}</textarea>
+        </label>
+        <label class="techniques-field" for="bindingVowConditions${idx}">
+          <span class="field-label">Conditions</span>
+          <textarea id="bindingVowConditions${idx}" class="inventory-textarea" rows="3" maxlength="700" data-vow-conditions="${idx}">${normalized.conditions}</textarea>
+        </label>
+        <div class="techniques-vow-footer">
           <button type="button" class="inventory-mini-btn inventory-icon-btn danger" data-vow-remove="${idx}" aria-label="Delete vow" title="Delete vow" style="margin-left:auto;">
             <svg class="inventory-icon-trash" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
               <path fill="currentColor" d="M9 3h6a1 1 0 0 1 1 1v1h4v2h-1l-1 12a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 7H4V5h4V4a1 1 0 0 1 1-1Zm1 2v0h4V5h-4Zm-1 4h2v9H9V9Zm4 0h2v9h-2V9Z"/>
@@ -248,14 +286,6 @@ function renderBindingVowsEditor(state) {
             </svg>
           </button>
         </div>
-        <label class="techniques-field" for="bindingVowTitle${idx}">
-          <span class="field-label">Title</span>
-          <input id="bindingVowTitle${idx}" class="meta-input" data-vow-title="${idx}" value="${normalized.title}" />
-        </label>
-        <label class="techniques-field" for="bindingVowDetails${idx}">
-          <span class="field-label">Details</span>
-          <textarea id="bindingVowDetails${idx}" class="inventory-textarea" rows="4" maxlength="700" data-vow-details="${idx}">${normalized.details}</textarea>
-        </label>
       </div>
     `;
   }).join("");
@@ -282,12 +312,10 @@ function getSelectedMode() {
 function setModeUI(mode) {
   const isNone = mode === "none";
   const nameField = document.getElementById("techniquesNameField");
-  const applicationsSection = document.getElementById("techniquesApplicationsSection");
   const noCtSection = document.getElementById("techniquesNoCtSection");
   const noCtInfoCard = document.getElementById("techniquesNoCtInfoCard");
 
   if (nameField) nameField.style.display = isNone ? "none" : "";
-  if (applicationsSection) applicationsSection.style.display = isNone ? "none" : "";
   if (noCtSection) noCtSection.style.display = isNone ? "" : "none";
   if (noCtInfoCard) noCtInfoCard.style.display = isNone ? "" : "none";
 }
@@ -372,7 +400,7 @@ function startTechniqueEditing() {
   if (!state) return;
   _editSnapshot = createEditSnapshot(state);
   _isEditing = true;
-  _editorStep = "details";
+  _editorStep = "mode";
   applyTechniquesStateToUI();
 }
 
@@ -381,7 +409,8 @@ function cancelTechniqueEditing() {
   if (!state) return;
   restoreEditSnapshot(state, _editSnapshot);
   _isEditing = false;
-  _editorStep = "details";
+  _editorStep = "mode";
+  _expandedAppIndices.clear();
   refreshCharacterStats();
   applyTechniquesStateToUI();
   scheduleSave();
@@ -410,7 +439,7 @@ function saveTechniqueEditing() {
   if (!state) return;
   ensureTechniquesState(state);
   _isEditing = false;
-  _editorStep = "details";
+  _editorStep = "mode";
   _editSnapshot = null;
   refreshCharacterStats();
   applyTechniquesStateToUI();
@@ -465,11 +494,59 @@ export function initTechniques({ getState: getStateFn, scheduleSave: scheduleSav
       const state = getState();
       if (!state) return;
       ensureTechniquesState(state);
-      state.techniques.applications.push(createDefaultApplication(state.techniques.applications.length));
-      _editSnapshot = createEditSnapshot(state);
-      _isEditing = true;
-      _editorStep = "details";
-      applyTechniquesStateToUI();
+      const newIdx = state.techniques.applications.length;
+      state.techniques.applications.push(createDefaultApplication(newIdx));
+      _expandedAppIndices.add(newIdx);
+      updateTechniquesDerivedUI(state);
+      scheduleSave();
+    });
+  }
+
+  const summaryGrid = document.getElementById("techniqueApplicationsSummary");
+  if (summaryGrid) {
+    summaryGrid.addEventListener("click", e => {
+      const toggleTrigger = e.target?.closest?.("[data-app-edit-toggle]");
+      if (toggleTrigger) {
+        const idx = parseNonNegativeInt(toggleTrigger.dataset.appEditToggle);
+        if (_expandedAppIndices.has(idx)) _expandedAppIndices.delete(idx);
+        else _expandedAppIndices.add(idx);
+        const state = getState();
+        if (state) renderApplicationsSummary(state);
+        return;
+      }
+      const removeTrigger = e.target?.closest?.("[data-app-remove-inline]");
+      if (removeTrigger) {
+        const state = getState();
+        if (!state) return;
+        ensureTechniquesState(state);
+        const removeIdx = parseNonNegativeInt(removeTrigger.dataset.appRemoveInline);
+        state.techniques.applications.splice(removeIdx, 1);
+        state.techniques.applications = state.techniques.applications.map((entry, i) => normalizeApplication(entry, i));
+        _expandedAppIndices.clear();
+        updateTechniquesDerivedUI(state);
+        scheduleSave();
+      }
+    });
+    summaryGrid.addEventListener("input", e => {
+      const state = getState();
+      if (!state) return;
+      ensureTechniquesState(state);
+      const titleAttr = e.target?.dataset?.appTitleInline;
+      const descAttr = e.target?.dataset?.appDescInline;
+      const costAttr = e.target?.dataset?.appCostInline;
+      if (titleAttr !== undefined) {
+        const idx = parseNonNegativeInt(titleAttr);
+        if (state.techniques.applications[idx]) state.techniques.applications[idx].title = String(e.target.value || "");
+      }
+      if (descAttr !== undefined) {
+        const idx = parseNonNegativeInt(descAttr);
+        if (state.techniques.applications[idx]) state.techniques.applications[idx].description = String(e.target.value || "");
+      }
+      if (costAttr !== undefined) {
+        const idx = parseNonNegativeInt(costAttr);
+        if (state.techniques.applications[idx]) state.techniques.applications[idx].ceCost = parseNonNegativeInt(e.target.value);
+      }
+      scheduleSave();
     });
   }
 
@@ -606,13 +683,17 @@ export function initTechniques({ getState: getStateFn, scheduleSave: scheduleSav
       ensureTechniquesState(state);
 
       const titleIdx = parseNonNegativeInt(e.target?.dataset?.vowTitle);
-      const detailsIdx = parseNonNegativeInt(e.target?.dataset?.vowDetails);
+      const benefitsIdx = parseNonNegativeInt(e.target?.dataset?.vowBenefits);
+      const conditionsIdx = parseNonNegativeInt(e.target?.dataset?.vowConditions);
 
       if (e.target?.dataset?.vowTitle !== undefined && state.techniques.bindingVows[titleIdx]) {
         state.techniques.bindingVows[titleIdx].title = String(e.target.value || "");
       }
-      if (e.target?.dataset?.vowDetails !== undefined && state.techniques.bindingVows[detailsIdx]) {
-        state.techniques.bindingVows[detailsIdx].details = String(e.target.value || "");
+      if (e.target?.dataset?.vowBenefits !== undefined && state.techniques.bindingVows[benefitsIdx]) {
+        state.techniques.bindingVows[benefitsIdx].benefits = String(e.target.value || "");
+      }
+      if (e.target?.dataset?.vowConditions !== undefined && state.techniques.bindingVows[conditionsIdx]) {
+        state.techniques.bindingVows[conditionsIdx].conditions = String(e.target.value || "");
       }
 
       scheduleSave();

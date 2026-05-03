@@ -977,12 +977,59 @@
       margin-bottom: 8px;
     }
     .techniques-app-card {
+      position: relative;
       border: 1px solid var(--border-strong);
       background: rgba(240, 235, 224, 0.75);
       padding: 6px;
       min-height: 110px;
       height: 100%;
       overflow: auto;
+    }
+    .techniques-app-card--editing {
+      grid-column: 1 / -1;
+      aspect-ratio: auto;
+      height: auto;
+      min-height: 0;
+    }
+    .techniques-app-card-actions {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 4px;
+      margin-bottom: 6px;
+    }
+    .techniques-app-card-edit-btn {
+      position: absolute;
+      top: 4px;
+      right: 4px;
+      background: none;
+      border: none;
+      color: var(--ink-faint);
+      font-size: 13px;
+      line-height: 1;
+      cursor: pointer;
+      padding: 0;
+      transform: scaleX(-1);
+    }
+    .techniques-app-card-edit-btn:hover { color: var(--accent); }
+    .techniques-app-card-done-btn {
+      background: none;
+      border: 1px solid var(--border-strong);
+      color: var(--ink);
+      font-size: 12px;
+      cursor: pointer;
+      padding: 1px 5px;
+      line-height: 1.4;
+    }
+    .techniques-app-card-done-btn:hover {
+      border-color: var(--ink);
+      color: var(--accent);
+    }
+    .techniques-app-card-field {
+      display: block;
+      width: 100%;
+      margin-bottom: 4px;
+      font-size: 12px;
     }
     .techniques-app-card-title {
       font-family: 'Cinzel', serif;
@@ -1100,6 +1147,11 @@
       justify-content: space-between;
       margin-bottom: 4px;
       gap: 6px;
+    }
+    .techniques-vow-footer {
+      display: flex;
+      justify-content: flex-end;
+      margin-top: 4px;
     }
     .techniques-app-remove-btn {
       width: auto;
