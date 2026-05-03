@@ -920,8 +920,10 @@ export function initTechniques({ getState: getStateFn, scheduleSave: scheduleSav
   const summaryGrid = document.getElementById("techniqueApplicationsSummary");
   if (summaryGrid) {
     summaryGrid.addEventListener("click", e => {
-      e.preventDefault();
-      e.stopPropagation();
+      if (e.target?.tagName !== "INPUT" && e.target?.tagName !== "SELECT" && e.target?.tagName !== "TEXTAREA") {
+        e.preventDefault();
+        e.stopPropagation();
+      }
       // Open edit (pencil icon on view card)
       const openTrigger = e.target?.closest?.("[data-app-edit-toggle]");
       if (openTrigger) {
