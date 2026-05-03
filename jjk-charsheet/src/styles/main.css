@@ -191,6 +191,10 @@
       display: flex;
       margin-top: 4px;
     }
+    #overrideModeBtn svg {
+      width: 13px;
+      height: 13px;
+    }
 
     /* ── INFO MODAL ── */
     .info-overlay {
@@ -317,12 +321,12 @@
 
     @keyframes statDerivedPulse {
       0% {
-        background-color: rgba(163, 89, 43, 0.22);
-        box-shadow: 0 0 0 0 rgba(163, 89, 43, 0.35);
+        background-color: rgba(163, 89, 43, 0.12);
+        box-shadow: 0 0 0 0 rgba(163, 89, 43, 0.18);
       }
       100% {
         background-color: transparent;
-        box-shadow: 0 0 0 6px rgba(163, 89, 43, 0);
+        box-shadow: 0 0 0 5px rgba(163, 89, 43, 0);
       }
     }
 
@@ -741,7 +745,7 @@
     .skill-row {
       display: flex;
       align-items: center;
-      gap: 6px;
+      gap: 4px;
     }
     .skill-dot {
       width: 11px; height: 11px;
@@ -762,16 +766,16 @@
       height: 12px;
     }
     .skill-dot.permanent::after {
-      content: "✦";
+      content: "★";
       position: absolute;
       inset: 0;
       display: flex;
       align-items: center;
       justify-content: center;
       color: var(--ink);
-      font-size: 12px;
+      font-size: 10px;
       line-height: 1;
-      transform: translateY(-0.7px);
+      transform: translateY(-0.2px);
     }
     .skill-bonus {
       font-family: 'Cinzel', serif;
@@ -791,7 +795,7 @@
       border: none;
       border-bottom: 1px dashed var(--border);
       outline: none;
-      width: 28px;
+      width: 24px;
       text-align: center;
       flex-shrink: 0;
     }
@@ -806,12 +810,19 @@
       font-size: 12px;
       line-height: 1;
       padding: 0;
-      min-width: 10px;
+      min-width: 8px;
       visibility: hidden;
       opacity: 0;
       cursor: default;
       transition: opacity 120ms ease;
       flex: 0 0 auto;
+    }
+    .override-marker-btn.derived-override-marker {
+      position: absolute;
+      right: -9px;
+      top: 50%;
+      transform: translateY(-50%);
+      min-width: auto;
     }
     .override-marker-btn.visible {
       visibility: visible;

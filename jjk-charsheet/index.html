@@ -42,7 +42,13 @@
             </svg>
             About
           </button>
-          <button class="info-btn" id="overrideModeBtn" type="button" aria-label="Toggle override mode" title="Enable manual overrides">Edit / Override</button>
+          <button class="info-btn" id="overrideModeBtn" type="button" aria-label="Toggle override mode" title="Enable manual overrides">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">
+              <path d="M3 17.25V21h3.75L19.81 7.94l-3.75-3.75L3 17.25z" stroke="currentColor" stroke-width="1.4" fill="none"/>
+              <path d="M14.06 4.19l3.75 3.75" stroke="currentColor" stroke-width="1.4"/>
+            </svg>
+            <span id="overrideModeBtnLabel">Override</span>
+          </button>
         </div>
         <div style="display:flex;align-items:center;justify-content:center;padding-top:4px;">
           <div class="crest"><div class="crest-inner">術</div></div>
@@ -159,7 +165,6 @@
               <span class="hp-sep">/</span>
               <input class="hp-input" id="ceMax" placeholder="0" type="number" min="0" />
             </div>
-            <textarea class="ce-note-input" id="ceNote" placeholder="CE notes…" rows="2"></textarea>
           </div>
 
           <!-- Armor Class -->

@@ -375,9 +375,10 @@ function syncHP() {
 
 function updateOverrideButtonUI() {
   const btn = document.getElementById("overrideModeBtn");
+  const label = document.getElementById("overrideModeBtnLabel");
   if (!btn) return;
   btn.classList.toggle("active", _isOverrideMode);
-  btn.textContent = _isOverrideMode ? "Exit Override" : "Edit / Override";
+  if (label) label.textContent = "Override";
   btn.title = _isOverrideMode ? "Disable manual overrides" : "Enable manual overrides";
 }
 
@@ -390,8 +391,10 @@ function ensureDerivedOverrideMarker(inputId, fieldKey) {
     marker = document.createElement("button");
     marker.type = "button";
     marker.className = "override-marker-btn";
+    marker.classList.add("derived-override-marker");
     marker.dataset.derivedOverrideClear = fieldKey;
     marker.textContent = "*";
+    input.parentElement.style.position = "relative";
     marker.addEventListener("click", () => {
       if (!_isOverrideMode) return;
       const state = getState();
@@ -452,7 +455,8 @@ export function applyCharacterStateToUI() {
   setInputValueWithPulse(document.getElementById("moveInput"), state.movement || "");
   setInputValueWithPulse(document.getElementById("ceCurrent"), state.ceCurrent || "");
   setInputValueWithPulse(document.getElementById("ceMax"), state.ceMax || "");
-  document.getElementById("ceNote").value = state.ceNote || "";
+  const ceNoteEl = document.getElementById("ceNote");
+  if (ceNoteEl) ceNoteEl.value = state.ceNote || "";
 
   const arcSel = document.getElementById("archetypeSelect");
   arcSel.value = state.archetype || "";
