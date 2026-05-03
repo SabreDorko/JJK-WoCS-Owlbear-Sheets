@@ -1,0 +1,264 @@
+[
+  {
+    "id": "dancing-shoes",
+    "name": "Dancing Shoes",
+    "itemType": "clothing",
+    "allowedSlots": ["feet"],
+    "slotsNeeded": 1,
+    "description": "Light performance shoes for mobility-focused builds.",
+    "modifiers": [],
+    "aliases": ["dancing shoes", "running shoes"]
+  },
+  {
+    "id": "tonfa",
+    "name": "Tonfa",
+    "itemType": "weapon",
+    "weaponGrip": "oneHanded",
+    "description": "Training tonfa.",
+    "modifiers": [],
+    "aliases": ["tonfa"]
+  },
+  {
+    "id": "tearaway-uniform",
+    "name": "Tearaway Uniform",
+    "itemType": "clothing",
+    "allowedSlots": ["body"],
+    "slotsNeeded": 1,
+    "description": "Rugged uniform for close combat.",
+    "modifiers": [],
+    "aliases": ["tearaway uniform"]
+  },
+  {
+    "id": "knuckle-guards",
+    "name": "Knuckle Guards",
+    "itemType": "item",
+    "description": "Hand protection used for brawling.",
+    "modifiers": [],
+    "aliases": ["knuckle guards"]
+  },
+  {
+    "id": "hunting-knife",
+    "name": "Hunting Knife",
+    "itemType": "weapon",
+    "weaponGrip": "oneHanded",
+    "description": "A compact knife suited for close range.",
+    "modifiers": [],
+    "aliases": ["hunting knife"]
+  },
+  {
+    "id": "camouflage-paint",
+    "name": "Camouflage Paint",
+    "itemType": "item",
+    "description": "Consumable stealth prep.",
+    "modifiers": [],
+    "aliases": ["camouflage paint"]
+  },
+  {
+    "id": "gun",
+    "name": "Gun",
+    "itemType": "weapon",
+    "weaponGrip": "oneHanded",
+    "description": "Standard sidearm.",
+    "modifiers": [],
+    "aliases": ["gun"]
+  },
+  {
+    "id": "incendiary-rounds",
+    "name": "Incendiary Rounds",
+    "itemType": "item",
+    "description": "Special ammunition that inflicts singe.",
+    "modifiers": [],
+    "aliases": ["incendiary rounds"]
+  },
+  {
+    "id": "body-armor",
+    "name": "Body Armor",
+    "itemType": "clothing",
+    "allowedSlots": ["body"],
+    "slotsNeeded": 1,
+    "description": "Protective chest armor.",
+    "modifiers": [],
+    "aliases": ["body armor"]
+  },
+  {
+    "id": "motorcycle-goggles",
+    "name": "Motorcycle Goggles",
+    "itemType": "clothing",
+    "allowedSlots": ["accessory"],
+    "slotsNeeded": 1,
+    "description": "Protective eyewear.",
+    "modifiers": [],
+    "aliases": ["motorcycle goggles"]
+  },
+  {
+    "id": "running-gear",
+    "name": "Running Gear",
+    "itemType": "clothing",
+    "allowedSlots": ["legs"],
+    "slotsNeeded": 1,
+    "description": "Athletic wear optimized for speed.",
+    "modifiers": [],
+    "aliases": ["running gear"]
+  },
+  {
+    "id": "switchblade",
+    "name": "Switchblade",
+    "itemType": "weapon",
+    "weaponGrip": "oneHanded",
+    "description": "Concealable folding blade.",
+    "modifiers": [],
+    "aliases": ["switchblade"]
+  },
+  {
+    "id": "token-from-the-past",
+    "name": "A Token From The Past",
+    "itemType": "item",
+    "description": "Lucky keepsake tied to old memories.",
+    "modifiers": [],
+    "aliases": ["a token from the past", "token from the past"]
+  },
+  {
+    "id": "notebook",
+    "name": "Notebook",
+    "itemType": "item",
+    "description": "Planning and education notes.",
+    "modifiers": [],
+    "aliases": ["notebook"]
+  },
+  {
+    "id": "katana",
+    "name": "Katana",
+    "itemType": "weapon",
+    "weaponGrip": "oneHanded",
+    "description": "Standard katana.",
+    "modifiers": [],
+    "aliases": ["katana"]
+  },
+  {
+    "id": "sword-polish",
+    "name": "Sword Polish",
+    "itemType": "item",
+    "description": "Consumable polish for blade maintenance.",
+    "modifiers": [],
+    "aliases": ["sword polish"]
+  },
+  {
+    "id": "first-aid-kit",
+    "name": "First Aid Kit",
+    "itemType": "item",
+    "description": "Basic emergency medical supplies.",
+    "modifiers": [],
+    "aliases": ["first aid kit"]
+  },
+  {
+    "id": "cigarettes",
+    "name": "Cigarettes",
+    "itemType": "item",
+    "description": "Consumable stress and CE management item.",
+    "modifiers": [],
+    "aliases": ["cigarettes"]
+  },
+  {
+    "id": "sentimental-possession",
+    "name": "Sentimental Possession",
+    "itemType": "item",
+    "description": "Personal keepsake with latent power.",
+    "modifiers": [],
+    "aliases": ["sentimental possession"]
+  },
+  {
+    "id": "potential",
+    "name": "Potential",
+    "itemType": "item",
+    "description": "A one-time narrative edge.",
+    "modifiers": [],
+    "aliases": ["potential"]
+  },
+  {
+    "id": "hammer",
+    "name": "Hammer",
+    "itemType": "weapon",
+    "weaponGrip": "twoHanded",
+    "description": "Heavy blunt weapon.",
+    "modifiers": [],
+    "aliases": ["hammer", "sledge hammer", "hammer/sledge hammer"]
+  },
+  {
+    "id": "punk-boots",
+    "name": "Punk Boots",
+    "itemType": "clothing",
+    "allowedSlots": ["feet"],
+    "slotsNeeded": 1,
+    "description": "Durable boots with street style.",
+    "modifiers": [],
+    "aliases": ["punk boots"]
+  },
+  {
+    "id": "hero-business-suit",
+    "name": "Hero/Business Suit",
+    "itemType": "clothing",
+    "allowedSlots": ["body"],
+    "slotsNeeded": 1,
+    "description": "Formal combat-ready attire.",
+    "modifiers": [],
+    "aliases": ["hero/business suit", "hero suit", "business suit"]
+  },
+  {
+    "id": "professional-glasses",
+    "name": "Professional Glasses",
+    "itemType": "clothing",
+    "allowedSlots": ["accessory"],
+    "slotsNeeded": 1,
+    "description": "Stylish glasses for tactical reads.",
+    "modifiers": [],
+    "aliases": ["professional glasses"]
+  },
+  {
+    "id": "lucky-dice",
+    "name": "Lucky Dice",
+    "itemType": "item",
+    "description": "Risk-reward dice set.",
+    "modifiers": [],
+    "aliases": ["lucky dice"]
+  },
+  {
+    "id": "skateboard",
+    "name": "Skateboard",
+    "itemType": "item",
+    "description": "Mobility-focused board.",
+    "modifiers": [],
+    "aliases": ["skateboard"]
+  },
+  {
+    "id": "tinkers-kit",
+    "name": "Tinker's Kit",
+    "itemType": "item",
+    "description": "General purpose tinkering tools.",
+    "modifiers": [],
+    "aliases": ["tinker's kit", "tinker’s kit", "tinkers kit"]
+  },
+  {
+    "id": "caffeine-patch",
+    "name": "Caffeine Patch",
+    "itemType": "item",
+    "description": "Consumable stimulant for overnight crafting.",
+    "modifiers": [],
+    "aliases": ["caffeine patch"]
+  },
+  {
+    "id": "mysterious-herbs",
+    "name": "3 Mysterious Herbs",
+    "itemType": "item",
+    "description": "Set of unknown herbs with varied effects.",
+    "modifiers": [],
+    "aliases": ["3 mysterious herbs", "mysterious herbs"]
+  },
+  {
+    "id": "poison-vial",
+    "name": "Poison Vial",
+    "itemType": "item",
+    "description": "Weapon coating and poison source.",
+    "modifiers": [],
+    "aliases": ["poison vial"]
+  }
+]

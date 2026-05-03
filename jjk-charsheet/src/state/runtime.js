@@ -40,8 +40,29 @@ export function createPersistenceRuntime({
   getLocalPlayerId,
   onSchedule,
   onAfterSave,
+  onAfterLoad,
 }) {
   let saveTimeout = null;
+
+  function parseStateTimestamp(state) {
+    const raw = parseInt(state?.__savedAt, 10);
+    return Number.isFinite(raw) && raw > 0 ? raw : 0;
+  }
+
+  function pickNewestState(preferredA, preferredB) {
+    if (!preferredA && !preferredB) return null;
+    if (!preferredA) return preferredB;
+    if (!preferredB) return preferredA;
+
+    const aTs = parseStateTimestamp(preferredA);
+    const bTs = parseStateTimestamp(preferredB);
+
+    if (aTs > bTs) return preferredA;
+    if (bTs > aTs) return preferredB;
+
+    // If timestamps are missing or identical, prefer local copy for same-device continuity.
+    return preferredB;
+  }
 
   function getStorageKey() {
     const localPlayerId = getLocalPlayerId();
@@ -49,31 +70,71 @@ export function createPersistenceRuntime({
   }
 
   async function saveState() {
+    const state = getState();
+    if (!state || typeof state !== "object") return;
+
+    state.__savedAt = Date.now();
+    let wroteRoom = false;
+
     try {
-      await OBR.room.setMetadata({ [getStorageKey()]: getState() });
+      await OBR.room.setMetadata({ [getStorageKey()]: state });
+      wroteRoom = true;
     } catch (_) {
-      localStorage.setItem(getStorageKey(), JSON.stringify(getState()));
+      // Keep going and persist local backup below.
     }
 
-    if (onAfterSave) onAfterSave();
+    try {
+      localStorage.setItem(getStorageKey(), JSON.stringify(state));
+    } catch (_) {
+      // Ignore local backup write failures.
+    }
+
+    if (onAfterSave) {
+      onAfterSave({
+        savedAt: state.__savedAt,
+        source: wroteRoom ? "room+local" : "local",
+      });
+    }
   }
 
   async function loadState() {
     const key = getStorageKey();
 
+    let roomState = null;
+    let localState = null;
+
     try {
       const meta = await OBR.room.getMetadata();
-      if (meta[key]) return meta[key];
-      if (meta[storageKeyBase]) return meta[storageKeyBase];
+      roomState = meta[key] || meta[storageKeyBase] || null;
     } catch (_) {
-      const saved = localStorage.getItem(key);
-      if (saved) return JSON.parse(saved);
-
-      const oldSaved = localStorage.getItem(storageKeyBase);
-      if (oldSaved) return JSON.parse(oldSaved);
+      roomState = null;
     }
 
-    return null;
+    try {
+      const saved = localStorage.getItem(key);
+      localState = saved ? JSON.parse(saved) : null;
+      if (!localState) {
+        const oldSaved = localStorage.getItem(storageKeyBase);
+        localState = oldSaved ? JSON.parse(oldSaved) : null;
+      }
+    } catch (_) {
+      localState = null;
+    }
+
+    const picked = pickNewestState(roomState, localState);
+
+    if (onAfterLoad) {
+      let source = "none";
+      if (picked && picked === roomState) source = "room";
+      else if (picked && picked === localState) source = "local";
+
+      onAfterLoad({
+        savedAt: parseStateTimestamp(picked),
+        source,
+      });
+    }
+
+    return picked;
   }
 
   function scheduleSave() {
