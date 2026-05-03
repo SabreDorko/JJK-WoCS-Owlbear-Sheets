@@ -77,66 +77,6 @@
             <div class="field-label">Cursed Technique</div>
             <input class="meta-input" id="ctInput" placeholder="—" />
           </div>
-          <div class="meta-field">
-            <div class="field-label">Archetype</div>
-            <select class="meta-select" id="archetypeSelect" onchange="onArchetypeChange()">
-              <option value="">— Select —</option>
-              <option value="acrobat">Acrobat</option>
-              <option value="brawler">Brawler</option>
-              <option value="brutalizer">Brutalizer</option>
-              <option value="caster">Caster</option>
-              <option value="unbreakable">Unbreakable</option>
-              <option value="speedster">Speedster</option>
-              <option value="mastermind">Mastermind</option>
-              <option value="swordsman">Swordsman</option>
-              <option value="shaman">Shaman</option>
-              <option value="prodigy">Prodigy</option>
-              <option value="rebel">Rebel</option>
-              <option value="confidant">Confidant</option>
-              <option value="thrill_seeker">Thrill Seeker</option>
-              <option value="tinkerer">Tinkerer</option>
-              <option value="toxicologist">Toxicologist</option>
-            </select>
-          </div>
-          <div class="meta-field">
-            <div class="field-label">Sub-Archetype</div>
-            <select class="meta-select" id="subArchetypeSelect" disabled>
-              <option value="">— Pick archetype first —</option>
-            </select>
-          </div>
-          <div class="meta-field" style="grid-column:1/-1;">
-            <button class="meta-toggle-btn" id="addSecondArchetypeBtn" type="button">Add Second Archetype</button>
-          </div>
-          <div class="meta-field multi-class-field hidden" id="multiClassArchetypeField">
-            <div class="field-label">Second Archetype</div>
-            <select class="meta-select" id="archetypeSelect2" onchange="onArchetypeChange2()">
-              <option value="">— Select —</option>
-              <option value="acrobat">Acrobat</option>
-              <option value="brawler">Brawler</option>
-              <option value="brutalizer">Brutalizer</option>
-              <option value="caster">Caster</option>
-              <option value="unbreakable">Unbreakable</option>
-              <option value="speedster">Speedster</option>
-              <option value="mastermind">Mastermind</option>
-              <option value="swordsman">Swordsman</option>
-              <option value="shaman">Shaman</option>
-              <option value="prodigy">Prodigy</option>
-              <option value="rebel">Rebel</option>
-              <option value="confidant">Confidant</option>
-              <option value="thrill_seeker">Thrill Seeker</option>
-              <option value="tinkerer">Tinkerer</option>
-              <option value="toxicologist">Toxicologist</option>
-            </select>
-          </div>
-          <div class="meta-field multi-class-field hidden" id="multiClassSubArchetypeField">
-            <div class="field-label">Sub-Archetype 2</div>
-            <select class="meta-select" id="subArchetypeSelect2" disabled>
-              <option value="">— Pick archetype first —</option>
-            </select>
-          </div>
-          <div class="meta-field multi-class-field hidden" id="removeSecondArchetypeField" style="grid-column:1/-1;">
-            <button class="meta-toggle-btn" id="removeSecondArchetypeBtn" type="button">Remove Second Archetype</button>
-          </div>
         </div>
       </div>
 
@@ -389,6 +329,72 @@
     <div class="tab-panel" id="panel-archetype">
       <div class="archetype-shell">
         <div class="archetype-layout">
+          <section class="archetype-card archetype-card-wide">
+            <div class="archetype-card-title">Archetype Selection</div>
+            <div class="meta-grid archetype-picker-grid">
+              <div class="meta-field">
+                <div class="field-label">Archetype</div>
+                <select class="meta-select" id="archetypeSelect" onchange="onArchetypeChange()">
+                  <option value="">— Select —</option>
+                  <option value="acrobat">Acrobat</option>
+                  <option value="brawler">Brawler</option>
+                  <option value="brutalizer">Brutalizer</option>
+                  <option value="caster">Caster</option>
+                  <option value="unbreakable">Unbreakable</option>
+                  <option value="speedster">Speedster</option>
+                  <option value="mastermind">Mastermind</option>
+                  <option value="swordsman">Swordsman</option>
+                  <option value="shaman">Shaman</option>
+                  <option value="prodigy">Prodigy</option>
+                  <option value="rebel">Rebel</option>
+                  <option value="confidant">Confidant</option>
+                  <option value="thrill_seeker">Thrill Seeker</option>
+                  <option value="tinkerer">Tinkerer</option>
+                  <option value="toxicologist">Toxicologist</option>
+                </select>
+              </div>
+              <div class="meta-field">
+                <div class="field-label">Sub-Archetype</div>
+                <select class="meta-select" id="subArchetypeSelect" disabled>
+                  <option value="">— Pick archetype first —</option>
+                </select>
+              </div>
+              <div class="meta-field" style="grid-column:1/-1;">
+                <button class="meta-toggle-btn" id="addSecondArchetypeBtn" type="button">Add Second Archetype</button>
+              </div>
+              <div class="meta-field multi-class-field hidden" id="multiClassArchetypeField">
+                <div class="field-label">Second Archetype</div>
+                <select class="meta-select" id="archetypeSelect2" onchange="onArchetypeChange2()">
+                  <option value="">— Select —</option>
+                  <option value="acrobat">Acrobat</option>
+                  <option value="brawler">Brawler</option>
+                  <option value="brutalizer">Brutalizer</option>
+                  <option value="caster">Caster</option>
+                  <option value="unbreakable">Unbreakable</option>
+                  <option value="speedster">Speedster</option>
+                  <option value="mastermind">Mastermind</option>
+                  <option value="swordsman">Swordsman</option>
+                  <option value="shaman">Shaman</option>
+                  <option value="prodigy">Prodigy</option>
+                  <option value="rebel">Rebel</option>
+                  <option value="confidant">Confidant</option>
+                  <option value="thrill_seeker">Thrill Seeker</option>
+                  <option value="tinkerer">Tinkerer</option>
+                  <option value="toxicologist">Toxicologist</option>
+                </select>
+              </div>
+              <div class="meta-field multi-class-field hidden" id="multiClassSubArchetypeField">
+                <div class="field-label">Sub-Archetype 2</div>
+                <select class="meta-select" id="subArchetypeSelect2" disabled>
+                  <option value="">— Pick archetype first —</option>
+                </select>
+              </div>
+              <div class="meta-field multi-class-field hidden" id="removeSecondArchetypeField" style="grid-column:1/-1;">
+                <button class="meta-toggle-btn" id="removeSecondArchetypeBtn" type="button">Remove Second Archetype</button>
+              </div>
+            </div>
+          </section>
+
           <section class="archetype-card">
             <div class="archetype-card-title">Archetype Summary</div>
             <div class="archetype-summary-grid">

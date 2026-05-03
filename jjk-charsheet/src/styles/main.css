@@ -937,6 +937,13 @@
       text-transform: uppercase;
       color: var(--ink);
     }
+    .archetype-picker-grid {
+      margin-top: 2px;
+      gap: 7px 10px;
+    }
+    .archetype-picker-grid .meta-field {
+      gap: 2px;
+    }
     .archetype-summary-grid {
       display: grid;
       gap: 6px;
