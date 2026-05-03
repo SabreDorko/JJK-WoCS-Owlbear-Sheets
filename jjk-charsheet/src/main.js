@@ -185,7 +185,7 @@ async function init() {
     getState: () => state,
     scheduleSave,
     refreshCharacterStats: applyCharacterStateToUI,
-    pushRollHistory,
+    showRollToast,
   });
 
   initArchetype({

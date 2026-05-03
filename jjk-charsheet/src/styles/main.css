@@ -664,6 +664,11 @@
       background: #fdf0f0;
     }
     .roll-toast.crit-fail .roll-toast-title { color: var(--accent); }
+    .roll-toast.pass {
+      border-color: #2a6e2a;
+      background: #f0f7f0;
+    }
+    .roll-toast.pass .roll-toast-title { color: #2a6e2a; }
     .roll-toast-container {
       position: fixed;
       right: 12px;
@@ -821,6 +826,13 @@
       font-size: 12px;
       color: var(--ink);
       line-height: 1.2;
+    }
+    .roll-history-item-badge {
+      font-family: 'Cinzel', serif;
+      font-size: 8px;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      margin-top: 4px;
     }
     .roll-history-empty {
       font-family: 'Crimson Text', serif;

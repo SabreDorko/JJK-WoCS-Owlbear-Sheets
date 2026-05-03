@@ -1,7 +1,7 @@
 let _getState = null;
 let _scheduleSave = null;
 let _refreshCharacterStats = null;
-let _pushRollHistory = null;
+let _showRollToast = null;
 let _initialized = false;
 let _isEditing = false;
 let _editorStep = "mode";
@@ -39,13 +39,13 @@ function performApplicationCast(state, techniqueIndex, applicationIndex) {
   const ceCost = normalized.ceCost || 0;
   const sorcererXp = parseNonNegativeInt(state.sorcererXp);
   const ceCurrent = parseNonNegativeInt(state.ceCurrent);
+  const label = `${techniqueName} › ${normalized.title}`;
   
   // Check if auto-pass (DC < Sorcerer XP)
   if (dc < sorcererXp) {
     // Auto-pass: log as "Pass" without rolling
-    const time = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
-    if (_pushRollHistory) {
-      _pushRollHistory(`${techniqueName} › ${normalized.title}`, 0, [], 0, null, "Pass", null);
+    if (_showRollToast) {
+      _showRollToast(label, 0, [], 0, "pass", null, null);
     }
     // Deduct CE
     state.ceCurrent = String(Math.max(0, ceCurrent - ceCost));
@@ -65,22 +65,23 @@ function performApplicationCast(state, techniqueIndex, applicationIndex) {
   const maxPossible = diceCount * 6;
   const allOnes = rolls.every(r => r === 1);
   
-  let critStatus = null;
-  let resultText = "Fail";
+  let rollStatus = null;
   
   if (allOnes) {
-    critStatus = "fail";
-    resultText = "Fail";
+    rollStatus = "fail";
   } else if (total >= dc) {
     if (total >= maxPossible) {
-      critStatus = "success";
+      rollStatus = "success";
+    } else {
+      rollStatus = "pass";
     }
-    resultText = "Pass";
+  } else {
+    rollStatus = "fail";
   }
   
-  // Log the roll
-  if (_pushRollHistory) {
-    _pushRollHistory(`${techniqueName} › ${normalized.title}`, diceCount, rolls, total, critStatus, resultText, null);
+  // Show the toast and log the roll
+  if (_showRollToast) {
+    _showRollToast(label, diceCount, rolls, total, rollStatus, null, null);
   }
   
   // Deduct CE
@@ -429,7 +430,7 @@ function renderApplicationsSummary(state) {
         <div class="techniques-app-effect"><strong>Effect:</strong> ${effectText}</div>
         <p class="techniques-app-card-desc">${description}</p>
         <div class="techniques-app-card-footer">
-          <button type="button" class="techniques-app-cast-btn ${btnClass}" data-app-cast="${idx}" title="${btnState.tooltip}"${btnDisabled}>${starMarkup}Cast/Use</button>
+          <button type="button" class="techniques-app-cast-btn ${btnClass}" data-app-cast="${idx}" title="${btnState.tooltip}"${btnDisabled}>${starMarkup}Use</button>
         </div>
       </article>
     `;
@@ -720,11 +721,11 @@ function saveTechniqueEditing() {
   scheduleSave();
 }
 
-export function initTechniques({ getState: getStateFn, scheduleSave: scheduleSaveFn, refreshCharacterStats: refreshCharacterStatsFn, pushRollHistory: pushRollHistoryFn }) {
+export function initTechniques({ getState: getStateFn, scheduleSave: scheduleSaveFn, refreshCharacterStats: refreshCharacterStatsFn, showRollToast: showRollToastFn }) {
   _getState = getStateFn;
   _scheduleSave = scheduleSaveFn;
   _refreshCharacterStats = refreshCharacterStatsFn;
-  _pushRollHistory = pushRollHistoryFn;
+  _showRollToast = showRollToastFn;
 
   if (_initialized) {
     applyTechniquesStateToUI();
@@ -851,6 +852,8 @@ export function initTechniques({ getState: getStateFn, scheduleSave: scheduleSav
       // Cast/Use Application
       const castTrigger = e.target?.closest?.("[data-app-cast]");
       if (castTrigger) {
+        e.preventDefault?.();
+        e.stopPropagation?.();
         const state = getState();
         if (!state) return;
         const idx = parseNonNegativeInt(castTrigger.dataset.appCast);
