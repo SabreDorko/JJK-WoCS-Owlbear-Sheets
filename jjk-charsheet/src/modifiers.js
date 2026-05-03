@@ -65,7 +65,7 @@ export function describeModifier(modifier) {
   if (modifier?.kind === "storage") return `${valueWithSign(value)} Storage Slot${Math.abs(value) === 1 ? "" : "s"}`;
   if (modifier?.kind === "stat") return `${valueWithSign(value)} ${statLabel}`;
   if (modifier?.kind === "rolls") return `${valueWithSign(value)} ${statLabel} Rolls`;
-  if (modifier?.kind === "skill") return `${valueWithSign(value)} ${getSkillName(statKey, modifier?.skillIndex)} Substat`;
+  if (modifier?.kind === "skill") return `${valueWithSign(value)} ${getSkillName(statKey, modifier?.skillIndex)}`;
   return "";
 }
 
