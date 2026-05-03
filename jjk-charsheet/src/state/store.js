@@ -66,6 +66,13 @@ export function defaultState() {
   return {
     charName: "", archetype: "", subArchetype: "", age: "",
     grade: "", ct: "", playerName: "",
+    techniques: {
+      mode: "ct",
+      ctAbilities: ["", "", ""],
+      domainAbilities: ["", "", ""],
+      noCtPath: "",
+      notes: "",
+    },
     archetype2: "", subArchetype2: "", hasSecondArchetype: false,
     ac: "", hpCurrent: "", hpMax: "",
     movement: "", ceCurrent: "", ceMax: "", ceNote: "",

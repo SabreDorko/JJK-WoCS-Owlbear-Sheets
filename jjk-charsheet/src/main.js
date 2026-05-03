@@ -21,6 +21,10 @@ import {
   applyCharacterStateToUI,
 } from "./character.js";
 import {
+  initTechniques,
+  applyTechniquesStateToUI,
+} from "./techniques.js";
+import {
   initParty,
   getPartySnapshot,
   renderPartyList,
@@ -73,6 +77,7 @@ function scheduleSave() {
 // ── APPLY STATE TO UI ─────────────────────────────────────────────────────────
 function applyStateToUI() {
   applyCharacterStateToUI();
+  applyTechniquesStateToUI();
 
   renderRollHistory();
   renderPartyList();
@@ -102,6 +107,12 @@ async function init() {
     getState: () => state,
     scheduleSave,
     showRollToast,
+  });
+
+  initTechniques({
+    getState: () => state,
+    scheduleSave,
+    refreshCharacterStats: applyCharacterStateToUI,
   });
 
   // Wire up the rolls module with its dependencies

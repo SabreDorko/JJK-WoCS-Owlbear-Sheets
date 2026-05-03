@@ -1,5 +1,6 @@
 import { ARCHETYPES, CENTER_STATS, RIGHT_STATS } from "./state/store.js";
 import { computeActiveModifierEffects, getRollModifierSources } from "./modifiers.js";
+import { updateTechniquesDerivedUI } from "./techniques.js";
 
 let _getState = null;
 let _scheduleSave = null;
@@ -131,9 +132,10 @@ function applyDerivedCharacterFields({ preserveCurrent = true } = {}) {
   const powerLevel = getEffectiveStatLevel(state, effects, "power");
   const techniqueLevel = getEffectiveStatLevel(state, effects, "technique");
   const speedLevel = getEffectiveStatLevel(state, effects, "speed");
+  const domainCtBonus = state?.techniques?.mode === "domain" ? 10 : 0;
 
   const nextHpMax = Math.max(1, 10 + (powerLevel * 5));
-  const nextCeMax = Math.max(1, 15 + (techniqueLevel * 5));
+  const nextCeMax = Math.max(1, 15 + (techniqueLevel * 5) + domainCtBonus);
   const nextAc = Math.max(0, techniqueLevel + speedLevel + (effects.acBonus || 0));
   const nextMovement = Math.max(0, 30 + (speedLevel * 5) + (effects.movementBonus || 0));
 
@@ -184,6 +186,7 @@ export function updateBlackFlashRangeDisplay() {
 
   valueEl.textContent = String(range);
   noteEl.textContent = `Technique ${tech}`;
+  updateTechniquesDerivedUI(state);
 }
 
 export function renderStats() {
@@ -482,6 +485,7 @@ export function applyCharacterStateToUI() {
 
   renderStats();
   updateBlackFlashRangeDisplay();
+  updateTechniquesDerivedUI(state);
   applyOverrideFieldReadOnlyState();
   updateOverrideButtonUI();
   ensureDerivedOverrideMarker("acInput", "ac");

@@ -15,7 +15,7 @@
     <div class="tab active" data-tab="character">Character</div>
     <div class="tab" data-tab="inventory">Inventory</div>
     <div class="tab disabled" data-tab="combat">Combat<span class="tab-soon">soon</span></div>
-    <div class="tab disabled" data-tab="techniques">Techniques<span class="tab-soon">soon</span></div>
+    <div class="tab" data-tab="techniques">Techniques</div>
     <div class="tab" data-tab="party">Party</div>
   </div>
 
@@ -391,9 +391,118 @@
       </div>
     </div>
     <div class="tab-panel" id="panel-techniques">
-      <div class="soon-panel">
-        <div class="soon-kanji">呪</div>
-        <div class="soon-text">Techniques — Coming Soon</div>
+      <div class="techniques-layout">
+        <div class="techniques-card">
+          <div class="techniques-card-title">Technique Type</div>
+          <div class="techniques-mode-grid" role="radiogroup" aria-label="Technique mode">
+            <label class="techniques-mode-option">
+              <input type="radio" name="techniqueMode" id="techniqueModeCt" value="ct" />
+              <span>Cursed Technique</span>
+            </label>
+            <label class="techniques-mode-option">
+              <input type="radio" name="techniqueMode" id="techniqueModeDomain" value="domain" />
+              <span>Domain-Based Cursed Technique</span>
+            </label>
+            <label class="techniques-mode-option">
+              <input type="radio" name="techniqueMode" id="techniqueModeNone" value="none" />
+              <span>No Cursed Technique</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="techniques-card" id="techniquesCtSection">
+          <div class="techniques-card-title">Cursed Technique Setup</div>
+          <label class="techniques-field" for="techniqueNameInput">
+            <span class="field-label">Technique Name</span>
+            <input id="techniqueNameInput" class="meta-input" placeholder="Limitless, Boogie Woogie, Blood Manipulation..." />
+          </label>
+
+          <div class="techniques-ability-grid">
+            <label class="techniques-field" for="ctAbilityInput1">
+              <span class="field-label">CT Ability 1</span>
+              <input id="ctAbilityInput1" class="meta-input" placeholder="Basic application" />
+            </label>
+            <label class="techniques-field" for="ctAbilityInput2">
+              <span class="field-label">CT Ability 2</span>
+              <input id="ctAbilityInput2" class="meta-input" placeholder="Second application" />
+            </label>
+            <label class="techniques-field" for="ctAbilityInput3">
+              <span class="field-label">CT Ability 3</span>
+              <input id="ctAbilityInput3" class="meta-input" placeholder="Advanced application" />
+            </label>
+          </div>
+          <div id="techniquesCapacityWarning" class="techniques-warning" style="display:none;"></div>
+          <div class="techniques-muted">Starting characters can have up to 3 CT abilities based on Technique level.</div>
+        </div>
+
+        <div class="techniques-card" id="techniquesDomainSection" style="display:none;">
+          <div class="techniques-card-title">Domain Abilities</div>
+          <div class="techniques-muted">Domain-based CT gives +10 CE max and lets you access domain abilities earlier, but outside-domain CT abilities are limited by Technique level.</div>
+          <div class="techniques-ability-grid">
+            <label class="techniques-field" for="domainAbilityInput1">
+              <span class="field-label">Domain Ability 1</span>
+              <input id="domainAbilityInput1" class="meta-input" placeholder="Sure-hit effect" />
+            </label>
+            <label class="techniques-field" for="domainAbilityInput2">
+              <span class="field-label">Domain Ability 2</span>
+              <input id="domainAbilityInput2" class="meta-input" placeholder="Barrier interaction" />
+            </label>
+            <label class="techniques-field" for="domainAbilityInput3">
+              <span class="field-label">Domain Ability 3</span>
+              <input id="domainAbilityInput3" class="meta-input" placeholder="Domain expansion feature" />
+            </label>
+          </div>
+        </div>
+
+        <div class="techniques-card" id="techniquesNoCtSection" style="display:none;">
+          <div class="techniques-card-title">No Cursed Technique Path</div>
+          <label class="techniques-field" for="noCtPathSelect">
+            <span class="field-label">Starting Benefit</span>
+            <select id="noCtPathSelect" class="meta-select">
+              <option value="">- Choose a path -</option>
+              <option value="extra-skills">Two extra grade 4-3 jujutsu skills (non Black Flash/NSS)</option>
+              <option value="unique-tool">Unique cursed tool equal to your grade</option>
+              <option value="ce-trait">Natural CE trait</option>
+              <option value="cursed-corpse">Start with a cursed corpse and taught commands</option>
+              <option value="nss-batto">Start with NSS Batto Sword Draw and Instant Draw</option>
+            </select>
+          </label>
+          <div class="techniques-muted">Skill table picks can be wired later when you are ready for Skills and Training.</div>
+        </div>
+
+        <div class="techniques-card">
+          <div class="techniques-card-title">Sorcerer Experience</div>
+          <div class="techniques-rules-grid">
+            <div class="techniques-rule-chip">
+              <span class="techniques-rule-label">Technique Level</span>
+              <strong id="techniqueLevelValue">0</strong>
+            </div>
+            <div class="techniques-rule-chip">
+              <span class="techniques-rule-label">Starting CT Ability Cap</span>
+              <strong id="ctAbilityCapValue">0</strong>
+            </div>
+            <div class="techniques-rule-chip">
+              <span class="techniques-rule-label">Outside-Domain Cap</span>
+              <strong id="domainOutsideCapValue">0</strong>
+            </div>
+            <div class="techniques-rule-chip">
+              <span class="techniques-rule-label">Talent Auto-Success</span>
+              <strong id="talentAutoValue">&lt; 0</strong>
+            </div>
+            <div class="techniques-rule-chip">
+              <span class="techniques-rule-label">Domain CE Bonus</span>
+              <strong id="domainCeValue">+10</strong>
+            </div>
+          </div>
+          <div class="techniques-muted">If a talent check DC is below Technique x 2, it automatically succeeds and does not require a roll.</div>
+        </div>
+
+        <div class="techniques-card">
+          <label class="techniques-field" for="techniqueNotesInput">
+            <span class="field-label">Technique Notes / DM Rulings</span>
+            <textarea id="techniqueNotesInput" class="inventory-textarea" rows="4" maxlength="500" placeholder="Record limits, edge cases, and rulings after playtesting your technique."></textarea>
+          </label>
+        </div>
       </div>
     </div>
     <div class="tab-panel" id="panel-party">
