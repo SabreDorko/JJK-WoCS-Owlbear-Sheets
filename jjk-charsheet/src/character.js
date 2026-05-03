@@ -96,12 +96,16 @@ function setInputValueWithPulse(inputEl, nextValue) {
   const next = String(nextValue ?? "");
   if (inputEl.value === next) {
     inputEl.value = next;
+    inputEl.classList.remove("stat-derived-pulse");
     return;
   }
   inputEl.value = next;
   inputEl.classList.remove("stat-derived-pulse");
   void inputEl.offsetWidth;
   inputEl.classList.add("stat-derived-pulse");
+  inputEl.addEventListener("animationend", () => {
+    inputEl.classList.remove("stat-derived-pulse");
+  }, { once: true });
 }
 
 function getEffectiveStatLevel(state, effects, statKey) {

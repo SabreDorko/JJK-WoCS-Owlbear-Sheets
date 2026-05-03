@@ -766,14 +766,14 @@
       height: 12px;
     }
     .skill-dot.permanent::after {
-      content: "★";
+      content: "✦";
       position: absolute;
       inset: 0;
       display: flex;
       align-items: center;
       justify-content: center;
       color: var(--ink);
-      font-size: 10px;
+      font-size: 11px;
       line-height: 1;
       transform: translateY(-0.2px);
     }
@@ -950,12 +950,17 @@
       width: 21px;
       height: 21px;
       min-width: 21px;
-      border-radius: 50%;
+      border-radius: 0;
       padding: 0;
       line-height: 1;
       display: inline-flex;
       align-items: center;
       justify-content: center;
+      border: none;
+      background: transparent;
+    }
+    .inventory-yen-adjust-btn:hover {
+      color: var(--accent);
     }
     .inventory-yen-adjust-icon {
       width: 16px;
@@ -1545,14 +1550,18 @@
       width: 16px;
       height: 16px;
       min-width: 16px;
-      border-radius: 50%;
+      border-radius: 0;
       padding: 0;
-      border-width: 1px;
+      border: none;
+      background: transparent;
       font-size: 0;
       line-height: 0;
       display: inline-flex;
       align-items: center;
       justify-content: center;
+    }
+    .inventory-amount-adjust-btn:hover {
+      color: var(--accent);
     }
     .inventory-body-col .inventory-amount-adjust-btn {
       width: 16px;
