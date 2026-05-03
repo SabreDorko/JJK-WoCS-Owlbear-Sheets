@@ -911,6 +911,35 @@
     }
     .jujutsu-subpanel { display: none; }
     .jujutsu-subpanel.active { display: block; padding-top: 8px; }
+    #techniqueSummaryCard {
+      position: relative;
+      padding-right: 32px;
+    }
+    .technique-edit-icon-btn {
+      position: absolute;
+      top: 0;
+      right: 0;
+      width: 24px;
+      height: 24px;
+      border: 1px solid var(--border-strong);
+      background: rgba(240, 235, 224, 0.9);
+      color: var(--ink);
+      font-size: 14px;
+      line-height: 1;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      padding: 0;
+    }
+    .technique-edit-icon-btn:hover {
+      border-color: var(--ink);
+      color: var(--accent);
+    }
+    .technique-edit-icon-btn:focus-visible {
+      outline: 1px solid var(--accent);
+      outline-offset: 1px;
+    }
     .technique-summary-text {
       font-family: 'Crimson Text', serif;
       font-size: 18px;
@@ -926,7 +955,7 @@
     }
     .techniques-app-card-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(140px, 140px));
+      grid-template-columns: repeat(auto-fill, minmax(170px, 170px));
       gap: 7px;
       justify-content: start;
       margin-bottom: 8px;
@@ -935,7 +964,7 @@
       border: 1px solid var(--border-strong);
       background: rgba(240, 235, 224, 0.75);
       padding: 6px;
-      min-height: 76px;
+      min-height: 92px;
       aspect-ratio: 1 / 1;
       overflow: hidden;
     }
@@ -1897,7 +1926,7 @@
       .inventory-form-grid { grid-template-columns: 1fr; }
       .slot-option-grid { grid-template-columns: 1fr; }
       .techniques-layout { grid-template-columns: 1fr; }
-      .techniques-app-card-grid { grid-template-columns: repeat(auto-fill, minmax(124px, 124px)); }
+      .techniques-app-card-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 150px)); }
     }
 
     /* ── PARTY TAB ── */

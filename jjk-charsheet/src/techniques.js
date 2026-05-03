@@ -26,6 +26,21 @@ function parseNonNegativeInt(rawValue) {
   return Math.max(0, parsed);
 }
 
+function createDefaultApplication(index) {
+  return {
+    title: `Application ${index + 1}`,
+    description: "",
+    ceCost: 0,
+  };
+}
+
+function createDefaultBindingVow(index) {
+  return {
+    title: `Vow ${index + 1}`,
+    details: "",
+  };
+}
+
 function normalizeApplication(raw, index) {
   const fallbackTitle = `Application ${index + 1}`;
   const title = String(raw?.title || "").trim();
@@ -38,6 +53,16 @@ function normalizeApplication(raw, index) {
   };
 }
 
+function normalizeBindingVow(raw, index) {
+  const fallbackTitle = `Vow ${index + 1}`;
+  const title = String(raw?.title || "").trim();
+  const details = String(raw?.details || "").trim();
+  return {
+    title: title || fallbackTitle,
+    details,
+  };
+}
+
 function ensureTechniquesState(state) {
   if (!state || typeof state !== "object") return;
   if (!state.techniques || typeof state.techniques !== "object") state.techniques = {};
@@ -46,6 +71,7 @@ function ensureTechniquesState(state) {
   if (!["ct", "domain", "none"].includes(techniques.mode)) techniques.mode = "none";
   if (!JUJUTSU_SUBTABS.has(techniques.activeSubtab)) techniques.activeSubtab = "technique";
   if (!Array.isArray(techniques.applications)) techniques.applications = [];
+  if (!Array.isArray(techniques.bindingVows)) techniques.bindingVows = [];
 
   if (!techniques.applications.length) {
     const legacyCt = Array.isArray(techniques.ctAbilities) ? techniques.ctAbilities : [];
@@ -58,9 +84,23 @@ function ensureTechniquesState(state) {
   }
 
   techniques.applications = techniques.applications.map((entry, idx) => normalizeApplication(entry, idx));
+  techniques.bindingVows = techniques.bindingVows.map((entry, idx) => normalizeBindingVow(entry, idx));
+
+  // CT/Domain should always start with one editable application slot.
+  if (techniques.mode !== "none" && techniques.applications.length === 0) {
+    techniques.applications = [createDefaultApplication(0)];
+  }
+
   techniques.noCtPath = String(techniques.noCtPath || "");
   techniques.notes = String(techniques.notes || "");
   techniques.bindingVowsNotes = String(techniques.bindingVowsNotes || "");
+
+  if (!techniques.bindingVows.length && techniques.bindingVowsNotes.trim()) {
+    techniques.bindingVows = [{
+      title: "Vow 1",
+      details: techniques.bindingVowsNotes.trim(),
+    }];
+  }
 }
 
 function getActiveSubtab(state) {
@@ -186,6 +226,37 @@ function renderApplicationsEditor(state) {
   }).join("");
 }
 
+function renderBindingVowsEditor(state) {
+  const list = document.getElementById("bindingVowsList");
+  if (!list) return;
+
+  const vows = Array.isArray(state?.techniques?.bindingVows) ? state.techniques.bindingVows : [];
+  if (!vows.length) {
+    list.innerHTML = '<div class="techniques-app-empty">No Vows Made.</div>';
+    return;
+  }
+
+  list.innerHTML = vows.map((vow, idx) => {
+    const normalized = normalizeBindingVow(vow, idx);
+    return `
+      <div class="techniques-app-editor-item">
+        <div class="techniques-app-editor-item-head">
+          <span class="field-label">Vow ${idx + 1}</span>
+          <button type="button" class="inventory-secondary-btn techniques-app-remove-btn" data-vow-remove="${idx}">Remove</button>
+        </div>
+        <label class="techniques-field" for="bindingVowTitle${idx}">
+          <span class="field-label">Title</span>
+          <input id="bindingVowTitle${idx}" class="meta-input" data-vow-title="${idx}" value="${normalized.title}" />
+        </label>
+        <label class="techniques-field" for="bindingVowDetails${idx}">
+          <span class="field-label">Details</span>
+          <textarea id="bindingVowDetails${idx}" class="inventory-textarea" rows="4" maxlength="700" data-vow-details="${idx}">${normalized.details}</textarea>
+        </label>
+      </div>
+    `;
+  }).join("");
+}
+
 function setEditorVisibility() {
   const summaryCard = document.getElementById("techniqueSummaryCard");
   const editor = document.getElementById("techniqueEditor");
@@ -270,10 +341,8 @@ export function applyTechniquesStateToUI() {
   const notes = document.getElementById("techniqueNotesInput");
   if (notes) notes.value = state.techniques.notes || "";
 
-  const bindingVowsNotesInput = document.getElementById("bindingVowsNotesInput");
-  if (bindingVowsNotesInput) bindingVowsNotesInput.value = state.techniques.bindingVowsNotes || "";
-
   renderApplicationsEditor(state);
+  renderBindingVowsEditor(state);
 
   setJujutsuSubtabUI(getActiveSubtab(state));
 
@@ -405,11 +474,7 @@ export function initTechniques({ getState: getStateFn, scheduleSave: scheduleSav
       const state = getState();
       if (!state) return;
       ensureTechniquesState(state);
-      state.techniques.applications.push({
-        title: `Application ${state.techniques.applications.length + 1}`,
-        description: "",
-        ceCost: 0,
-      });
+      state.techniques.applications.push(createDefaultApplication(state.techniques.applications.length));
       renderApplicationsEditor(state);
       updateTechniquesDerivedUI(state);
       scheduleSave();
@@ -478,13 +543,48 @@ export function initTechniques({ getState: getStateFn, scheduleSave: scheduleSav
     });
   }
 
-  const bindingVowsNotesInput = document.getElementById("bindingVowsNotesInput");
-  if (bindingVowsNotesInput) {
-    bindingVowsNotesInput.addEventListener("input", e => {
+  const addBindingVowBtn = document.getElementById("addBindingVowBtn");
+  if (addBindingVowBtn) {
+    addBindingVowBtn.addEventListener("click", () => {
       const state = getState();
       if (!state) return;
       ensureTechniquesState(state);
-      state.techniques.bindingVowsNotes = String(e.target.value || "");
+      state.techniques.bindingVows.push(createDefaultBindingVow(state.techniques.bindingVows.length));
+      renderBindingVowsEditor(state);
+      scheduleSave();
+    });
+  }
+
+  const bindingVowsList = document.getElementById("bindingVowsList");
+  if (bindingVowsList) {
+    bindingVowsList.addEventListener("input", e => {
+      const state = getState();
+      if (!state) return;
+      ensureTechniquesState(state);
+
+      const titleIdx = parseNonNegativeInt(e.target?.dataset?.vowTitle);
+      const detailsIdx = parseNonNegativeInt(e.target?.dataset?.vowDetails);
+
+      if (e.target?.dataset?.vowTitle !== undefined && state.techniques.bindingVows[titleIdx]) {
+        state.techniques.bindingVows[titleIdx].title = String(e.target.value || "");
+      }
+      if (e.target?.dataset?.vowDetails !== undefined && state.techniques.bindingVows[detailsIdx]) {
+        state.techniques.bindingVows[detailsIdx].details = String(e.target.value || "");
+      }
+
+      scheduleSave();
+    });
+
+    bindingVowsList.addEventListener("click", e => {
+      const removeIdxRaw = e.target?.dataset?.vowRemove;
+      if (removeIdxRaw === undefined) return;
+      const state = getState();
+      if (!state) return;
+      ensureTechniquesState(state);
+      const removeIdx = parseNonNegativeInt(removeIdxRaw);
+      state.techniques.bindingVows.splice(removeIdx, 1);
+      state.techniques.bindingVows = state.techniques.bindingVows.map((entry, idx) => normalizeBindingVow(entry, idx));
+      renderBindingVowsEditor(state);
       scheduleSave();
     });
   }

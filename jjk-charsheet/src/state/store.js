@@ -70,6 +70,7 @@ export function defaultState() {
       mode: "none",
       activeSubtab: "technique",
       applications: [],
+      bindingVows: [],
       noCtPath: "",
       notes: "",
       bindingVowsNotes: "",

@@ -400,10 +400,10 @@
 
         <div class="jujutsu-subpanel active" id="jujutsuSubpanelTechnique" data-subpanel="technique" role="tabpanel">
           <div id="techniqueSummaryCard">
+            <button class="technique-edit-icon-btn" id="techniqueEditBtn" type="button" aria-label="Edit Technique" title="Edit Technique">&#9998;</button>
             <div class="technique-summary-text" id="techniqueSummaryText">No technique.</div>
             <div class="technique-type-summary" id="techniqueTypeSummary"><em>No Cursed Technique</em></div>
             <div class="techniques-app-card-grid" id="techniqueApplicationsSummary"></div>
-            <button class="meta-toggle-btn" id="techniqueEditBtn" type="button">Edit Technique</button>
           </div>
 
           <div id="techniqueEditor" style="display:none;">
@@ -490,11 +490,12 @@
         <div class="jujutsu-subpanel" id="jujutsuSubpanelVows" data-subpanel="vows" role="tabpanel">
           <div class="techniques-card">
             <div class="techniques-card-title">Binding Vows</div>
-            <label class="techniques-field" for="bindingVowsNotesInput">
-              <span class="field-label">Vows / Restrictions / Conditions</span>
-              <textarea id="bindingVowsNotesInput" class="inventory-textarea" rows="6" maxlength="700" placeholder="Record your vow terms, conditions, and reward effects here."></textarea>
-            </label>
-            <div class="techniques-muted">Track both what is sacrificed and what benefit is gained.</div>
+            <div class="techniques-app-editor-header">
+              <span class="field-label">Vows</span>
+              <button class="inventory-mini-btn" id="addBindingVowBtn" type="button">Make a Vow</button>
+            </div>
+            <div class="techniques-app-editor-list" id="bindingVowsList"></div>
+            <div class="techniques-muted">Track what is sacrificed and what benefit is gained for each vow.</div>
           </div>
         </div>
       </div>
