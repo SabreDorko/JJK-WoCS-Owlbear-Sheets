@@ -242,7 +242,12 @@ function renderBindingVowsEditor(state) {
       <div class="techniques-app-editor-item">
         <div class="techniques-app-editor-item-head">
           <span class="field-label">Vow ${idx + 1}</span>
-          <button type="button" class="inventory-secondary-btn techniques-app-remove-btn" data-vow-remove="${idx}">Remove</button>
+          <button type="button" class="inventory-mini-btn inventory-icon-btn danger" data-vow-remove="${idx}" aria-label="Delete vow" title="Delete vow">
+            <svg class="inventory-icon-trash" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <path fill="currentColor" d="M9 3h6a1 1 0 0 1 1 1v1h4v2h-1l-1 12a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 7H4V5h4V4a1 1 0 0 1 1-1Zm1 2v0h4V5h-4Zm-1 4h2v9H9V9Zm4 0h2v9h-2V9Z"/>
+              <path fill="none" stroke="currentColor" stroke-width="1.5" d="M6 7.5h12"/>
+            </svg>
+          </button>
         </div>
         <label class="techniques-field" for="bindingVowTitle${idx}">
           <span class="field-label">Title</span>
@@ -576,7 +581,8 @@ export function initTechniques({ getState: getStateFn, scheduleSave: scheduleSav
     });
 
     bindingVowsList.addEventListener("click", e => {
-      const removeIdxRaw = e.target?.dataset?.vowRemove;
+      const removeTrigger = e.target?.closest?.("[data-vow-remove]");
+      const removeIdxRaw = removeTrigger?.dataset?.vowRemove;
       if (removeIdxRaw === undefined) return;
       const state = getState();
       if (!state) return;

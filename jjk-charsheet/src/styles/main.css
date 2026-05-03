@@ -921,8 +921,8 @@
       right: 0;
       width: 24px;
       height: 24px;
-      border: 1px solid var(--border-strong);
-      background: rgba(240, 235, 224, 0.9);
+      border: none;
+      background: transparent;
       color: var(--ink);
       font-size: 14px;
       line-height: 1;
@@ -931,9 +931,9 @@
       justify-content: center;
       cursor: pointer;
       padding: 0;
+      transform: scaleX(-1);
     }
     .technique-edit-icon-btn:hover {
-      border-color: var(--ink);
       color: var(--accent);
     }
     .technique-edit-icon-btn:focus-visible {
@@ -955,18 +955,18 @@
     }
     .techniques-app-card-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(170px, 170px));
+      grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 7px;
-      justify-content: start;
+      align-items: stretch;
       margin-bottom: 8px;
     }
     .techniques-app-card {
       border: 1px solid var(--border-strong);
       background: rgba(240, 235, 224, 0.75);
       padding: 6px;
-      min-height: 92px;
-      aspect-ratio: 1 / 1;
-      overflow: hidden;
+      min-height: 110px;
+      height: 100%;
+      overflow: auto;
     }
     .techniques-app-card-title {
       font-family: 'Cinzel', serif;
@@ -1061,6 +1061,13 @@
       align-items: center;
       justify-content: space-between;
       gap: 6px;
+    }
+    .binding-vows-shell {
+      display: grid;
+      gap: 8px;
+    }
+    .binding-vows-header {
+      justify-content: flex-end;
     }
     .techniques-app-editor-list {
       display: grid;
@@ -1926,7 +1933,7 @@
       .inventory-form-grid { grid-template-columns: 1fr; }
       .slot-option-grid { grid-template-columns: 1fr; }
       .techniques-layout { grid-template-columns: 1fr; }
-      .techniques-app-card-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 150px)); }
+      .techniques-app-card-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     }
 
     /* ── PARTY TAB ── */
