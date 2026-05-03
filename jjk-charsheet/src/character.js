@@ -624,6 +624,18 @@ export function initCharacter({ getState: getStateFn, scheduleSave: scheduleSave
   bindField("subArchetypeSelect", "subArchetype");
   bindField("subArchetypeSelect2", "subArchetype2");
 
+  // Special handling for sorcererXp and ceCurrent to refresh application cards
+  const sorcererXpInput = document.getElementById("sorcererXpInput");
+  if (sorcererXpInput) {
+    sorcererXpInput.addEventListener("input", () => updateTechniquesDerivedUI());
+    sorcererXpInput.addEventListener("change", () => updateTechniquesDerivedUI());
+  }
+  const ceCurrentInput = document.getElementById("ceCurrent");
+  if (ceCurrentInput) {
+    ceCurrentInput.addEventListener("input", () => updateTechniquesDerivedUI());
+    ceCurrentInput.addEventListener("change", () => updateTechniquesDerivedUI());
+  }
+
   wireDerivedOverrideInput("acInput", "ac");
   wireDerivedOverrideInput("hpMax", "hpMax");
   wireDerivedOverrideInput("ceMax", "ceMax");
