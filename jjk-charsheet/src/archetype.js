@@ -1,6 +1,7 @@
 let _getState = null;
 let _scheduleSave = null;
 let _initialized = false;
+const _expandedAbilityDescriptions = new Set();
 
 const MAX_ABILITY_SLOTS = 5;
 
@@ -221,6 +222,31 @@ function selectedArchetypeEntries(state) {
   return entries;
 }
 
+function getAbilityDefinition(archetypeKey, abilityId) {
+  const rule = ARCHETYPE_RULES[archetypeKey];
+  if (!rule) return null;
+
+  const shared = rule.sharedAbilities.find(item => item.id === abilityId);
+  if (shared) return { ...shared, source: "shared" };
+
+  for (const [subName, subDef] of Object.entries(rule.subclassAbilities || {})) {
+    if (subDef?.tier1?.id === abilityId) return { ...subDef.tier1, tier: 1, source: `sub:${subName}` };
+    if (subDef?.tier5?.id === abilityId) return { ...subDef.tier5, tier: 5, source: `sub:${subName}` };
+  }
+
+  return null;
+}
+
+function hasHigherTierInSlots(unlockedSet, archetypeKey, tier) {
+  return [...unlockedSet].some(globalId => {
+    const [archKey, abilityId] = String(globalId || "").split(":");
+    if (archKey !== archetypeKey) return false;
+    const def = getAbilityDefinition(archKey, abilityId);
+    if (!def || !Number.isFinite(def.tier)) return false;
+    return def.tier > tier;
+  });
+}
+
 function getTieredAbilities(archetypeKey, selectedSub) {
   const rule = ARCHETYPE_RULES[archetypeKey];
   if (!rule) return [];
@@ -291,7 +317,7 @@ function renderArchetypeSummary(state) {
     const slotSummary = getSlotSummary(state);
     rulesSummary.innerHTML = `
       <div class="archetype-slot-pill">Ability Slots: ${slotSummary.usedSlots}/${slotSummary.unlockedSlots} used (${slotSummary.openSlots} open)</div>
-      <div class="archetype-rule-note">You have 5 base slots. Unlock in tier order (1-5) within each archetype tree.</div>
+      <div class="archetype-rule-note">You have 5 base slots. Add abilities in tier order (1-5) within each archetype tree.</div>
     `;
   }
 }
@@ -300,43 +326,81 @@ function renderBenefits(state) {
   const benefitsList = document.getElementById("archetypeBenefitsList");
   if (!benefitsList) return;
 
-  const selected = selectedArchetypeEntries(state);
-  if (!selected.length) {
+  if (!state.archetype) {
     benefitsList.innerHTML = '<div class="techniques-app-empty">Pick archetypes on this tab to view permanent aptitudes and starting equipment.</div>';
     return;
   }
 
-  benefitsList.innerHTML = selected.map(entry => {
-    const rule = ARCHETYPE_RULES[entry.key];
-    if (!rule) {
-      return `
-        <article class="archetype-benefit-card">
-          <div class="archetype-benefit-title">${getArchetypeLabel(entry.key)}</div>
-          <div class="techniques-muted">No predefined data yet. Add this archetype to ARCHETYPE_RULES in archetype.js.</div>
-        </article>
-      `;
-    }
-
-    const aptitudes = rule.permanentAptitudes.map(item => `<li>${item}</li>`).join("");
-    const equipment = rule.startingEquipment.map(item => `<li>${item}</li>`).join("");
-
-    return `
+  const rule = ARCHETYPE_RULES[state.archetype];
+  if (!rule) {
+    benefitsList.innerHTML = `
       <article class="archetype-benefit-card">
-        <div class="archetype-benefit-title">${rule.label}</div>
-        <div class="archetype-benefit-sub">Scales with ${toTitleCase(rule.scaleStat)}</div>
-        <div class="archetype-benefit-grid">
-          <div>
-            <div class="field-label">Permanent Aptitudes</div>
-            <ul class="archetype-mini-list">${aptitudes}</ul>
-          </div>
-          <div>
-            <div class="field-label">Starting Equipment</div>
-            <ul class="archetype-mini-list">${equipment}</ul>
-          </div>
-        </div>
+        <div class="archetype-benefit-title">${getArchetypeLabel(state.archetype)}</div>
+        <div class="techniques-muted">No predefined data yet. Add this archetype to ARCHETYPE_RULES in archetype.js.</div>
       </article>
     `;
-  }).join("");
+    return;
+  }
+
+  const aptitudes = rule.permanentAptitudes.map(item => `<li>${item}</li>`).join("");
+  const equipment = rule.startingEquipment.map(item => `<li>${item}</li>`).join("");
+
+  benefitsList.innerHTML = `
+    <article class="archetype-benefit-card">
+      <div class="archetype-benefit-title">${rule.label}</div>
+      <div class="archetype-benefit-sub">Scales with ${toTitleCase(rule.scaleStat)}</div>
+      <div class="archetype-benefit-grid">
+        <div>
+          <div class="field-label">Permanent Aptitudes</div>
+          <ul class="archetype-mini-list">${aptitudes}</ul>
+        </div>
+        <div>
+          <div class="field-label">Starting Equipment</div>
+          <ul class="archetype-mini-list">${equipment}</ul>
+        </div>
+      </div>
+      <div class="techniques-muted">Only your first archetype grants starting aptitudes and starting equipment.</div>
+    </article>
+  `;
+}
+
+function renderAbilitySlots(state) {
+  const grid = document.getElementById("archetypeAbilitySlots");
+  if (!grid) return;
+
+  const unlocked = Array.isArray(state?.archetypeProgress?.unlockedAbilityIds)
+    ? state.archetypeProgress.unlockedAbilityIds
+    : [];
+
+  const cards = [];
+  for (let i = 0; i < MAX_ABILITY_SLOTS; i += 1) {
+    const globalId = unlocked[i] || "";
+    if (!globalId) {
+      cards.push(`
+        <article class="archetype-slot-item archetype-slot-item--empty">
+          <div class="archetype-slot-index">Slot ${i + 1}</div>
+          <div class="techniques-muted">Empty</div>
+        </article>
+      `);
+      continue;
+    }
+
+    const [archKey, abilityId] = globalId.split(":");
+    const rule = ARCHETYPE_RULES[archKey];
+    const def = getAbilityDefinition(archKey, abilityId);
+    const canRemove = def ? !hasHigherTierInSlots(new Set(unlocked), archKey, def.tier) : true;
+
+    cards.push(`
+      <article class="archetype-slot-item">
+        <div class="archetype-slot-index">Slot ${i + 1}</div>
+        <div class="archetype-slot-name">${def?.name || abilityId}</div>
+        <div class="archetype-slot-meta">${rule?.label || toTitleCase(archKey)} · Tier ${def?.tier || "?"}</div>
+        <button type="button" class="inventory-secondary-btn archetype-slot-remove" data-slot-remove="${globalId}"${canRemove ? "" : " disabled"}>Remove</button>
+      </article>
+    `);
+  }
+
+  grid.innerHTML = cards.join("");
 }
 
 function renderAbilityTree(state) {
@@ -368,15 +432,18 @@ function renderAbilityTree(state) {
 
     const rows = abilities.map((ability, idx) => {
       const globalId = ability.id ? abilityGlobalId(entry.key, ability.id) : "";
-      const unlocked = ability.id ? hasUnlocked(state, globalId) : false;
+      const added = ability.id ? hasUnlocked(state, globalId) : false;
       const previous = idx > 0 ? abilities[idx - 1] : null;
       const previousMet = idx === 0
         ? true
         : Boolean(previous?.id) && hasUnlocked(state, abilityGlobalId(entry.key, previous.id));
       const statMet = currentStat >= (ability.minStat || 0);
-      const slotsMet = unlocked || slotSummary.openSlots > 0;
-      const canUnlock = ability.id && !unlocked && previousMet && statMet && slotsMet;
-      const canRelock = ability.id && unlocked && !hasHigherTierUnlocked(state, entry.key, selectedSub, ability.tier);
+      const slotsMet = added || slotSummary.openSlots > 0;
+      const canAdd = ability.id && !added && previousMet && statMet && slotsMet;
+      const descKey = ability.id
+        ? `${entry.key}:${ability.id}`
+        : `${entry.key}:tier-${ability.tier}:${selectedSub || "none"}`;
+      const isExpanded = _expandedAbilityDescriptions.has(descKey);
 
       const statusText = ability.subLocked
         ? "Locked: choose a sub-archetype"
@@ -386,25 +453,29 @@ function renderAbilityTree(state) {
             ? `Locked: need ${toTitleCase(rule.scaleStat)} ${ability.minStat}`
             : !slotsMet
               ? "Locked: no open ability slot"
-              : unlocked
-                ? "Unlocked"
-                : "Ready to unlock";
+              : added
+                ? "Added"
+                : "Ready to add";
 
       return `
-        <div class="archetype-ability-row${unlocked ? " unlocked" : ""}">
+        <div class="archetype-ability-row${added ? " unlocked" : ""}">
           <div class="archetype-ability-row-head">
             <div>
               <div class="archetype-ability-name">Tier ${ability.tier}: ${ability.name}</div>
               <div class="archetype-ability-meta">${toTitleCase(rule.scaleStat)} ${ability.minStat}+${ability.tier === 1 || ability.tier === 5 ? " · Sub-Archetype" : " · Shared"}</div>
             </div>
             <div class="archetype-ability-controls">
-              ${unlocked
-                ? `<button type="button" class="inventory-secondary-btn" data-ability-toggle="${globalId}"${canRelock ? "" : " disabled"}>Relock</button>`
-                : `<button type="button" class="meta-toggle-btn" data-ability-toggle="${globalId}"${canUnlock ? "" : " disabled"}>Unlock</button>`}
+              ${added
+                ? `<button type="button" class="inventory-secondary-btn" disabled>Added</button>`
+                : `<button type="button" class="meta-toggle-btn" data-ability-add="${globalId}"${canAdd ? "" : " disabled"}>Add</button>`}
             </div>
           </div>
           <div class="archetype-ability-status">${statusText}</div>
-          <div class="archetype-ability-notes">${ability.notes || ""}</div>
+          <button type="button" class="archetype-desc-toggle" data-ability-desc-toggle="${descKey}" aria-expanded="${isExpanded ? "true" : "false"}">
+            <span class="archetype-desc-chevron">${isExpanded ? "▾" : "▸"}</span>
+            <span>Description</span>
+          </button>
+          <div class="archetype-ability-notes${isExpanded ? " open" : ""}">${ability.notes || ""}</div>
         </div>
       `;
     }).join("");
@@ -419,7 +490,7 @@ function renderAbilityTree(state) {
   }).join("");
 }
 
-function toggleAbility(globalId) {
+function addAbilityToSlots(globalId) {
   const state = getState();
   if (!state) return;
   ensureArchetypeState(state);
@@ -437,28 +508,45 @@ function toggleAbility(globalId) {
   if (!ability) return;
 
   const unlockedSet = new Set(state.archetypeProgress.unlockedAbilityIds);
-  const currentlyUnlocked = unlockedSet.has(globalId);
+  if (unlockedSet.has(globalId)) return;
 
-  if (currentlyUnlocked) {
-    if (hasHigherTierUnlocked(state, archetypeKey, selectedSub, ability.tier)) return;
-    unlockedSet.delete(globalId);
-  } else {
-    const slotSummary = getSlotSummary(state);
-    const abilityIndex = abilities.findIndex(item => item.id === abilityId);
-    if (abilityIndex < 0) return;
+  const slotSummary = getSlotSummary(state);
+  const abilityIndex = abilities.findIndex(item => item.id === abilityId);
+  if (abilityIndex < 0) return;
 
-    const previous = abilityIndex > 0 ? abilities[abilityIndex - 1] : null;
-    const previousMet = abilityIndex === 0
-      ? true
-      : Boolean(previous?.id) && unlockedSet.has(abilityGlobalId(archetypeKey, previous.id));
-    const statMet = statScore(state, ARCHETYPE_RULES[archetypeKey].scaleStat) >= (ability.minStat || 0);
+  const previous = abilityIndex > 0 ? abilities[abilityIndex - 1] : null;
+  const previousMet = abilityIndex === 0
+    ? true
+    : Boolean(previous?.id) && unlockedSet.has(abilityGlobalId(archetypeKey, previous.id));
+  const statMet = statScore(state, ARCHETYPE_RULES[archetypeKey].scaleStat) >= (ability.minStat || 0);
 
-    if (!previousMet || !statMet || slotSummary.openSlots <= 0) return;
-    unlockedSet.add(globalId);
-  }
+  if (!previousMet || !statMet || slotSummary.openSlots <= 0) return;
+  unlockedSet.add(globalId);
 
   state.archetypeProgress.unlockedAbilityIds = [...unlockedSet].filter(value => KNOWN_ABILITY_IDS.has(value));
   renderArchetypeSummary(state);
+  renderAbilitySlots(state);
+  renderAbilityTree(state);
+  scheduleSave();
+}
+
+function removeAbilityFromSlots(globalId) {
+  const state = getState();
+  if (!state) return;
+  ensureArchetypeState(state);
+
+  const [archetypeKey, abilityId] = String(globalId || "").split(":");
+  if (!archetypeKey || !abilityId) return;
+
+  const def = getAbilityDefinition(archetypeKey, abilityId);
+  const unlockedSet = new Set(state.archetypeProgress.unlockedAbilityIds);
+  if (!unlockedSet.has(globalId)) return;
+  if (def && hasHigherTierInSlots(unlockedSet, archetypeKey, def.tier)) return;
+
+  unlockedSet.delete(globalId);
+  state.archetypeProgress.unlockedAbilityIds = [...unlockedSet].filter(value => KNOWN_ABILITY_IDS.has(value));
+  renderArchetypeSummary(state);
+  renderAbilitySlots(state);
   renderAbilityTree(state);
   scheduleSave();
 }
@@ -475,6 +563,7 @@ export function applyArchetypeStateToUI() {
   ensureArchetypeState(state);
   renderArchetypeSummary(state);
   renderBenefits(state);
+  renderAbilitySlots(state);
   renderAbilityTree(state);
 }
 
@@ -490,9 +579,28 @@ export function initArchetype({ getState: getStateFn, scheduleSave: scheduleSave
   const abilityTree = document.getElementById("archetypeAbilityTreeList");
   if (abilityTree) {
     abilityTree.addEventListener("click", e => {
-      const toggleTrigger = e.target?.closest?.("[data-ability-toggle]");
-      if (!toggleTrigger) return;
-      toggleAbility(toggleTrigger.dataset.abilityToggle);
+      const addTrigger = e.target?.closest?.("[data-ability-add]");
+      if (addTrigger) {
+        addAbilityToSlots(addTrigger.dataset.abilityAdd);
+        return;
+      }
+
+      const descTrigger = e.target?.closest?.("[data-ability-desc-toggle]");
+      if (!descTrigger) return;
+      const key = String(descTrigger.dataset.abilityDescToggle || "");
+      if (!key) return;
+      if (_expandedAbilityDescriptions.has(key)) _expandedAbilityDescriptions.delete(key);
+      else _expandedAbilityDescriptions.add(key);
+      renderAbilityTree(getState());
+    });
+  }
+
+  const slotGrid = document.getElementById("archetypeAbilitySlots");
+  if (slotGrid) {
+    slotGrid.addEventListener("click", e => {
+      const removeTrigger = e.target?.closest?.("[data-slot-remove]");
+      if (!removeTrigger) return;
+      removeAbilityFromSlots(removeTrigger.dataset.slotRemove);
     });
   }
 
