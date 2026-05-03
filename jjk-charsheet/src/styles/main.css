@@ -910,7 +910,7 @@
       font-weight: 600;
     }
     .jujutsu-subpanel { display: none; }
-    .jujutsu-subpanel.active { display: block; }
+    .jujutsu-subpanel.active { display: block; padding-top: 8px; }
     .technique-summary-text {
       font-family: 'Crimson Text', serif;
       font-size: 18px;
@@ -931,10 +931,10 @@
       margin-bottom: 8px;
     }
     .techniques-app-card {
-      border: 1px solid var(--border);
-      background: rgba(240, 235, 224, 0.72);
-      padding: 7px 8px;
-      min-height: 72px;
+      border: 1px solid var(--border-strong);
+      background: rgba(240, 235, 224, 0.75);
+      padding: 6px;
+      min-height: 76px;
     }
     .techniques-app-card-title {
       font-family: 'Cinzel', serif;
