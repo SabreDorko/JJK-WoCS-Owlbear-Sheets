@@ -84,6 +84,10 @@
     }
     .tab-panel { display: none; position: relative; z-index: 1; }
     .tab-panel.active { display: block; }
+    #panel-jujutsu.active,
+    #panel-archetype.active {
+      animation: panelFadeIn 220ms ease;
+    }
 
     /* ── HEADER ── */
     .header-grid {
@@ -777,6 +781,9 @@
       line-height: 1;
       transform: translateY(-0.2px);
     }
+    .skill-dot.locked-by-archetype:not(.permanent) {
+      box-shadow: 0 0 0 1px rgba(176, 74, 52, 0.45);
+    }
     .skill-bonus {
       font-family: 'Cinzel', serif;
       font-size: 13px;
@@ -910,7 +917,11 @@
       font-weight: 600;
     }
     .jujutsu-subpanel { display: none; }
-    .jujutsu-subpanel.active { display: block; padding-top: 8px; }
+    .jujutsu-subpanel.active {
+      display: block;
+      padding-top: 8px;
+      animation: sectionRiseIn 240ms ease both;
+    }
 
     .archetype-shell {
       display: grid;
@@ -929,7 +940,12 @@
       padding: 8px;
       display: grid;
       gap: 7px;
+      animation: sectionRiseIn 280ms ease both;
     }
+    .archetype-layout .archetype-card:nth-of-type(2) { animation-delay: 40ms; }
+    .archetype-layout .archetype-card:nth-of-type(3) { animation-delay: 70ms; }
+    .archetype-layout .archetype-card:nth-of-type(4) { animation-delay: 100ms; }
+    .archetype-layout .archetype-card:nth-of-type(5) { animation-delay: 130ms; }
     .archetype-card-title {
       font-family: 'Cinzel', serif;
       font-size: 10px;
@@ -1200,6 +1216,78 @@
     .archetype-ability-controls .meta-toggle-btn,
     .archetype-ability-controls .inventory-secondary-btn {
       min-width: 78px;
+    }
+    .archetype-aptitude-picks {
+      display: grid;
+      gap: 8px;
+      margin-top: 8px;
+    }
+    .archetype-aptitude-row {
+      display: grid;
+      gap: 6px;
+      border: 1px solid var(--border);
+      background: rgba(240, 235, 224, 0.65);
+      padding: 7px;
+    }
+    .archetype-aptitude-row--warning {
+      border-color: var(--accent);
+      box-shadow: inset 0 0 0 1px rgba(176, 74, 52, 0.25);
+    }
+    .archetype-aptitude-row-label {
+      font-family: 'Cinzel', serif;
+      font-size: 10px;
+      letter-spacing: 0.7px;
+      text-transform: uppercase;
+      color: var(--ink-faint);
+    }
+    .archetype-aptitude-preview {
+      font-family: 'Crimson Text', serif;
+      font-size: 14px;
+      color: var(--ink);
+      line-height: 1.25;
+    }
+    .archetype-aptitude-warning {
+      font-family: 'Cinzel', serif;
+      font-size: 10px;
+      letter-spacing: 0.7px;
+      text-transform: uppercase;
+      color: var(--accent);
+    }
+    .archetype-custom-abilities {
+      display: grid;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    @keyframes panelFadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(4px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @keyframes sectionRiseIn {
+      from {
+        opacity: 0;
+        transform: translateY(6px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      #panel-jujutsu.active,
+      #panel-archetype.active,
+      .jujutsu-subpanel.active,
+      .archetype-card {
+        animation: none;
+      }
     }
 
     @media (max-width: 860px) {

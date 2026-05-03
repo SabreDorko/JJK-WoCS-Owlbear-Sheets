@@ -6,6 +6,7 @@ let _isEditing = false;
 let _editorStep = "mode";
 let _editSnapshot = null;
 const _expandedAppIndices = new Map();
+let _pendingNewApplicationIndex = null;
 
 const JUJUTSU_SUBTABS = new Set(["technique", "vows", "training"]);
 
@@ -165,6 +166,20 @@ function getTechniqueTypeText(mode) {
   if (mode === "domain") return "Domain-Based Cursed Technique";
   if (mode === "none") return "No Cursed Technique";
   return "Cursed Technique";
+}
+
+function setTechniqueAddButtonState() {
+  const addBtn = document.getElementById("techniqueAddAppSummaryBtn");
+  if (!addBtn) return;
+
+  const isCancelMode = Number.isFinite(_pendingNewApplicationIndex);
+  addBtn.setAttribute("aria-label", isCancelMode ? "Cancel New Application" : "Add Application");
+  addBtn.setAttribute("title", isCancelMode ? "Cancel New Application" : "Add Application");
+
+  const path = addBtn.querySelector("path");
+  if (path) {
+    path.setAttribute("d", isCancelMode ? "M5 11h14v2H5z" : "M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6V5z");
+  }
 }
 
 function renderApplicationsSummary(state) {
@@ -376,6 +391,9 @@ export function updateTechniquesDerivedUI(stateArg = null) {
   const summaryFooter = document.getElementById("techniqueSummaryFooter");
   if (summaryFooter) summaryFooter.style.display = hasActiveTechnique ? "" : "none";
 
+  if (!hasActiveTechnique) _pendingNewApplicationIndex = null;
+  setTechniqueAddButtonState();
+
   const inlineNotes = document.getElementById("techniqueInlineNotesInput");
   if (inlineNotes && document.activeElement !== inlineNotes) {
     inlineNotes.value = state.techniques.notes || "";
@@ -433,6 +451,7 @@ function cancelTechniqueEditing() {
   restoreEditSnapshot(state, _editSnapshot);
   _isEditing = false;
   _editorStep = "mode";
+  _pendingNewApplicationIndex = null;
   _expandedAppIndices.clear();
   refreshCharacterStats();
   applyTechniquesStateToUI();
@@ -463,6 +482,7 @@ function saveTechniqueEditing() {
   ensureTechniquesState(state);
   _isEditing = false;
   _editorStep = "mode";
+  _pendingNewApplicationIndex = null;
   _editSnapshot = null;
   refreshCharacterStats();
   applyTechniquesStateToUI();
@@ -517,10 +537,25 @@ export function initTechniques({ getState: getStateFn, scheduleSave: scheduleSav
       const state = getState();
       if (!state) return;
       ensureTechniquesState(state);
+
+      if (Number.isFinite(_pendingNewApplicationIndex)) {
+        const idx = _pendingNewApplicationIndex;
+        if (state.techniques.applications[idx]) {
+          state.techniques.applications.splice(idx, 1);
+          state.techniques.applications = state.techniques.applications.map((entry, i) => normalizeApplication(entry, i));
+        }
+        _pendingNewApplicationIndex = null;
+        _expandedAppIndices.clear();
+        updateTechniquesDerivedUI(state);
+        scheduleSave();
+        return;
+      }
+
       const newIdx = state.techniques.applications.length;
       state.techniques.applications.push(createDefaultApplication(newIdx));
       const newSnap = JSON.parse(JSON.stringify(state.techniques.applications[newIdx]));
       _expandedAppIndices.set(newIdx, newSnap);
+      _pendingNewApplicationIndex = newIdx;
       updateTechniquesDerivedUI(state);
       scheduleSave();
     });
@@ -545,8 +580,9 @@ export function initTechniques({ getState: getStateFn, scheduleSave: scheduleSav
       if (saveTrigger) {
         const idx = parseNonNegativeInt(saveTrigger.dataset.appSaveInline);
         _expandedAppIndices.delete(idx);
+        if (_pendingNewApplicationIndex === idx) _pendingNewApplicationIndex = null;
         const state = getState();
-        if (state) renderApplicationsSummary(state);
+        if (state) updateTechniquesDerivedUI(state);
         return;
       }
       // Cancel (collapse, revert to snapshot)
@@ -561,7 +597,8 @@ export function initTechniques({ getState: getStateFn, scheduleSave: scheduleSav
         if (snap && state.techniques.applications[idx]) {
           state.techniques.applications[idx] = { ...snap };
         }
-        renderApplicationsSummary(state);
+        if (_pendingNewApplicationIndex === idx) _pendingNewApplicationIndex = null;
+        updateTechniquesDerivedUI(state);
         scheduleSave();
         return;
       }
@@ -574,6 +611,7 @@ export function initTechniques({ getState: getStateFn, scheduleSave: scheduleSav
         const removeIdx = parseNonNegativeInt(removeTrigger.dataset.appRemoveInline);
         state.techniques.applications.splice(removeIdx, 1);
         state.techniques.applications = state.techniques.applications.map((entry, i) => normalizeApplication(entry, i));
+        if (_pendingNewApplicationIndex !== null) _pendingNewApplicationIndex = null;
         _expandedAppIndices.clear();
         updateTechniquesDerivedUI(state);
         scheduleSave();

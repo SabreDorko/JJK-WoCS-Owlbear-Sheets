@@ -1,4 +1,5 @@
-import { ARCHETYPES } from "./state/store.js";
+import { ARCHETYPES, CENTER_STATS, RIGHT_STATS } from "./state/store.js";
+import { applyCharacterStateToUI } from "./character.js";
 
 let _getState = null;
 let _scheduleSave = null;
@@ -993,6 +994,12 @@ const KNOWN_ABILITY_IDS = new Set(
   })
 );
 
+const STAT_KEYS = ["power", "speed", "technique", "intelligence", "cooperation"];
+const SKILL_LABELS_BY_STAT = [...CENTER_STATS, ...RIGHT_STATS].reduce((acc, stat) => {
+  acc[stat.key] = [...stat.skills];
+  return acc;
+}, {});
+
 function getState() {
   return _getState ? _getState() : null;
 }
@@ -1012,7 +1019,8 @@ function toTitleCase(value) {
 
 function getArchetypeLabel(archetypeKey) {
   if (!archetypeKey) return "Unselected";
-  return ARCHETYPE_RULES[archetypeKey]?.label || toTitleCase(archetypeKey);
+  const state = getState();
+  return getArchetypeRule(state, archetypeKey)?.label || toTitleCase(archetypeKey);
 }
 
 function normalizeStatKey(rawValue) {
@@ -1046,6 +1054,7 @@ function validateArchetypeMappings() {
   const archetypeKeys = Object.keys(ARCHETYPES || {});
 
   archetypeKeys.forEach(archKey => {
+    if (archKey === "custom") return;
     const rule = ARCHETYPE_RULES[archKey];
     if (!rule) {
       warnings.push(`Missing ARCHETYPE_RULES entry for '${archKey}'.`);
@@ -1083,11 +1092,158 @@ function statScore(state, statKey) {
   return parseInt(state?.stats?.[normalizedKey]?.score, 10) || 0;
 }
 
+function sanitizeAbilityId(rawValue, fallbackId) {
+  const sanitized = String(rawValue || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return sanitized || fallbackId;
+}
+
+function ensureCustomArchetypeState(state) {
+  if (!state || typeof state !== "object") return;
+  if (!state.customArchetype || typeof state.customArchetype !== "object") state.customArchetype = {};
+
+  const custom = state.customArchetype;
+  if (!custom.name) custom.name = "Custom Archetype";
+  if (!STAT_KEYS.includes(normalizeStatKey(custom.scaleStat))) custom.scaleStat = "power";
+  if (!custom.subArchetypeA) custom.subArchetypeA = "Custom A";
+  if (!custom.subArchetypeB) custom.subArchetypeB = "Custom B";
+  if (!Array.isArray(custom.permanentAptitudeRules)) {
+    custom.permanentAptitudeRules = [
+      "Choose 1 permanent aptitude from Power",
+      "Choose 1 permanent aptitude from Technique",
+    ];
+  }
+  while (custom.permanentAptitudeRules.length < 2) custom.permanentAptitudeRules.push("");
+
+  if (!Array.isArray(custom.startingEquipment)) custom.startingEquipment = ["", ""];
+  while (custom.startingEquipment.length < 2) custom.startingEquipment.push("");
+
+  if (!custom.abilities || typeof custom.abilities !== "object") custom.abilities = {};
+  const defaults = {
+    tier1A: { id: "custom-tier1-a", name: "Tier 1A", notes: "", minStat: 1 },
+    tier1B: { id: "custom-tier1-b", name: "Tier 1B", notes: "", minStat: 1 },
+    tier2: { id: "custom-tier2", name: "Tier 2", notes: "", minStat: 2 },
+    tier3: { id: "custom-tier3", name: "Tier 3", notes: "", minStat: 3 },
+    tier4: { id: "custom-tier4", name: "Tier 4", notes: "", minStat: 4 },
+    tier5A: { id: "custom-tier5-a", name: "Tier 5A", notes: "", minStat: 5 },
+    tier5B: { id: "custom-tier5-b", name: "Tier 5B", notes: "", minStat: 5 },
+  };
+
+  Object.entries(defaults).forEach(([key, def]) => {
+    if (!custom.abilities[key] || typeof custom.abilities[key] !== "object") custom.abilities[key] = { ...def };
+    if (!custom.abilities[key].name) custom.abilities[key].name = def.name;
+    custom.abilities[key].id = sanitizeAbilityId(custom.abilities[key].name, def.id);
+    custom.abilities[key].notes = String(custom.abilities[key].notes || "");
+    custom.abilities[key].minStat = parseInt(custom.abilities[key].minStat, 10) || def.minStat;
+  });
+}
+
+function getCustomRule(state) {
+  ensureCustomArchetypeState(state);
+  const custom = state?.customArchetype;
+  if (!custom) return null;
+
+  const subA = String(custom.subArchetypeA || "Custom A").trim() || "Custom A";
+  const subB = String(custom.subArchetypeB || "Custom B").trim() || "Custom B";
+  const abilities = custom.abilities || {};
+  return {
+    label: String(custom.name || "Custom Archetype"),
+    scaleStat: normalizeStatKey(custom.scaleStat || "power"),
+    permanentAptitudes: [...(custom.permanentAptitudeRules || [])].filter(Boolean),
+    startingEquipment: [...(custom.startingEquipment || [])].filter(Boolean),
+    sharedAbilities: [
+      { tier: 2, ...abilities.tier2 },
+      { tier: 3, ...abilities.tier3 },
+      { tier: 4, ...abilities.tier4 },
+    ],
+    subclassAbilities: {
+      [subA]: {
+        tier1: { ...abilities.tier1A, minStat: 1 },
+        tier5: { ...abilities.tier5A, minStat: 5 },
+      },
+      [subB]: {
+        tier1: { ...abilities.tier1B, minStat: 1 },
+        tier5: { ...abilities.tier5B, minStat: 5 },
+      },
+    },
+  };
+}
+
+function getArchetypeRule(state, archetypeKey) {
+  if (!archetypeKey) return null;
+  if (archetypeKey === "custom") return getCustomRule(state);
+  return ARCHETYPE_RULES[archetypeKey] || null;
+}
+
+function getKnownAbilityIdsForState(state) {
+  const ids = new Set(KNOWN_ABILITY_IDS);
+  const customRule = getArchetypeRule(state, "custom");
+  if (customRule) {
+    customRule.sharedAbilities.forEach(ability => {
+      if (ability?.id) ids.add(`custom:${ability.id}`);
+    });
+    Object.values(customRule.subclassAbilities || {}).forEach(def => {
+      if (def?.tier1?.id) ids.add(`custom:${def.tier1.id}`);
+      if (def?.tier5?.id) ids.add(`custom:${def.tier5.id}`);
+    });
+  }
+  return ids;
+}
+
+function getPermanentAptitudeRequirementSlots(rule) {
+  if (!rule) return [];
+  const slots = [];
+  (rule.permanentAptitudes || []).forEach(rawLine => {
+    const line = String(rawLine || "").trim();
+    if (!line) return;
+    const stats = [...new Set((line.match(/power|speed|technique|intelligence|cooperation/gi) || []).map(normalizeStatKey))];
+    const countMatch = line.match(/choose\s+(\d+)/i);
+    const count = Math.max(1, parseInt(countMatch?.[1] || "1", 10) || 1);
+    for (let i = 0; i < count; i += 1) {
+      slots.push({ allowedStats: stats.length ? stats : [...STAT_KEYS], ruleText: line });
+    }
+  });
+  return slots;
+}
+
+function ensurePermanentAptitudeState(state) {
+  if (!state.archetypeProgress || typeof state.archetypeProgress !== "object") state.archetypeProgress = {};
+  if (!Array.isArray(state.archetypeProgress.permanentAptitudeSelections)) {
+    state.archetypeProgress.permanentAptitudeSelections = [];
+  }
+}
+
+function aptitudeSelectionSignature(selection) {
+  if (!selection) return "";
+  return `${selection.statKey}:${parseInt(selection.skillIndex, 10) || 0}`;
+}
+
+function findFirstNonDuplicateSkillIndex(selections, currentIndex, statKey, preferredIndex = 0) {
+  const skills = SKILL_LABELS_BY_STAT[statKey] || [];
+  if (!skills.length) return 0;
+
+  const hasCollision = candidateIndex => {
+    const signature = `${statKey}:${candidateIndex}`;
+    return selections.some((entry, idx) => idx !== currentIndex && aptitudeSelectionSignature(entry) === signature);
+  };
+
+  if (!hasCollision(preferredIndex)) return preferredIndex;
+  for (let i = 0; i < skills.length; i += 1) {
+    if (!hasCollision(i)) return i;
+  }
+  return preferredIndex;
+}
+
 function ensureArchetypeState(state) {
   if (!state || typeof state !== "object") return;
+  ensureCustomArchetypeState(state);
   if (!state.archetypeProgress || typeof state.archetypeProgress !== "object") {
     state.archetypeProgress = {};
   }
+  ensurePermanentAptitudeState(state);
 
   if (!Array.isArray(state.archetypeProgress.unlockedAbilityIds)) {
     const legacyUnlocked = Array.isArray(state.archetypeGrantedAbilities)
@@ -1099,9 +1255,10 @@ function ensureArchetypeState(state) {
     state.archetypeProgress.unlockedAbilityIds = legacyUnlocked;
   }
 
+  const knownIds = getKnownAbilityIdsForState(state);
   state.archetypeProgress.unlockedAbilityIds = state.archetypeProgress.unlockedAbilityIds
     .map(value => String(value || "").trim())
-    .filter(value => KNOWN_ABILITY_IDS.has(value));
+    .filter(value => knownIds.has(value));
 }
 
 function abilityGlobalId(archetypeKey, abilityId) {
@@ -1131,8 +1288,8 @@ function selectedArchetypeEntries(state) {
   return entries;
 }
 
-function getAbilityDefinition(archetypeKey, abilityId) {
-  const rule = ARCHETYPE_RULES[archetypeKey];
+function getAbilityDefinition(state, archetypeKey, abilityId) {
+  const rule = getArchetypeRule(state, archetypeKey);
   if (!rule) return null;
 
   const shared = rule.sharedAbilities.find(item => item.id === abilityId);
@@ -1147,17 +1304,18 @@ function getAbilityDefinition(archetypeKey, abilityId) {
 }
 
 function hasHigherTierInSlots(unlockedSet, archetypeKey, tier) {
+  const state = getState();
   return [...unlockedSet].some(globalId => {
     const [archKey, abilityId] = String(globalId || "").split(":");
     if (archKey !== archetypeKey) return false;
-    const def = getAbilityDefinition(archKey, abilityId);
+    const def = getAbilityDefinition(state, archKey, abilityId);
     if (!def || !Number.isFinite(def.tier)) return false;
     return def.tier > tier;
   });
 }
 
-function getTieredAbilities(archetypeKey, selectedSub) {
-  const rule = ARCHETYPE_RULES[archetypeKey];
+function getTieredAbilities(archetypeKey, selectedSub, state = getState()) {
+  const rule = getArchetypeRule(state, archetypeKey);
   if (!rule) return [];
 
   const byTier = new Map();
@@ -1240,7 +1398,7 @@ function renderBenefits(state) {
     return;
   }
 
-  const rule = ARCHETYPE_RULES[state.archetype];
+  const rule = getArchetypeRule(state, state.archetype);
   if (!rule) {
     benefitsList.innerHTML = `
       <article class="archetype-benefit-card">
@@ -1273,6 +1431,149 @@ function renderBenefits(state) {
   `;
 }
 
+function renderPermanentAptitudePicker(state) {
+  const container = document.getElementById("archetypePermanentAptitudes");
+  if (!container) return;
+
+  if (!state.archetype) {
+    container.innerHTML = '<div class="techniques-app-empty">Pick a primary archetype to configure permanent aptitude skills.</div>';
+    return;
+  }
+
+  const rule = getArchetypeRule(state, state.archetype);
+  if (!rule) {
+    container.innerHTML = '<div class="techniques-app-empty">No permanent aptitude rule is defined for this archetype.</div>';
+    return;
+  }
+
+  const slots = getPermanentAptitudeRequirementSlots(rule);
+  ensurePermanentAptitudeState(state);
+  const previous = state.archetypeProgress.permanentAptitudeSelections || [];
+  const nextSelections = slots.map((slot, index) => {
+    const current = previous[index] || {};
+    const fallbackStat = slot.allowedStats[0] || "power";
+    const statKey = slot.allowedStats.includes(current.statKey) ? current.statKey : fallbackStat;
+    const skills = SKILL_LABELS_BY_STAT[statKey] || [];
+    const skillIndex = Number.isInteger(current.skillIndex) && current.skillIndex >= 0 && current.skillIndex < skills.length
+      ? current.skillIndex
+      : 0;
+    return {
+      slotIndex: index,
+      statKey,
+      skillIndex,
+      sourceArchetype: state.archetype,
+      sourceLabel: rule.label,
+    };
+  });
+  const seen = new Map();
+  nextSelections.forEach(entry => {
+    const signature = aptitudeSelectionSignature(entry);
+    seen.set(signature, (seen.get(signature) || 0) + 1);
+  });
+  state.archetypeProgress.permanentAptitudeSelections = nextSelections;
+
+  container.innerHTML = slots.length
+    ? `
+      <div class="techniques-muted">Selections here immediately become Permanent Aptitudes on the main sheet and stay locked unless Override mode is enabled.</div>
+      <div class="archetype-aptitude-picks">
+        ${slots.map((slot, index) => {
+          const entry = nextSelections[index];
+          const isDuplicate = (seen.get(aptitudeSelectionSignature(entry)) || 0) > 1;
+          const statOptions = slot.allowedStats
+            .map(stat => `<option value="${stat}"${entry.statKey === stat ? " selected" : ""}>${toTitleCase(stat)}</option>`)
+            .join("");
+          const skills = SKILL_LABELS_BY_STAT[entry.statKey] || [];
+          const skillOptions = skills
+            .map((label, skillIndex) => `<option value="${skillIndex}"${entry.skillIndex === skillIndex ? " selected" : ""}>${label}</option>`)
+            .join("");
+          const selectedSkillLabel = skills[entry.skillIndex] || "Unknown";
+          return `
+            <div class="archetype-aptitude-row${isDuplicate ? " archetype-aptitude-row--warning" : ""}">
+              <div class="archetype-aptitude-row-label">Pick ${index + 1}</div>
+              <select class="meta-select" data-perm-apt-stat="${index}">${statOptions}</select>
+              <select class="meta-select" data-perm-apt-skill="${index}">${skillOptions}</select>
+              <div class="archetype-aptitude-preview">Selected: ${selectedSkillLabel}</div>
+              <div class="techniques-muted">${slot.ruleText}</div>
+              ${isDuplicate ? '<div class="archetype-aptitude-warning">Duplicate pick detected. Choose a different skill.</div>' : ""}
+            </div>
+          `;
+        }).join("")}
+      </div>
+    `
+    : '<div class="techniques-app-empty">This archetype has no permanent aptitude requirements.</div>';
+}
+
+function renderCustomBuilder(state) {
+  const card = document.getElementById("customArchetypeBuilder");
+  const body = document.getElementById("customArchetypeBuilderBody");
+  if (!card || !body) return;
+
+  const show = state.archetype === "custom" || (state.hasSecondArchetype && state.archetype2 === "custom");
+  card.style.display = show ? "" : "none";
+  if (!show) return;
+
+  ensureCustomArchetypeState(state);
+  const custom = state.customArchetype;
+  const abilityFields = [
+    ["tier1A", "Tier 1 (Sub A)"],
+    ["tier1B", "Tier 1 (Sub B)"],
+    ["tier2", "Tier 2"],
+    ["tier3", "Tier 3"],
+    ["tier4", "Tier 4"],
+    ["tier5A", "Tier 5 (Sub A)"],
+    ["tier5B", "Tier 5 (Sub B)"],
+  ];
+
+  body.innerHTML = `
+    <div class="techniques-muted">Custom values here drive both the Benefits card and the Ability Tree in real time.</div>
+    <div class="meta-grid archetype-picker-grid">
+      <div class="meta-field">
+        <div class="field-label">Archetype Name</div>
+        <input class="meta-input" data-custom-field="name" value="${custom.name || ""}" />
+      </div>
+      <div class="meta-field">
+        <div class="field-label">Scale Stat</div>
+        <select class="meta-select" data-custom-field="scaleStat">
+          ${STAT_KEYS.map(key => `<option value="${key}"${normalizeStatKey(custom.scaleStat) === key ? " selected" : ""}>${toTitleCase(key)}</option>`).join("")}
+        </select>
+      </div>
+      <div class="meta-field">
+        <div class="field-label">Sub-Archetype A</div>
+        <input class="meta-input" data-custom-field="subArchetypeA" value="${custom.subArchetypeA || ""}" />
+      </div>
+      <div class="meta-field">
+        <div class="field-label">Sub-Archetype B</div>
+        <input class="meta-input" data-custom-field="subArchetypeB" value="${custom.subArchetypeB || ""}" />
+      </div>
+      <div class="meta-field">
+        <div class="field-label">Permanent Aptitude Rule 1</div>
+        <input class="meta-input" data-custom-field="permanentAptitudeRules.0" value="${custom.permanentAptitudeRules?.[0] || ""}" />
+      </div>
+      <div class="meta-field">
+        <div class="field-label">Permanent Aptitude Rule 2</div>
+        <input class="meta-input" data-custom-field="permanentAptitudeRules.1" value="${custom.permanentAptitudeRules?.[1] || ""}" />
+      </div>
+      <div class="meta-field">
+        <div class="field-label">Starting Equipment 1</div>
+        <input class="meta-input" data-custom-field="startingEquipment.0" value="${custom.startingEquipment?.[0] || ""}" />
+      </div>
+      <div class="meta-field">
+        <div class="field-label">Starting Equipment 2</div>
+        <input class="meta-input" data-custom-field="startingEquipment.1" value="${custom.startingEquipment?.[1] || ""}" />
+      </div>
+    </div>
+    <div class="archetype-custom-abilities">
+      ${abilityFields.map(([key, label]) => `
+        <div class="archetype-aptitude-row">
+          <div class="archetype-aptitude-row-label">${label}</div>
+          <input class="meta-input" data-custom-ability="${key}" data-custom-prop="name" value="${custom.abilities?.[key]?.name || ""}" placeholder="Ability name" />
+          <textarea class="inventory-textarea" data-custom-ability="${key}" data-custom-prop="notes" rows="2" placeholder="Ability notes">${custom.abilities?.[key]?.notes || ""}</textarea>
+        </div>
+      `).join("")}
+    </div>
+  `;
+}
+
 function renderAbilitySlots(state) {
   const grid = document.getElementById("archetypeAbilitySlots");
   if (!grid) return;
@@ -1295,8 +1596,8 @@ function renderAbilitySlots(state) {
     }
 
     const [archKey, abilityId] = globalId.split(":");
-    const rule = ARCHETYPE_RULES[archKey];
-    const def = getAbilityDefinition(archKey, abilityId);
+    const rule = getArchetypeRule(state, archKey);
+    const def = getAbilityDefinition(state, archKey, abilityId);
     const canRemove = def ? !hasHigherTierInSlots(new Set(unlocked), archKey, def.tier) : true;
     const descKey = `slot:${globalId}`;
     const isExpanded = _expandedAbilityDescriptions.has(descKey);
@@ -1337,7 +1638,7 @@ function renderAbilityTree(state) {
   const slotSummary = getSlotSummary(state);
 
   list.innerHTML = selected.map(entry => {
-    const rule = ARCHETYPE_RULES[entry.key];
+    const rule = getArchetypeRule(state, entry.key);
     if (!rule) {
       return `
         <article class="archetype-ability-item">
@@ -1349,7 +1650,7 @@ function renderAbilityTree(state) {
 
     const selectedSub = entry.type === "primary" ? state.subArchetype : state.subArchetype2;
     const currentStat = statScore(state, rule.scaleStat);
-    const abilities = getTieredAbilities(entry.key, selectedSub);
+    const abilities = getTieredAbilities(entry.key, selectedSub, state);
 
     const rows = abilities.map((ability, idx) => {
       const globalId = ability.id ? abilityGlobalId(entry.key, ability.id) : "";
@@ -1429,7 +1730,7 @@ function addAbilityToSlots(globalId) {
   if (!entry) return;
 
   const selectedSub = entry.type === "primary" ? state.subArchetype : state.subArchetype2;
-  const abilities = getTieredAbilities(archetypeKey, selectedSub);
+  const abilities = getTieredAbilities(archetypeKey, selectedSub, state);
   const ability = abilities.find(item => item.id === abilityId);
   if (!ability) return;
 
@@ -1444,13 +1745,17 @@ function addAbilityToSlots(globalId) {
   const previousMet = abilityIndex === 0
     ? true
     : Boolean(previous?.id) && unlockedSet.has(abilityGlobalId(archetypeKey, previous.id));
-  const statMet = statScore(state, ARCHETYPE_RULES[archetypeKey].scaleStat) >= (ability.minStat || 0);
+  const rule = getArchetypeRule(state, archetypeKey);
+  if (!rule) return;
+  const statMet = statScore(state, rule.scaleStat) >= (ability.minStat || 0);
 
   if (!previousMet || !statMet || slotSummary.openSlots <= 0) return;
   unlockedSet.add(globalId);
 
-  state.archetypeProgress.unlockedAbilityIds = [...unlockedSet].filter(value => KNOWN_ABILITY_IDS.has(value));
+  const knownIds = getKnownAbilityIdsForState(state);
+  state.archetypeProgress.unlockedAbilityIds = [...unlockedSet].filter(value => knownIds.has(value));
   renderArchetypeSummary(state);
+  renderBenefits(state);
   renderAbilitySlots(state);
   renderAbilityTree(state);
   scheduleSave();
@@ -1464,14 +1769,16 @@ function removeAbilityFromSlots(globalId) {
   const [archetypeKey, abilityId] = String(globalId || "").split(":");
   if (!archetypeKey || !abilityId) return;
 
-  const def = getAbilityDefinition(archetypeKey, abilityId);
+  const def = getAbilityDefinition(state, archetypeKey, abilityId);
   const unlockedSet = new Set(state.archetypeProgress.unlockedAbilityIds);
   if (!unlockedSet.has(globalId)) return;
   if (def && hasHigherTierInSlots(unlockedSet, archetypeKey, def.tier)) return;
 
   unlockedSet.delete(globalId);
-  state.archetypeProgress.unlockedAbilityIds = [...unlockedSet].filter(value => KNOWN_ABILITY_IDS.has(value));
+  const knownIds = getKnownAbilityIdsForState(state);
+  state.archetypeProgress.unlockedAbilityIds = [...unlockedSet].filter(value => knownIds.has(value));
   renderArchetypeSummary(state);
+  renderBenefits(state);
   renderAbilitySlots(state);
   renderAbilityTree(state);
   scheduleSave();
@@ -1483,14 +1790,40 @@ function refreshFromArchetypeSelectors() {
   setTimeout(() => applyArchetypeStateToUI(), 0);
 }
 
+function setCustomFieldValue(state, fieldPath, value) {
+  ensureCustomArchetypeState(state);
+  if (!fieldPath) return;
+  const path = String(fieldPath).split(".");
+  let target = state.customArchetype;
+  for (let i = 0; i < path.length - 1; i += 1) {
+    const key = path[i];
+    if (!target[key] || typeof target[key] !== "object") {
+      target[key] = Number.isInteger(parseInt(path[i + 1], 10)) ? [] : {};
+    }
+    target = target[key];
+  }
+  target[path[path.length - 1]] = value;
+}
+
 export function applyArchetypeStateToUI() {
   const state = getState();
   if (!state) return;
   ensureArchetypeState(state);
+
+  if (state.archetype === "custom") {
+    state.subArchetype = state.subArchetype || state.customArchetype.subArchetypeA;
+  }
+  if (state.hasSecondArchetype && state.archetype2 === "custom") {
+    state.subArchetype2 = state.subArchetype2 || state.customArchetype.subArchetypeA;
+  }
+
   renderArchetypeSummary(state);
   renderBenefits(state);
+  renderPermanentAptitudePicker(state);
+  renderCustomBuilder(state);
   renderAbilitySlots(state);
   renderAbilityTree(state);
+  applyCharacterStateToUI();
 }
 
 export function initArchetype({ getState: getStateFn, scheduleSave: scheduleSaveFn }) {
@@ -1539,6 +1872,91 @@ export function initArchetype({ getState: getStateFn, scheduleSave: scheduleSave
       if (_expandedAbilityDescriptions.has(key)) _expandedAbilityDescriptions.delete(key);
       else _expandedAbilityDescriptions.add(key);
       renderAbilitySlots(getState());
+    });
+  }
+
+  const aptitudePicker = document.getElementById("archetypePermanentAptitudes");
+  if (aptitudePicker) {
+    aptitudePicker.addEventListener("change", e => {
+      const state = getState();
+      if (!state) return;
+      ensureArchetypeState(state);
+
+      const statSelect = e.target?.closest?.("[data-perm-apt-stat]");
+      if (statSelect) {
+        const index = parseInt(statSelect.dataset.permAptStat, 10);
+        const nextStat = normalizeStatKey(statSelect.value);
+        const selections = state.archetypeProgress.permanentAptitudeSelections || [];
+        const current = selections[index] || {};
+        const nextSkill = findFirstNonDuplicateSkillIndex(selections, index, nextStat, 0);
+        selections[index] = {
+          ...current,
+          statKey: nextStat,
+          skillIndex: nextSkill,
+          sourceArchetype: state.archetype,
+          sourceLabel: getArchetypeLabel(state.archetype),
+        };
+        state.archetypeProgress.permanentAptitudeSelections = selections;
+        applyArchetypeStateToUI();
+        scheduleSave();
+        return;
+      }
+
+      const skillSelect = e.target?.closest?.("[data-perm-apt-skill]");
+      if (!skillSelect) return;
+      const index = parseInt(skillSelect.dataset.permAptSkill, 10);
+      const nextSkill = parseInt(skillSelect.value, 10) || 0;
+      const selections = state.archetypeProgress.permanentAptitudeSelections || [];
+      const current = selections[index] || {};
+      const statKey = current.statKey || "power";
+      const resolvedSkill = findFirstNonDuplicateSkillIndex(selections, index, statKey, nextSkill);
+      selections[index] = {
+        ...current,
+        skillIndex: resolvedSkill,
+        sourceArchetype: state.archetype,
+        sourceLabel: getArchetypeLabel(state.archetype),
+      };
+      state.archetypeProgress.permanentAptitudeSelections = selections;
+      applyArchetypeStateToUI();
+      scheduleSave();
+    });
+  }
+
+  const customBuilder = document.getElementById("customArchetypeBuilderBody");
+  if (customBuilder) {
+    customBuilder.addEventListener("input", e => {
+      const state = getState();
+      if (!state) return;
+      ensureArchetypeState(state);
+
+      const fieldEl = e.target?.closest?.("[data-custom-field]");
+      if (fieldEl) {
+        setCustomFieldValue(state, fieldEl.dataset.customField, fieldEl.value);
+        applyArchetypeStateToUI();
+        scheduleSave();
+        return;
+      }
+
+      const abilityEl = e.target?.closest?.("[data-custom-ability][data-custom-prop]");
+      if (!abilityEl) return;
+      const abilityKey = abilityEl.dataset.customAbility;
+      const prop = abilityEl.dataset.customProp;
+      ensureCustomArchetypeState(state);
+      if (!state.customArchetype.abilities[abilityKey]) state.customArchetype.abilities[abilityKey] = {};
+      state.customArchetype.abilities[abilityKey][prop] = abilityEl.value;
+      applyArchetypeStateToUI();
+      scheduleSave();
+    });
+
+    customBuilder.addEventListener("change", e => {
+      if (!e.target?.closest?.("select")) return;
+      const state = getState();
+      if (!state) return;
+      const fieldEl = e.target?.closest?.("[data-custom-field]");
+      if (!fieldEl) return;
+      setCustomFieldValue(state, fieldEl.dataset.customField, fieldEl.value);
+      applyArchetypeStateToUI();
+      scheduleSave();
     });
   }
 

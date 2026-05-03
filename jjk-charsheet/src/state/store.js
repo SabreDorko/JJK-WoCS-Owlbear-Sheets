@@ -21,6 +21,7 @@ export const ARCHETYPES = {
   thrill_seeker: ["Easygoing", "Gambler"],
   tinkerer:      ["Technician", "Engineer"],
   toxicologist:  ["Plague", "Herbalist"],
+  custom:        ["Custom A", "Custom B"],
 };
 
 // ── STAT DEFINITIONS ──────────────────────────────────────────────────────────
@@ -77,6 +78,27 @@ export function defaultState() {
     },
     archetypeProgress: {
       unlockedAbilityIds: [],
+      permanentAptitudeSelections: [],
+    },
+    customArchetype: {
+      name: "Custom Archetype",
+      scaleStat: "power",
+      subArchetypeA: "Custom A",
+      subArchetypeB: "Custom B",
+      permanentAptitudeRules: [
+        "Choose 1 permanent aptitude from Power",
+        "Choose 1 permanent aptitude from Technique",
+      ],
+      startingEquipment: ["", ""],
+      abilities: {
+        tier1A: { id: "custom-tier1-a", name: "Tier 1A", notes: "", minStat: 1 },
+        tier1B: { id: "custom-tier1-b", name: "Tier 1B", notes: "", minStat: 1 },
+        tier2: { id: "custom-tier2", name: "Tier 2", notes: "", minStat: 2 },
+        tier3: { id: "custom-tier3", name: "Tier 3", notes: "", minStat: 3 },
+        tier4: { id: "custom-tier4", name: "Tier 4", notes: "", minStat: 4 },
+        tier5A: { id: "custom-tier5-a", name: "Tier 5A", notes: "", minStat: 5 },
+        tier5B: { id: "custom-tier5-b", name: "Tier 5B", notes: "", minStat: 5 },
+      },
     },
     archetypeGrantedAbilities: [],
     archetype2: "", subArchetype2: "", hasSecondArchetype: false,
