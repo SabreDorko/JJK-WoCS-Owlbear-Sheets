@@ -21,6 +21,7 @@ let openMovePickerItemId = null;
 let openYenAdjustMode = null;
 let openOverflowChoice = null;
 let openDeleteConfirmItemId = null;
+let openDeleteConfirmAnchor = null;
 let draftItemModifiers = [];
 let editingModifierIndex = null;
 let isModifierEditMode = false;
@@ -943,8 +944,8 @@ function renderEditButton() {
 function renderDeleteButton(itemId, forceAlignLeft = false) {
   const showConfirm = openDeleteConfirmItemId === itemId;
   const confirmClasses = forceAlignLeft
-    ? "skills-delete-confirm confirm-align-left confirm-force-left"
-    : "skills-delete-confirm";
+    ? "skills-delete-confirm confirm-align-left confirm-force-left confirm-cursor-anchor"
+    : "skills-delete-confirm confirm-cursor-anchor";
   return `
     <span class="skills-delete-wrap">
       <button type="button" class="inventory-mini-btn inventory-icon-btn danger" data-action="deleteItem" aria-label="Delete item" title="Delete item">
@@ -1497,10 +1498,19 @@ function handleInventoryActions(event) {
 
   const action = button.dataset.action;
   if (action === "deleteItem") {
+    const triggerRect = button.getBoundingClientRect();
+    const anchorX = Number.isFinite(event.clientX) ? event.clientX : (triggerRect.left + (triggerRect.width / 2));
+    const anchorY = Number.isFinite(event.clientY) ? event.clientY : triggerRect.top;
     openEquipPickerItemId = null;
     openMovePickerItemId = null;
     openOverflowChoice = null;
-    openDeleteConfirmItemId = openDeleteConfirmItemId === item.id ? null : item.id;
+    if (openDeleteConfirmItemId === item.id) {
+      openDeleteConfirmItemId = null;
+      openDeleteConfirmAnchor = null;
+    } else {
+      openDeleteConfirmItemId = item.id;
+      openDeleteConfirmAnchor = { itemId: item.id, x: anchorX, y: anchorY };
+    }
     renderInventory();
     return;
   }
@@ -1510,12 +1520,14 @@ function handleInventoryActions(event) {
     openMovePickerItemId = null;
     openOverflowChoice = null;
     openDeleteConfirmItemId = null;
+    openDeleteConfirmAnchor = null;
     deleteInventoryItem(item.id);
     return;
   }
 
   if (action === "cancelDeleteItem") {
     openDeleteConfirmItemId = null;
+    openDeleteConfirmAnchor = null;
     renderInventory();
     return;
   }
@@ -1525,6 +1537,7 @@ function handleInventoryActions(event) {
     openMovePickerItemId = null;
     openOverflowChoice = null;
     openDeleteConfirmItemId = null;
+    openDeleteConfirmAnchor = null;
     startItemEdit(item.id);
     return;
   }
@@ -1534,6 +1547,7 @@ function handleInventoryActions(event) {
     openMovePickerItemId = null;
     openOverflowChoice = null;
     openDeleteConfirmItemId = null;
+    openDeleteConfirmAnchor = null;
     if (expandedDescriptionIds.has(item.id)) expandedDescriptionIds.delete(item.id);
     else expandedDescriptionIds.add(item.id);
     const isExpanded = expandedDescriptionIds.has(item.id);
@@ -1550,6 +1564,7 @@ function handleInventoryActions(event) {
     openMovePickerItemId = null;
     openOverflowChoice = null;
     openDeleteConfirmItemId = null;
+    openDeleteConfirmAnchor = null;
     if (shouldShowEquipTargetSelect(item)) {
       openEquipPickerItemId = openEquipPickerItemId === item.id ? null : item.id;
       renderInventory();
@@ -1580,6 +1595,7 @@ function handleInventoryActions(event) {
     openMovePickerItemId = null;
     openOverflowChoice = null;
     openDeleteConfirmItemId = null;
+    openDeleteConfirmAnchor = null;
     const result = moveItemToEquippedSlot(item, selectedSlot);
     if (result.requiresOverflowChoice) {
       openOverflowChoice = {
@@ -1604,6 +1620,7 @@ function handleInventoryActions(event) {
     openMovePickerItemId = null;
     openOverflowChoice = null;
     openDeleteConfirmItemId = null;
+    openDeleteConfirmAnchor = null;
     const result = moveItemToEquippedSlot(item, pending.targetSlotKey || null, {
       allowOverflowToStorage: true,
       forcedTargetSlots: pending.targetSlots || null,
@@ -1621,6 +1638,7 @@ function handleInventoryActions(event) {
   if (action === "cancelOverflowChoice") {
     openOverflowChoice = null;
     openDeleteConfirmItemId = null;
+    openDeleteConfirmAnchor = null;
     renderInventory();
     return;
   }
@@ -1629,6 +1647,7 @@ function handleInventoryActions(event) {
     openEquipPickerItemId = null;
     openOverflowChoice = null;
     openDeleteConfirmItemId = null;
+    openDeleteConfirmAnchor = null;
     const options = getMoveDestinationOptions(item);
     if (!options.length) return;
     openMovePickerItemId = openMovePickerItemId === item.id ? null : item.id;
@@ -1641,6 +1660,8 @@ function handleInventoryActions(event) {
     openEquipPickerItemId = null;
     openMovePickerItemId = null;
     openOverflowChoice = null;
+    openDeleteConfirmItemId = null;
+    openDeleteConfirmAnchor = null;
     const result = moveItemToDestination(item, destination);
     if (!result.ok) {
       setItemFormError(result.message || "Could not move item.");
@@ -1673,6 +1694,8 @@ function handleInventoryActions(event) {
     openEquipPickerItemId = null;
     openMovePickerItemId = null;
     openOverflowChoice = null;
+    openDeleteConfirmItemId = null;
+    openDeleteConfirmAnchor = null;
     if (isItemTypeDormRestricted(item)) {
       setItemFormError("Items cannot be sent to storage.");
       return;
@@ -1687,6 +1710,8 @@ function handleInventoryActions(event) {
     openEquipPickerItemId = null;
     openMovePickerItemId = null;
     openOverflowChoice = null;
+    openDeleteConfirmItemId = null;
+    openDeleteConfirmAnchor = null;
     if (!placeItemInFirstFreeInventorySlot(item)) {
       setItemFormError("Active inventory is full. Free a slot first.");
       return;
@@ -2051,6 +2076,47 @@ export function renderInventory() {
     const viewportPad = 8;
     const forcedLeftNudgePx = 16;
     menus.forEach(menu => {
+      const parentItemId = menu.closest("[data-item-id]")?.dataset?.itemId || null;
+      const cursorAnchored = menu.classList.contains("confirm-cursor-anchor")
+        && Boolean(openDeleteConfirmAnchor)
+        && openDeleteConfirmAnchor.itemId
+        && parentItemId === openDeleteConfirmAnchor.itemId;
+
+      if (cursorAnchored) {
+        menu.classList.remove("confirm-below", "confirm-align-left", "confirm-align-right");
+        menu.style.position = "fixed";
+        menu.style.left = `${Math.round(openDeleteConfirmAnchor.x)}px`;
+        menu.style.top = `${Math.round(openDeleteConfirmAnchor.y - 8)}px`;
+        menu.style.right = "auto";
+        menu.style.bottom = "auto";
+        menu.style.marginLeft = "0px";
+        menu.style.transform = "translate(-50%, -100%)";
+        menu.style.transformOrigin = "bottom center";
+
+        let anchoredRect = menu.getBoundingClientRect();
+        const overflowLeft = viewportPad - anchoredRect.left;
+        const overflowRight = anchoredRect.right - (window.innerWidth - viewportPad);
+        const overflowTop = viewportPad - anchoredRect.top;
+
+        let offsetX = 0;
+        if (overflowLeft > 0) offsetX += Math.ceil(overflowLeft);
+        if (overflowRight > 0) offsetX -= Math.ceil(overflowRight);
+
+        if (offsetX !== 0) {
+          const currentLeft = parseInt(menu.style.left, 10) || Math.round(openDeleteConfirmAnchor.x);
+          menu.style.left = `${currentLeft + offsetX}px`;
+          anchoredRect = menu.getBoundingClientRect();
+        }
+
+        if (overflowTop > 0) {
+          menu.style.top = `${Math.round(openDeleteConfirmAnchor.y + 8)}px`;
+          menu.style.transform = "translate(-50%, 0)";
+          menu.style.transformOrigin = "top center";
+        }
+
+        return;
+      }
+
       const forceAlignLeft = menu.classList.contains("confirm-force-left");
       const tabContent = menu.closest(".tab-content");
       const tabRect = tabContent ? tabContent.getBoundingClientRect() : null;
@@ -2185,6 +2251,7 @@ export function initInventory({ getState: getStateFn, scheduleSave: scheduleSave
       const clickedDeleteBtn = event.target.closest("button[data-action='deleteItem']");
       if (!clickedInsideDeleteConfirm && !clickedDeleteBtn) {
         openDeleteConfirmItemId = null;
+        openDeleteConfirmAnchor = null;
         renderInventory();
       }
     }
