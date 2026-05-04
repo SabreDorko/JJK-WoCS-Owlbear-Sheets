@@ -2047,13 +2047,30 @@ export function renderInventory() {
     const menus = document.querySelectorAll(".skills-delete-confirm");
     const viewportPad = 8;
     menus.forEach(menu => {
+      const tabContent = menu.closest(".tab-content");
+      const tabRect = tabContent ? tabContent.getBoundingClientRect() : null;
+      const leftBoundary = Math.max(viewportPad, (tabRect?.left ?? viewportPad) + 2);
+      const rightBoundary = Math.min(window.innerWidth - viewportPad, (tabRect?.right ?? window.innerWidth - viewportPad) - 2);
+
       menu.classList.remove("confirm-below", "confirm-align-left", "confirm-align-right");
       const rect = menu.getBoundingClientRect();
       if (rect.top < viewportPad) menu.classList.add("confirm-below");
-      if (rect.right > window.innerWidth - viewportPad) menu.classList.add("confirm-align-left");
+      if (rect.right > rightBoundary) menu.classList.add("confirm-align-left");
       // Inventory uses delete confirms (right-anchored by default), so left overflow
       // needs a left anchor to push the popup back into the viewport.
-      if (rect.left < viewportPad) menu.classList.add("confirm-align-left");
+      if (rect.left < leftBoundary) menu.classList.add("confirm-align-left");
+
+      // Second pass: if still clipped on either side, try the opposite anchor.
+      let adjusted = menu.getBoundingClientRect();
+      if (adjusted.left < leftBoundary) {
+        menu.classList.remove("confirm-align-left");
+        menu.classList.add("confirm-align-right");
+        adjusted = menu.getBoundingClientRect();
+      }
+      if (adjusted.right > rightBoundary) {
+        menu.classList.remove("confirm-align-right");
+        menu.classList.add("confirm-align-left");
+      }
     });
   });
   if (_refreshCharacterStats) _refreshCharacterStats();
