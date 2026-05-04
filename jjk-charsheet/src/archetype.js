@@ -445,11 +445,10 @@ function ensureCustomArchetypeState(state) {
 
   if (!Array.isArray(custom.permanentAptitudeRules)) {
     custom.permanentAptitudeRules = [
-      "Choose 1 permanent aptitude from Power",
-      "Choose 1 permanent aptitude from Technique",
+      "Choose 1 Permanent Aptitude from Power & Technique",
     ];
   }
-  while (custom.permanentAptitudeRules.length < 2) custom.permanentAptitudeRules.push("");
+  while (custom.permanentAptitudeRules.length < 1) custom.permanentAptitudeRules.push("");
 
   if (!Array.isArray(custom.startingEquipment)) custom.startingEquipment = ["", ""];
   while (custom.startingEquipment.length < 2) custom.startingEquipment.push("");
@@ -488,14 +487,29 @@ function parsePermanentAptitudeStatPicksFromRules(rawRules) {
     const text = String(line || "");
     const stats = [...new Set((text.match(/power|speed|technique|intelligence|cooperation/gi) || []).map(normalizeStatKey))]
       .filter(stat => STAT_KEYS.includes(stat));
-    if (stats.length !== 1) return;
+    if (!stats.length) return;
 
     const countMatch = text.match(/choose\s+(\d+)/i);
     const count = Math.max(1, parseInt(countMatch?.[1] || "1", 10) || 1);
-    const stat = stats[0];
-    for (let i = 0; i < count; i += 1) picks.push(stat);
+
+    if (stats.length === 1) {
+      const stat = stats[0];
+      for (let i = 0; i < count; i += 1) picks.push(stat);
+      return;
+    }
+
+    stats.forEach(stat => {
+      for (let i = 0; i < count; i += 1) picks.push(stat);
+    });
   });
   return picks;
+}
+
+function formatStatList(stats) {
+  const labels = stats.map(stat => toTitleCase(stat));
+  if (labels.length <= 1) return labels[0] || "";
+  if (labels.length === 2) return `${labels[0]} & ${labels[1]}`;
+  return `${labels.slice(0, -1).join(", ")} & ${labels[labels.length - 1]}`;
 }
 
 function buildPermanentAptitudeRulesFromPicks(rawPicks) {
@@ -504,9 +518,16 @@ function buildPermanentAptitudeRulesFromPicks(rawPicks) {
 
   const counts = new Map();
   picks.forEach(stat => counts.set(stat, (counts.get(stat) || 0) + 1));
-  return [...counts.entries()].map(([stat, count]) => {
-    const noun = count === 1 ? "aptitude" : "aptitudes";
-    return `Choose ${count} permanent ${noun} from ${toTitleCase(stat)}`;
+
+  const groupedStats = new Map();
+  [...counts.entries()].forEach(([stat, count]) => {
+    if (!groupedStats.has(count)) groupedStats.set(count, []);
+    groupedStats.get(count).push(stat);
+  });
+
+  return [...groupedStats.entries()].map(([count, stats]) => {
+    const noun = count === 1 ? "Aptitude" : "Aptitudes";
+    return `Choose ${count} Permanent ${noun} from ${formatStatList(stats)}`;
   });
 }
 
@@ -541,7 +562,7 @@ function buildCustomPermanentAptitudeRules(custom) {
       ? custom.permanentAptitudeStatPicks.slice(0, 2)
       : []
   );
-  if (!validPicks.length) return ["Choose 1 permanent aptitude from Power", "Choose 1 permanent aptitude from Technique"];
+  if (!validPicks.length) return ["Choose 1 Permanent Aptitude from Power & Technique"];
   return buildPermanentAptitudeRulesFromPicks(validPicks);
 }
 
@@ -1033,7 +1054,7 @@ function renderBenefits(state) {
         </div>
         <div>
           <div class="field-label">Starting Equipment</div>
-          <div class="techniques-muted">Choose your starting equipment options, then add or replace the granted gear below.</div>
+          <div class="techniques-muted">Choose your starting equipment options, then add or replace the granted gear below. Equipment is sent to Storage.</div>
           ${equipmentMarkup}
         </div>
       </div>
@@ -1042,13 +1063,8 @@ function renderBenefits(state) {
   `;
 }
 
-function renderPermanentAptitudePicker(state) {
-  const container = document.getElementById("archetypePermanentAptitudes");
-  const panel = document.getElementById("archetypePermanentAptitudesPanel");
-  const toggle = document.getElementById("archetypePermanentAptitudesToggleBtn");
-  if (container) container.innerHTML = "";
-  if (panel) panel.style.display = "none";
-  if (toggle) toggle.style.display = "none";
+function renderPermanentAptitudePicker(_state) {
+  // Panel removed from HTML; this function is a no-op kept for call-site compatibility.
 }
 
 function renderCustomBuilder(state) {
@@ -1472,7 +1488,7 @@ function applyCollapseState(buttonId, panelId, collapsed) {
 
 function syncArchetypeCollapseUI() {
   applyCollapseState("archetypeBenefitsToggleBtn", "archetypeBenefitsPanel", _collapsedArchetypeSections.benefits);
-  applyCollapseState("archetypePermanentAptitudesToggleBtn", "archetypePermanentAptitudesPanel", _collapsedArchetypeSections.permanentAptitudes);
+  // archetypePermanentAptitudesPanel removed from HTML.
 }
 
 export function applyArchetypeStateToUI() {
@@ -1721,19 +1737,6 @@ export function initArchetype({ getState: getStateFn, scheduleSave: scheduleSave
       if (!state) return;
       ensureArchetypeState(state);
       _collapsedArchetypeSections.benefits = !_collapsedArchetypeSections.benefits;
-      persistCollapsedSectionsToState(state);
-      syncArchetypeCollapseUI();
-      scheduleSave();
-    });
-  }
-
-  const permanentAptitudesToggle = document.getElementById("archetypePermanentAptitudesToggleBtn");
-  if (permanentAptitudesToggle) {
-    permanentAptitudesToggle.addEventListener("click", () => {
-      const state = getState();
-      if (!state) return;
-      ensureArchetypeState(state);
-      _collapsedArchetypeSections.permanentAptitudes = !_collapsedArchetypeSections.permanentAptitudes;
       persistCollapsedSectionsToState(state);
       syncArchetypeCollapseUI();
       scheduleSave();

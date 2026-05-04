@@ -11,7 +11,8 @@
       { "kind": "skill", "statKey": "speed", "skillIndex": 3, "value": 1 },
       { "kind": "skill", "statKey": "technique", "skillIndex": 0, "value": 1 }
     ],
-    "aliases": ["dancing shoes", "running shoes"]
+    "aliases": ["dancing shoes", "running shoes"],
+    "stackable": false
   },
   {
     "id": "tonfa",
@@ -23,7 +24,8 @@
     "weaponDamageParts": [{ "count": 2, "die": "d6" }],
     "description": "Training tonfa.",
     "modifiers": [],
-    "aliases": ["tonfa"]
+    "aliases": ["tonfa"],
+    "stackable": false
   },
   {
     "id": "tearaway-uniform",
@@ -31,9 +33,10 @@
     "itemType": "clothing",
     "allowedSlots": ["body"],
     "slotsNeeded": 1,
-    "description": "Rugged uniform for close combat.",
+    "description": "Rugged uniform for close combat. Can be torn off for advantage on one Intimidation roll.",
     "modifiers": [],
-    "aliases": ["tearaway uniform"]
+    "aliases": ["tearaway uniform"],
+    "stackable": false
   },
   {
     "id": "knuckle-guards",
@@ -41,7 +44,8 @@
     "itemType": "item",
     "description": "Hand protection used for brawling.",
     "modifiers": [],
-    "aliases": ["knuckle guards"]
+    "aliases": ["knuckle guards"],
+    "stackable": false
   },
   {
     "id": "hunting-knife",
@@ -50,18 +54,20 @@
     "weaponGrip": "oneHanded",
     "weaponType": "slashing",
     "weaponStat": "speed",
-    "weaponDamageParts": [{ "count": 1, "die": "d6" }],
-    "description": "A compact knife suited for close range.",
+    "weaponDamageParts": [{ "count": 1, "die": "d8" }],
+    "description": "A compact knife suited for close range. Inflicts bleed.",
     "modifiers": [],
-    "aliases": ["hunting knife"]
+    "aliases": ["hunting knife"],
+    "stackable": false
   },
   {
     "id": "camouflage-paint",
     "name": "Camouflage Paint",
     "itemType": "item",
-    "description": "Consumable stealth prep.",
+    "description": "Consumable stealth prep. (2/day)",
     "modifiers": [],
-    "aliases": ["camouflage paint"]
+    "aliases": ["camouflage paint"],
+    "stackable": false
   },
   {
     "id": "gun",
@@ -71,18 +77,21 @@
     "weaponType": "ranged",
     "weaponStat": "technique",
     "weaponDamageParts": [{ "count": 1, "die": "d8" }],
-    "weaponRange": 60,
-    "description": "Standard sidearm.",
+    "weaponRange": 40,
+    "description": "Standard sidearm with unlimited ammo.",
     "modifiers": [],
-    "aliases": ["gun"]
+    "aliases": ["gun"],
+    "stackable": false
   },
   {
     "id": "incendiary-rounds",
     "name": "Incendiary Rounds",
     "itemType": "item",
-    "description": "Special ammunition that inflicts singe.",
+    "description": "Special ammunition that inflicts singe. (DC TL x 3)",
     "modifiers": [],
-    "aliases": ["incendiary rounds"]
+    "aliases": ["incendiary rounds"],
+    "stackable": true,
+    "quantity": 5
   },
   {
     "id": "body-armor",
@@ -92,7 +101,8 @@
     "slotsNeeded": 1,
     "description": "Protective chest armor.",
     "modifiers": [],
-    "aliases": ["body armor"]
+    "aliases": ["body armor"],
+    "stackable": false
   },
   {
     "id": "motorcycle-goggles",
@@ -100,19 +110,21 @@
     "itemType": "clothing",
     "allowedSlots": ["accessory"],
     "slotsNeeded": 1,
-    "description": "Protective eyewear.",
+    "description": "Protective eyewear. Effective against wind and dust attacks.",
     "modifiers": [],
-    "aliases": ["motorcycle goggles"]
+    "aliases": ["motorcycle goggles"],
+    "stackable": false
   },
   {
     "id": "running-gear",
     "name": "Running Gear",
     "itemType": "clothing",
-    "allowedSlots": ["legs"],
-    "slotsNeeded": 1,
+    "allowedSlots": ["body", "legs"],
+    "slotsNeeded": 2,
     "description": "Athletic wear optimized for speed.",
     "modifiers": [],
-    "aliases": ["running gear"]
+    "aliases": ["running gear"],
+    "stackable": false
   },
   {
     "id": "switchblade",
@@ -122,77 +134,89 @@
     "weaponType": "slashing",
     "weaponStat": "speed",
     "weaponDamageParts": [{ "count": 1, "die": "d6" }],
-    "description": "Concealable folding blade.",
+    "description": "Concealable folding blade. Inflicts bleed.",
     "modifiers": [],
-    "aliases": ["switchblade"]
+    "aliases": ["switchblade"],
+    "stackable": false
   },
   {
     "id": "token-from-the-past",
     "name": "A Token From The Past",
     "itemType": "item",
-    "description": "Lucky keepsake tied to old memories.",
+    "description": "Lucky keepsake tied to old memories. Recharges with a successful deception roll. (3/day)",
     "modifiers": [],
-    "aliases": ["a token from the past", "token from the past"]
+    "aliases": ["a token from the past", "token from the past"],
+    "stackable": false
   },
   {
     "id": "notebook",
     "name": "Notebook",
     "itemType": "item",
-    "description": "Planning and education notes.",
+    "description": "A journal for notes and planning.",
     "modifiers": [],
-    "aliases": ["notebook"]
+    "aliases": ["notebook"],
+    "stackable": false
   },
   {
     "id": "katana",
     "name": "Katana",
     "itemType": "weapon",
-    "weaponGrip": "oneHanded",
+    "weaponGrip": "twoHanded",
     "weaponType": "slashing",
-    "weaponStat": "power",
-    "weaponDamageParts": [{ "count": 1, "die": "d8" }],
-    "description": "Standard katana.",
+    "weaponStat": "technique",
+    "weaponDamageParts": [{ "count": 2, "die": "d6" }],
+    "description": "A nice standard katana.",
     "modifiers": [],
-    "aliases": ["katana"]
+    "aliases": ["katana"],
+    "stackable": false
   },
   {
     "id": "sword-polish",
     "name": "Sword Polish",
     "itemType": "item",
-    "description": "Consumable polish for blade maintenance.",
+    "description": "Consumable polish for blade maintenance. (5 uses)",
     "modifiers": [],
-    "aliases": ["sword polish"]
+    "aliases": ["sword polish"],
+    "stackable": true,
+    "quantity": 5
   },
   {
     "id": "first-aid-kit",
     "name": "First Aid Kit",
     "itemType": "item",
-    "description": "Basic emergency medical supplies.",
+    "description": "Basic emergency medical supplies. (2 uses)",
     "modifiers": [],
-    "aliases": ["first aid kit"]
+    "aliases": ["first aid kit"],
+    "stackable": false,
+    "quantity": 2
   },
   {
     "id": "cigarettes",
     "name": "Cigarettes",
     "itemType": "item",
-    "description": "Consumable stress and CE management item.",
+    "description": "Consumable stress and CE management item. (10 uses)",
     "modifiers": [],
-    "aliases": ["cigarettes"]
+    "aliases": ["cigarettes"],
+    "stackable": true,
+    "quantity": 10
   },
   {
     "id": "sentimental-possession",
     "name": "Sentimental Possession",
     "itemType": "item",
-    "description": "Personal keepsake with latent power.",
+    "description": "Personal keepsake with latent power. Recharges weekly. (1/week)",
     "modifiers": [],
-    "aliases": ["sentimental possession"]
+    "aliases": ["sentimental possession"],
+    "stackable": false
   },
   {
     "id": "potential",
     "name": "Potential",
     "itemType": "item",
-    "description": "A one-time narrative edge.",
+    "description": "A one-time narrative edge. Does not take up an item slot.",
     "modifiers": [],
-    "aliases": ["potential"]
+    "aliases": ["potential"],
+    "stackable": true
   },
   {
     "id": "hammer",
@@ -204,7 +228,8 @@
     "weaponDamageParts": [{ "count": 2, "die": "d6" }],
     "description": "Heavy blunt weapon.",
     "modifiers": [],
-    "aliases": ["hammer", "sledge hammer", "hammer/sledge hammer"]
+    "aliases": ["hammer", "sledge hammer", "hammer/sledge hammer"],
+    "stackable": false
   },
   {
     "id": "punk-boots",
@@ -214,7 +239,8 @@
     "slotsNeeded": 1,
     "description": "Durable boots with street style.",
     "modifiers": [],
-    "aliases": ["punk boots"]
+    "aliases": ["punk boots"],
+    "stackable": false
   },
   {
     "id": "hero-business-suit",
@@ -224,7 +250,8 @@
     "slotsNeeded": 1,
     "description": "Formal combat-ready attire.",
     "modifiers": [],
-    "aliases": ["hero/business suit", "hero suit", "business suit"]
+    "aliases": ["hero/business suit", "hero suit", "business suit"],
+    "stackable": false
   },
   {
     "id": "professional-glasses",
@@ -234,23 +261,26 @@
     "slotsNeeded": 1,
     "description": "Stylish glasses for tactical reads.",
     "modifiers": [],
-    "aliases": ["professional glasses"]
+    "aliases": ["professional glasses"],
+    "stackable": false
   },
   {
     "id": "lucky-dice",
     "name": "Lucky Dice",
     "itemType": "item",
-    "description": "Risk-reward dice set.",
+    "description": "Risk-reward dice set. (3/day)",
     "modifiers": [],
-    "aliases": ["lucky dice"]
+    "aliases": ["lucky dice"],
+    "stackable": true
   },
   {
     "id": "skateboard",
     "name": "Skateboard",
     "itemType": "item",
-    "description": "Mobility-focused board.",
+    "description": "Mobility-focused board. +10 FT movement speed when used.",
     "modifiers": [],
-    "aliases": ["skateboard"]
+    "aliases": ["skateboard"],
+    "stackable": false
   },
   {
     "id": "tinkers-kit",
@@ -258,30 +288,37 @@
     "itemType": "item",
     "description": "General purpose tinkering tools.",
     "modifiers": [],
-    "aliases": ["tinker's kit", "tinker’s kit", "tinkers kit"]
+    "aliases": ["tinker's kit", "tinker's kit", "tinkers kit"],
+    "stackable": false
   },
   {
     "id": "caffeine-patch",
     "name": "Caffeine Patch",
     "itemType": "item",
-    "description": "Consumable stimulant for overnight crafting.",
+    "description": "Consumable stimulant for overnight crafting. (5 uses)",
     "modifiers": [],
-    "aliases": ["caffeine patch"]
+    "aliases": ["caffeine patch"],
+    "stackable": true,
+    "quantity": 5
   },
   {
     "id": "mysterious-herbs",
     "name": "3 Mysterious Herbs",
     "itemType": "item",
-    "description": "Set of unknown herbs with varied effects.",
+    "description": "Set of unknown herbs with varied effects. Discover effects through use.",
     "modifiers": [],
-    "aliases": ["3 mysterious herbs", "mysterious herbs"]
+    "aliases": ["3 mysterious herbs", "mysterious herbs"],
+    "stackable": true,
+    "quantity": 3
   },
   {
     "id": "poison-vial",
     "name": "Poison Vial",
     "itemType": "item",
-    "description": "Weapon coating and poison source.",
+    "description": "Weapon coating and poison source. (5 uses)",
     "modifiers": [],
-    "aliases": ["poison vial"]
+    "aliases": ["poison vial"],
+    "stackable": true,
+    "quantity": 5
   }
 ]
