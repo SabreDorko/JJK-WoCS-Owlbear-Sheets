@@ -2,6 +2,8 @@ let _getState = null;
 let _scheduleSave = null;
 let _refreshTraining = null;
 let _initialized = false;
+let _skillsSearchQuery = "";
+let _showXpSkillForm = false;
 
 function getState() {
   return _getState ? _getState() : null;
@@ -25,8 +27,22 @@ function parsePositiveInt(raw, fallback = 1) {
   return Math.max(1, parsed);
 }
 
+function parseNonNegativeInt(raw, fallback = 0) {
+  const parsed = parseInt(raw, 10);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.max(0, parsed);
+}
+
 function normalizeText(raw) {
   return String(raw || "").trim();
+}
+
+function escapeHtml(value) {
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/\"/g, "&quot;");
 }
 
 function ensureSkillsState(state) {
@@ -46,10 +62,19 @@ function sortByTitle(a, b) {
 }
 
 function renderXpSkillCard(skill) {
+  const maxStacks = parsePositiveInt(skill.maxStacks, 1);
+  const currentStacks = Math.min(parseNonNegativeInt(skill.currentStacks, 0), maxStacks);
+  const canDecrease = currentStacks > 0;
+  const canIncrease = currentStacks < maxStacks;
   return `
     <article class="skills-card" data-kind="xp" data-skill-id="${skill.id}">
       <div class="skills-card-title">${skill.title || "Untitled XP Skill"}</div>
       ${skill.description ? `<div class="skills-card-desc">${skill.description}</div>` : ""}
+      <div class="skills-card-meta">Stacks: ${currentStacks}/${maxStacks}</div>
+      <div class="skills-stack-controls">
+        <button type="button" class="inventory-mini-btn" data-action="decreaseXpStack" ${canDecrease ? "" : "disabled"}>-</button>
+        <button type="button" class="inventory-mini-btn" data-action="increaseXpStack" ${canIncrease ? "" : "disabled"}>+</button>
+      </div>
       <div class="skills-card-actions">
         <button type="button" class="inventory-mini-btn" data-action="editSkill">Edit</button>
         <button type="button" class="inventory-mini-btn danger" data-action="deleteSkill">Delete</button>
@@ -58,15 +83,26 @@ function renderXpSkillCard(skill) {
   `;
 }
 
-function renderJujutsuSkillCard(skill) {
+function isSkillCurrentlyInTraining(state, skill) {
+  const skillDefId = String(skill?.skillDefId || skill?.id || "").trim();
+  if (!skillDefId) return false;
+  const trainingList = Array.isArray(state?.training?.jujutsuSkills) ? state.training.jujutsuSkills : [];
+  return trainingList.some(entry =>
+    String(entry?.skillDefId || entry?.id || "") === skillDefId
+    && parsePositiveInt(entry?.progress, 0) < parsePositiveInt(entry?.requiredMissions, 1),
+  );
+}
+
+function renderJujutsuSkillCard(state, skill) {
   const timesLearned = parsePositiveInt(skill.timesLearned, 1);
   const maxLearnCount = parsePositiveInt(skill.maxLearnCount, 1);
-  const canRelearn = timesLearned < maxLearnCount;
+  const inTraining = isSkillCurrentlyInTraining(state, skill);
+  const canRelearn = timesLearned < maxLearnCount && !inTraining;
   return `
     <article class="skills-card" data-kind="jujutsu" data-skill-id="${skill.id}">
       <div class="skills-card-title">${skill.title || "Untitled Jujutsu Skill"}</div>
       ${skill.description ? `<div class="skills-card-desc">${skill.description}</div>` : ""}
-      <div class="skills-card-meta">Learned: ${timesLearned}/${maxLearnCount}</div>
+      <div class="skills-card-meta">Learned: ${timesLearned}/${maxLearnCount}${inTraining ? " (In Training)" : ""}</div>
       <div class="skills-card-actions">
         ${canRelearn ? '<button type="button" class="inventory-mini-btn" data-action="relearnSkill">Learn Again</button>' : ""}
         <button type="button" class="inventory-mini-btn" data-action="editSkill">Edit</button>
@@ -82,6 +118,8 @@ function renderSkillEditForm(skill, kind) {
   const maxLearnCount = parsePositiveInt(skill?.maxLearnCount, 1);
   const requirements = normalizeText(skill?.requirements);
   const requiredMissions = parsePositiveInt(skill?.requiredMissions, 1);
+  const maxStacks = parsePositiveInt(skill?.maxStacks, 1);
+  const currentStacks = Math.min(parseNonNegativeInt(skill?.currentStacks, 0), maxStacks);
 
   return `
     <div class="skills-edit-card" data-kind="${kind}" data-skill-id="${skill.id}">
@@ -94,6 +132,16 @@ function renderSkillEditForm(skill, kind) {
           <label class="field-label">Description</label>
           <textarea class="skill-textarea" data-field="description" rows="3" maxlength="300">${description}</textarea>
         </div>
+        ${kind === "xp" ? `
+          <div class="skill-input-field">
+            <label class="field-label">Max Stacks</label>
+            <input type="number" min="1" class="skill-input" data-field="maxStacks" value="${maxStacks}" />
+          </div>
+          <div class="skill-input-field">
+            <label class="field-label">Current Stacks</label>
+            <input type="number" min="0" class="skill-input" data-field="currentStacks" value="${currentStacks}" />
+          </div>
+        ` : ""}
         ${kind === "jujutsu" ? `
           <div class="skill-input-field">
             <label class="field-label">Max Learn Count</label>
@@ -136,17 +184,17 @@ function renderAddXpSkillForm() {
           <label class="field-label">Description</label>
           <textarea class="skill-textarea" data-field="description" rows="3" maxlength="300"></textarea>
         </div>
+        <div class="skill-input-field">
+          <label class="field-label">Max Stacks</label>
+          <input type="number" min="1" class="skill-input" data-field="maxStacks" value="1" />
+        </div>
       </div>
       <div class="skill-input-actions">
         <button type="button" class="training-add-skill-btn" data-action="saveNewXpSkill">Add XP Skill</button>
+        <button type="button" class="training-cancel-btn" data-action="cancelNewXpSkill">Cancel</button>
       </div>
     </div>
   `;
-}
-
-function getSearchValue() {
-  const input = document.getElementById("skillsSearchInput");
-  return String(input?.value || "").trim().toLowerCase();
 }
 
 function applySearchFilter(skills, search) {
@@ -160,15 +208,19 @@ function applySearchFilter(skills, search) {
 
 function renderSkillsPanel(state) {
   ensureSkillsState(state);
-  const search = getSearchValue();
+  const search = String(_skillsSearchQuery || "").trim().toLowerCase();
+  const hasSearch = search.length > 0;
 
   const xpSkills = applySearchFilter([...state.skills.xpSkills].sort(sortByTitle), search);
   const jujutsuSkills = applySearchFilter([...state.skills.jujutsuSkills].sort(sortByTitle), search);
 
+  const jujutsuEmptyMessage = hasSearch ? "No skills found" : "No learned Jujutsu skills yet.";
+  const xpEmptyMessage = hasSearch ? "No skills found" : "No XP skills yet.";
+
   return `
     <div class="skills-shell">
       <div class="skills-toolbar">
-        <input id="skillsSearchInput" class="meta-input" type="text" placeholder="Search skills..." value="${String(document.getElementById("skillsSearchInput")?.value || "").replace(/"/g, "&quot;")}" />
+        <input id="skillsSearchInput" class="meta-input" type="text" placeholder="Search XP + Jujutsu skills..." value="${escapeHtml(_skillsSearchQuery)}" />
       </div>
 
       <div class="training-section">
@@ -176,21 +228,39 @@ function renderSkillsPanel(state) {
           <h3 class="training-section-title">Jujutsu Skills</h3>
         </div>
         <div class="skills-grid">
-          ${jujutsuSkills.length ? jujutsuSkills.map(renderJujutsuSkillCard).join("") : '<div class="training-muted">No learned Jujutsu skills yet.</div>'}
+          ${jujutsuSkills.length ? jujutsuSkills.map(skill => renderJujutsuSkillCard(state, skill)).join("") : `<div class="training-muted">${jujutsuEmptyMessage}</div>`}
         </div>
       </div>
 
       <div class="training-section">
         <div class="training-section-header">
           <h3 class="training-section-title">XP Skills</h3>
+          <button type="button" class="training-add-skill-btn" data-action="showNewXpSkillForm">Add XP Skill</button>
         </div>
-        ${renderAddXpSkillForm()}
+        ${_showXpSkillForm ? renderAddXpSkillForm() : ""}
         <div class="skills-grid">
-          ${xpSkills.length ? xpSkills.map(renderXpSkillCard).join("") : '<div class="training-muted">No XP skills yet.</div>'}
+          ${xpSkills.length ? xpSkills.map(renderXpSkillCard).join("") : `<div class="training-muted">${xpEmptyMessage}</div>`}
         </div>
       </div>
     </div>
   `;
+}
+
+function rerenderSkillsPreserveSearchFocus(state, sourceInput = null) {
+  const active = sourceInput || document.getElementById("skillsSearchInput");
+  const shouldRefocus = Boolean(active && document.activeElement === active);
+  const start = shouldRefocus && typeof active.selectionStart === "number" ? active.selectionStart : null;
+  const end = shouldRefocus && typeof active.selectionEnd === "number" ? active.selectionEnd : null;
+
+  renderSkills(state);
+
+  if (!shouldRefocus) return;
+  const rebuilt = document.getElementById("skillsSearchInput");
+  if (!rebuilt) return;
+  rebuilt.focus();
+  if (start !== null && end !== null) {
+    rebuilt.setSelectionRange(start, end);
+  }
 }
 
 function findSkillById(state, kind, skillId) {
@@ -237,7 +307,8 @@ function setupSkillsEventHandlers() {
     if (e.target?.id === "skillsSearchInput") {
       const state = getState();
       if (!state) return;
-      renderSkills(state);
+      _skillsSearchQuery = String(e.target.value || "");
+      rerenderSkillsPreserveSearchFocus(state, e.target);
     }
   });
 
@@ -246,16 +317,32 @@ function setupSkillsEventHandlers() {
     if (!state) return;
     ensureSkillsState(state);
 
+    const showXpFormBtn = e.target?.closest?.("[data-action='showNewXpSkillForm']");
+    if (showXpFormBtn) {
+      _showXpSkillForm = true;
+      renderSkills(state);
+      return;
+    }
+
+    const cancelNewXpBtn = e.target?.closest?.("[data-action='cancelNewXpSkill']");
+    if (cancelNewXpBtn) {
+      _showXpSkillForm = false;
+      renderSkills(state);
+      return;
+    }
+
     const addXpBtn = e.target?.closest?.("[data-action='saveNewXpSkill']");
     if (addXpBtn) {
       const form = addXpBtn.closest(".skills-add-form");
       const title = normalizeText(form?.querySelector("[data-field='title']")?.value);
       const description = normalizeText(form?.querySelector("[data-field='description']")?.value);
+      const maxStacks = parsePositiveInt(form?.querySelector("[data-field='maxStacks']")?.value, 1);
       if (!title) {
         alert("Please provide an XP skill title.");
         return;
       }
-      state.skills.xpSkills.push({ id: createId("xp-skill"), title, description });
+      state.skills.xpSkills.push({ id: createId("xp-skill"), title, description, maxStacks, currentStacks: 0 });
+      _showXpSkillForm = false;
       scheduleSave();
       renderSkills(state);
       return;
@@ -285,6 +372,29 @@ function setupSkillsEventHandlers() {
       return;
     }
 
+    const increaseStackBtn = e.target?.closest?.("[data-action='increaseXpStack']");
+    if (increaseStackBtn) {
+      const info = findSkillById(state, "xp", skillId);
+      if (!info.skill) return;
+      const maxStacks = parsePositiveInt(info.skill.maxStacks, 1);
+      const currentStacks = parseNonNegativeInt(info.skill.currentStacks, 0);
+      info.skill.currentStacks = Math.min(currentStacks + 1, maxStacks);
+      scheduleSave();
+      renderSkills(state);
+      return;
+    }
+
+    const decreaseStackBtn = e.target?.closest?.("[data-action='decreaseXpStack']");
+    if (decreaseStackBtn) {
+      const info = findSkillById(state, "xp", skillId);
+      if (!info.skill) return;
+      const currentStacks = parseNonNegativeInt(info.skill.currentStacks, 0);
+      info.skill.currentStacks = Math.max(currentStacks - 1, 0);
+      scheduleSave();
+      renderSkills(state);
+      return;
+    }
+
     const relearnBtn = e.target?.closest?.("[data-action='relearnSkill']");
     if (relearnBtn) {
       const info = findSkillById(state, "jujutsu", skillId);
@@ -295,6 +405,7 @@ function setupSkillsEventHandlers() {
       if (startJujutsuRelearn(state, info.skill)) {
         scheduleSave();
         refreshTraining();
+        renderSkills(state);
       }
       return;
     }
@@ -316,6 +427,13 @@ function setupSkillsEventHandlers() {
 
       info.skill.title = title;
       info.skill.description = description;
+
+      if (editKind === "xp") {
+        const maxStacks = parsePositiveInt(editCard.querySelector("[data-field='maxStacks']")?.value, 1);
+        const currentStacks = parseNonNegativeInt(editCard.querySelector("[data-field='currentStacks']")?.value, 0);
+        info.skill.maxStacks = maxStacks;
+        info.skill.currentStacks = Math.min(currentStacks, maxStacks);
+      }
 
       if (editKind === "jujutsu") {
         info.skill.maxLearnCount = parsePositiveInt(editCard.querySelector("[data-field='maxLearnCount']")?.value, 1);

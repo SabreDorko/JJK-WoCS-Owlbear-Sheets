@@ -6,6 +6,7 @@
       --parchment-dark: #e2d9c8;
       --parchment-darker: #cfc4b0;
       --accent: #8b1a1a;
+  --border-light: rgba(26,20,16,0.38);
       --border: rgba(26,20,16,0.22);
       --border-strong: rgba(26,20,16,0.55);
     }
@@ -2582,6 +2583,24 @@
       flex-wrap: wrap;
       gap: 6px;
       align-items: center;
+    }
+    .skills-stack-controls {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .skills-stack-controls .inventory-mini-btn {
+      min-width: 24px;
+      padding: 1px 6px;
+      font-size: 10px;
+      line-height: 1;
+    }
+    .skills-add-form .skill-input,
+    .skills-edit-card .skill-input,
+    .skills-add-form .skill-textarea,
+    .skills-edit-card .skill-textarea {
+      border-color: var(--border-strong);
+      background: rgba(240, 235, 224, 0.82);
     }
 
     .skill-dot.trained-aptitude {
