@@ -442,15 +442,6 @@ function getAnchoredDeleteConfirmStyle(anchor, mode = "left-corner") {
 }
 
 function renderInlineApplicationDeleteWrap(idx) {
-  const showConfirm = _pendingInlineApplicationDeleteIndex === idx;
-  const anchor = showConfirm && _pendingInlineApplicationDeleteAnchor && _pendingInlineApplicationDeleteAnchor.idx === idx
-    ? _pendingInlineApplicationDeleteAnchor
-    : null;
-  const anchorMode = anchor?.mode === "left-corner" ? "left-corner" : "center";
-  const style = getAnchoredDeleteConfirmStyle(anchor, anchorMode);
-  const modeClass = anchor
-    ? (anchorMode === "left-corner" ? " confirm-cursor-anchor confirm-anchor-left-corner" : " confirm-cursor-anchor")
-    : "";
   return `
     <span class="skills-delete-wrap">
       <button type="button" class="inventory-mini-btn inventory-icon-btn danger" data-app-remove-inline="${idx}" aria-label="Delete application" title="Delete">
@@ -459,35 +450,19 @@ function renderInlineApplicationDeleteWrap(idx) {
           <path fill="none" stroke="currentColor" stroke-width="1.5" d="M6 7.5h12"/>
         </svg>
       </button>
-      ${showConfirm ? `<div class="skills-delete-confirm${modeClass}" data-tech-delete-kind="inline-app" data-tech-delete-idx="${idx}" role="menu"${style}>
-        <span class="skills-delete-confirm-text">Delete application?</span>
-        <button type="button" class="inventory-mini-btn danger" data-app-remove-inline-confirm="${idx}">Delete</button>
-        <button type="button" class="inventory-mini-btn" data-app-remove-inline-cancel="${idx}">Cancel</button>
-      </div>` : ""}
     </span>
   `;
 }
 
 function renderEditorApplicationDeleteWrap(idx) {
-  const showConfirm = _pendingEditorApplicationDeleteIndex === idx;
-  const anchor = showConfirm && _pendingEditorApplicationDeleteAnchor && _pendingEditorApplicationDeleteAnchor.idx === idx
-    ? _pendingEditorApplicationDeleteAnchor
-    : null;
-  const style = getAnchoredDeleteConfirmStyle(anchor, "left-corner");
   return `
     <span class="skills-delete-wrap">
       <button type="button" class="inventory-secondary-btn techniques-app-remove-btn" data-app-remove="${idx}">Remove</button>
-      ${showConfirm ? `<div class="skills-delete-confirm confirm-cursor-anchor confirm-anchor-left-corner" data-tech-delete-kind="editor-app" data-tech-delete-idx="${idx}" role="menu"${style}>
-        <span class="skills-delete-confirm-text">Delete application?</span>
-        <button type="button" class="inventory-mini-btn danger" data-app-remove-confirm="${idx}">Delete</button>
-        <button type="button" class="inventory-mini-btn" data-app-remove-cancel="${idx}">Cancel</button>
-      </div>` : ""}
     </span>
   `;
 }
 
 function renderVowDeleteWrap(idx) {
-  const showConfirm = _pendingVowDeleteIndex === idx;
   return `
     <span class="skills-delete-wrap" style="margin-left:auto;">
       <button type="button" class="inventory-mini-btn inventory-icon-btn danger" data-vow-remove="${idx}" aria-label="Delete vow" title="Delete vow">
@@ -496,11 +471,6 @@ function renderVowDeleteWrap(idx) {
           <path fill="none" stroke="currentColor" stroke-width="1.5" d="M6 7.5h12"/>
         </svg>
       </button>
-      ${showConfirm ? `<div class="skills-delete-confirm" role="menu">
-        <span class="skills-delete-confirm-text">Delete vow?</span>
-        <button type="button" class="inventory-mini-btn danger" data-vow-remove-confirm="${idx}">Delete</button>
-        <button type="button" class="inventory-mini-btn" data-vow-remove-cancel="${idx}">Cancel</button>
-      </div>` : ""}
     </span>
   `;
 }
@@ -1309,66 +1279,20 @@ export function initTechniques({ getState: getStateFn, scheduleSave: scheduleSav
         return;
       }
       const removeConfirmTrigger = e.target?.closest?.("[data-app-remove-inline-confirm]");
-      if (removeConfirmTrigger) {
+      if (removeConfirmTrigger) return;
+      // Delete
+      const removeTrigger = e.target?.closest?.("[data-app-remove-inline]");
+      if (removeTrigger) {
         const state = getState();
         if (!state) return;
         ensureTechniquesState(state);
-        const removeIdx = parseNonNegativeInt(removeConfirmTrigger.dataset.appRemoveInlineConfirm);
-        _pendingInlineApplicationDeleteIndex = null;
-        _pendingInlineApplicationDeleteAnchor = null;
+        const removeIdx = parseNonNegativeInt(removeTrigger.dataset.appRemoveInline);
         state.techniques.applications.splice(removeIdx, 1);
         state.techniques.applications = state.techniques.applications.map((entry, i) => normalizeApplication(entry, i));
         if (_pendingNewApplicationIndex !== null) _pendingNewApplicationIndex = null;
         _expandedAppIndices.clear();
         refreshApplicationCards(state);
         scheduleSave();
-        return;
-      }
-      const removeCancelTrigger = e.target?.closest?.("[data-app-remove-inline-cancel]");
-      if (removeCancelTrigger) {
-        const previousIdx = _pendingInlineApplicationDeleteIndex;
-        _pendingInlineApplicationDeleteIndex = null;
-        _pendingInlineApplicationDeleteAnchor = null;
-        const state = getState();
-        if (state && Number.isInteger(previousIdx)) updateInlineApplicationDeleteWrap(state, previousIdx);
-        return;
-      }
-      // Delete
-      const removeTrigger = e.target?.closest?.("[data-app-remove-inline]");
-      if (removeTrigger) {
-        const state = getState();
-        if (!state) return;
-        const removeIdx = parseNonNegativeInt(removeTrigger.dataset.appRemoveInline);
-        const previousIdx = _pendingInlineApplicationDeleteIndex;
-        if (_pendingInlineApplicationDeleteIndex === removeIdx) {
-          _pendingInlineApplicationDeleteIndex = null;
-          _pendingInlineApplicationDeleteAnchor = null;
-        } else {
-          const summaryGridRect = summaryGrid.getBoundingClientRect();
-          const cardRect = removeTrigger.closest(".techniques-app-card")?.getBoundingClientRect();
-          const cardCenterX = cardRect ? (cardRect.left + (cardRect.width / 2)) : null;
-          const gridCenterX = summaryGridRect.left + (summaryGridRect.width / 2);
-          const isLeftColumnCard = cardCenterX === null ? (removeIdx % 2 === 0) : (cardCenterX <= gridCenterX);
-
-          const triggerRect = removeTrigger.getBoundingClientRect();
-          const anchorX = triggerRect.left + (triggerRect.width / 2);
-          const anchorY = triggerRect.top;
-
-          _pendingInlineApplicationDeleteIndex = removeIdx;
-          _pendingInlineApplicationDeleteAnchor = isLeftColumnCard
-            ? {
-              idx: removeIdx,
-              x: anchorX,
-              y: anchorY,
-              mode: "left-corner",
-            }
-            : null;
-        }
-
-        if (Number.isInteger(previousIdx) && previousIdx !== removeIdx) {
-          updateInlineApplicationDeleteWrap(state, previousIdx);
-        }
-        updateInlineApplicationDeleteWrap(state, removeIdx);
         return;
       }
       const stepDownTrigger = e.target?.closest?.("[data-app-step-down]");
@@ -1616,53 +1540,16 @@ export function initTechniques({ getState: getStateFn, scheduleSave: scheduleSav
     });
 
     appList.addEventListener("click", e => {
-      const confirmIdxRaw = e.target?.dataset?.appRemoveConfirm;
-      if (confirmIdxRaw !== undefined) {
-        const state = getState();
-        if (!state) return;
-        ensureTechniquesState(state);
-        const removeIdx = parseNonNegativeInt(confirmIdxRaw);
-        _pendingEditorApplicationDeleteIndex = null;
-        _pendingEditorApplicationDeleteAnchor = null;
-        state.techniques.applications.splice(removeIdx, 1);
-        state.techniques.applications = state.techniques.applications.map((entry, idx) => normalizeApplication(entry, idx));
-        renderApplicationsEditor(state);
-        scheduleSave();
-        return;
-      }
-
-      const cancelIdxRaw = e.target?.dataset?.appRemoveCancel;
-      if (cancelIdxRaw !== undefined) {
-        const previousIdx = _pendingEditorApplicationDeleteIndex;
-        _pendingEditorApplicationDeleteIndex = null;
-        _pendingEditorApplicationDeleteAnchor = null;
-        const state = getState();
-        if (state && Number.isInteger(previousIdx)) updateEditorApplicationDeleteWrap(state, previousIdx);
-        return;
-      }
-
       const removeIdxRaw = e.target?.dataset?.appRemove;
       if (removeIdxRaw === undefined) return;
       const state = getState();
       if (!state) return;
+      ensureTechniquesState(state);
       const removeIdx = parseNonNegativeInt(removeIdxRaw);
-      const previousIdx = _pendingEditorApplicationDeleteIndex;
-      if (_pendingEditorApplicationDeleteIndex === removeIdx) {
-        _pendingEditorApplicationDeleteIndex = null;
-        _pendingEditorApplicationDeleteAnchor = null;
-      } else {
-        const trigger = e.target?.closest?.("[data-app-remove]");
-        const triggerRect = trigger?.getBoundingClientRect();
-        const anchorX = triggerRect ? (triggerRect.left + (triggerRect.width / 2)) : 0;
-        const anchorY = triggerRect ? triggerRect.top : 0;
-        _pendingEditorApplicationDeleteIndex = removeIdx;
-        _pendingEditorApplicationDeleteAnchor = { idx: removeIdx, x: anchorX, y: anchorY };
-      }
-
-      if (Number.isInteger(previousIdx) && previousIdx !== removeIdx) {
-        updateEditorApplicationDeleteWrap(state, previousIdx);
-      }
-      updateEditorApplicationDeleteWrap(state, removeIdx);
+      state.techniques.applications.splice(removeIdx, 1);
+      state.techniques.applications = state.techniques.applications.map((entry, idx) => normalizeApplication(entry, idx));
+      renderApplicationsEditor(state);
+      scheduleSave();
     });
   }
 
@@ -1735,52 +1622,17 @@ export function initTechniques({ getState: getStateFn, scheduleSave: scheduleSav
     });
 
     bindingVowsList.addEventListener("click", e => {
-      const confirmTrigger = e.target?.closest?.("[data-vow-remove-confirm]");
-      const confirmIdxRaw = confirmTrigger?.dataset?.vowRemoveConfirm;
-      if (confirmIdxRaw !== undefined) {
-        const state = getState();
-        if (!state) return;
-        ensureTechniquesState(state);
-        const removeIdx = parseNonNegativeInt(confirmIdxRaw);
-        _pendingVowDeleteIndex = null;
-        _pendingVowDeleteAnchor = null;
-        state.techniques.bindingVows.splice(removeIdx, 1);
-        state.techniques.bindingVows = state.techniques.bindingVows.map((entry, idx) => normalizeBindingVow(entry, idx));
-        renderBindingVowsEditor(state);
-        scheduleSave();
-        return;
-      }
-
-      const cancelTrigger = e.target?.closest?.("[data-vow-remove-cancel]");
-      const cancelIdxRaw = cancelTrigger?.dataset?.vowRemoveCancel;
-      if (cancelIdxRaw !== undefined) {
-        const previousIdx = _pendingVowDeleteIndex;
-        _pendingVowDeleteIndex = null;
-        _pendingVowDeleteAnchor = null;
-        const state = getState();
-        if (state && Number.isInteger(previousIdx)) updateVowDeleteWrap(state, previousIdx);
-        return;
-      }
-
       const removeTrigger = e.target?.closest?.("[data-vow-remove]");
       const removeIdxRaw = removeTrigger?.dataset?.vowRemove;
       if (removeIdxRaw === undefined) return;
       const state = getState();
       if (!state) return;
+      ensureTechniquesState(state);
       const removeIdx = parseNonNegativeInt(removeIdxRaw);
-      const previousIdx = _pendingVowDeleteIndex;
-      if (_pendingVowDeleteIndex === removeIdx) {
-        _pendingVowDeleteIndex = null;
-        _pendingVowDeleteAnchor = null;
-      } else {
-        _pendingVowDeleteIndex = removeIdx;
-        _pendingVowDeleteAnchor = null;
-      }
-
-      if (Number.isInteger(previousIdx) && previousIdx !== removeIdx) {
-        updateVowDeleteWrap(state, previousIdx);
-      }
-      updateVowDeleteWrap(state, removeIdx);
+      state.techniques.bindingVows.splice(removeIdx, 1);
+      state.techniques.bindingVows = state.techniques.bindingVows.map((entry, idx) => normalizeBindingVow(entry, idx));
+      renderBindingVowsEditor(state);
+      scheduleSave();
     });
   }
 

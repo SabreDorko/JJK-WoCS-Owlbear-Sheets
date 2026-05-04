@@ -5,8 +5,6 @@ let _refreshCharacterStats = null;
 let _initialized = false;
 let _skillsSearchQuery = "";
 let _showXpSkillForm = false;
-let _openDeleteConfirm = null; // { skillId, kind }
-let _openDeleteConfirmAnchor = null; // { skillId, kind, x, y }
 let _openStackRefundConfirm = null; // { skillId, targetStacks, refundAmount }
 
 function clamp(value, min, max) {
@@ -130,32 +128,14 @@ function renderStaticPips(current, total) {
 }
 
 function renderSkillActionIcons(skillId, kind) {
-  const showConfirm = _openDeleteConfirm && _openDeleteConfirm.skillId === skillId && _openDeleteConfirm.kind === kind;
-  const anchoredDeleteConfirm = showConfirm
-    && _openDeleteConfirmAnchor
-    && _openDeleteConfirmAnchor.skillId === skillId
-    && _openDeleteConfirmAnchor.kind === kind;
-  const confirmClassName = anchoredDeleteConfirm
-    ? "skills-delete-confirm confirm-cursor-anchor confirm-anchor-left-corner"
-    : "skills-delete-confirm";
-  const confirmStyle = anchoredDeleteConfirm
-    ? ` style="position:fixed;left:${Math.round(_openDeleteConfirmAnchor.x)}px;top:${Math.round(_openDeleteConfirmAnchor.y - 8)}px;right:auto;bottom:auto;margin-left:0;transform:translate(0, -100%);transform-origin:bottom left;"`
-    : "";
   return `
     <button type="button" class="inventory-icon-btn inventory-icon-btn-edit" data-action="editSkill" aria-label="Edit skill" title="Edit skill">✎</button>
-    <span class="skills-delete-wrap">
-      <button type="button" class="inventory-icon-btn danger" data-action="deleteSkill" aria-label="Delete skill" title="Delete skill">
-        <svg class="inventory-icon-trash" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-          <path fill="currentColor" d="M9 3h6a1 1 0 0 1 1 1v1h4v2h-1l-1 12a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 7H4V5h4V4a1 1 0 0 1 1-1Zm1 2v0h4V5h-4Zm-1 4h2v9H9V9Zm4 0h2v9h-2V9Z"/>
-          <path fill="none" stroke="currentColor" stroke-width="1.5" d="M6 7.5h12"/>
-        </svg>
-      </button>
-      ${showConfirm ? `<div class="${confirmClassName}" role="menu"${confirmStyle}>
-        <span class="skills-delete-confirm-text">Delete skill?</span>
-        <button type="button" class="inventory-mini-btn danger" data-action="confirmDeleteSkill">Delete</button>
-        <button type="button" class="inventory-mini-btn" data-action="cancelDeleteSkill">Cancel</button>
-      </div>` : ""}
-    </span>
+    <button type="button" class="inventory-icon-btn danger" data-action="deleteSkill" aria-label="Delete skill" title="Delete skill">
+      <svg class="inventory-icon-trash" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <path fill="currentColor" d="M9 3h6a1 1 0 0 1 1 1v1h4v2h-1l-1 12a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 7H4V5h4V4a1 1 0 0 1 1-1Zm1 2v0h4V5h-4Zm-1 4h2v9H9V9Zm4 0h2v9h-2V9Z"/>
+        <path fill="none" stroke="currentColor" stroke-width="1.5" d="M6 7.5h12"/>
+      </svg>
+    </button>
   `;
 }
 
@@ -367,45 +347,9 @@ function updateAddXpSkillButtonState(form, state) {
 
 function repositionSkillsFloatingMenus(panel) {
   if (!panel) return;
-  const floatingMenus = panel.querySelectorAll(".skills-delete-confirm, .skills-refund-confirm");
+  const floatingMenus = panel.querySelectorAll(".skills-refund-confirm");
   const viewportPad = 8;
   floatingMenus.forEach(menu => {
-    const parentCard = menu.closest(".skills-card[data-kind][data-skill-id]");
-    const parentSkillId = parentCard?.dataset?.skillId || null;
-    const parentKind = parentCard?.dataset?.kind || null;
-    const anchoredDeleteConfirm = menu.classList.contains("confirm-cursor-anchor")
-      && !!_openDeleteConfirmAnchor
-      && _openDeleteConfirmAnchor.skillId === parentSkillId
-      && _openDeleteConfirmAnchor.kind === parentKind;
-
-    if (anchoredDeleteConfirm) {
-      menu.classList.remove("confirm-below", "confirm-align-left", "confirm-align-right");
-      menu.style.position = "fixed";
-      menu.style.left = `${Math.round(_openDeleteConfirmAnchor.x)}px`;
-      menu.style.top = `${Math.round(_openDeleteConfirmAnchor.y - 8)}px`;
-      menu.style.right = "auto";
-      menu.style.bottom = "auto";
-      menu.style.marginLeft = "0px";
-      menu.style.transform = "translate(0, -100%)";
-      menu.style.transformOrigin = "bottom left";
-
-      let rect = menu.getBoundingClientRect();
-      const minLeft = viewportPad;
-      const maxLeft = window.innerWidth - viewportPad - rect.width;
-      const clampedLeft = clamp(rect.left, minLeft, Math.max(minLeft, maxLeft));
-      if (clampedLeft !== rect.left) {
-        menu.style.left = `${Math.round(_openDeleteConfirmAnchor.x + (clampedLeft - rect.left))}px`;
-        rect = menu.getBoundingClientRect();
-      }
-
-      if (rect.top < viewportPad) {
-        menu.style.top = `${Math.round(_openDeleteConfirmAnchor.y + 8)}px`;
-        menu.style.transform = "translate(0, 0)";
-        menu.style.transformOrigin = "top left";
-      }
-      return;
-    }
-
     menu.style.position = "";
     menu.style.left = "";
     menu.style.top = "";
@@ -553,8 +497,6 @@ function setupSkillsEventHandlers() {
     const showXpFormBtn = e.target?.closest?.("[data-action='showNewXpSkillForm']");
     if (showXpFormBtn) {
       _showXpSkillForm = true;
-      _openDeleteConfirm = null;
-      _openDeleteConfirmAnchor = null;
       _openStackRefundConfirm = null;
       renderSkills(state);
       return;
@@ -563,8 +505,6 @@ function setupSkillsEventHandlers() {
     const cancelNewXpBtn = e.target?.closest?.("[data-action='cancelNewXpSkill']");
     if (cancelNewXpBtn) {
       _showXpSkillForm = false;
-      _openDeleteConfirm = null;
-      _openDeleteConfirmAnchor = null;
       _openStackRefundConfirm = null;
       renderSkills(state);
       return;
@@ -590,8 +530,6 @@ function setupSkillsEventHandlers() {
       setAvailableXp(state, getAvailableXp(state) - costValidation.xpCost);
       state.skills.xpSkills.push({ id: createId("xp-skill"), title, description, maxStacks, currentStacks: 1, xpCost: costValidation.xpCost });
       _showXpSkillForm = false;
-      _openDeleteConfirm = null;
-      _openDeleteConfirmAnchor = null;
       _openStackRefundConfirm = null;
       scheduleSave();
       refreshCharacterStats();
@@ -614,47 +552,12 @@ function setupSkillsEventHandlers() {
 
     const deleteBtn = e.target?.closest?.("[data-action='deleteSkill']");
     if (deleteBtn) {
-      const previousOpen = _openDeleteConfirm ? { ..._openDeleteConfirm } : null;
-      const triggerRect = deleteBtn.getBoundingClientRect();
-      const anchorX = triggerRect.left + (triggerRect.width / 2);
-      const anchorY = triggerRect.top;
-      _openStackRefundConfirm = null;
-      if (_openDeleteConfirm && _openDeleteConfirm.skillId === skillId && _openDeleteConfirm.kind === kind) {
-        _openDeleteConfirm = null;
-        _openDeleteConfirmAnchor = null;
-      } else {
-        _openDeleteConfirm = { skillId, kind };
-        _openDeleteConfirmAnchor = { skillId, kind, x: anchorX, y: anchorY };
-      }
-
-      if (previousOpen && (previousOpen.skillId !== skillId || previousOpen.kind !== kind)) {
-        updateSkillCardActions(state, previousOpen.skillId, previousOpen.kind);
-      }
-      updateSkillCardActions(state, skillId, kind);
-      return;
-    }
-
-    const confirmDeleteBtn = e.target?.closest?.("[data-action='confirmDeleteSkill']");
-    if (confirmDeleteBtn) {
       const info = findSkillById(state, kind, skillId);
-      _openDeleteConfirm = null;
-      _openDeleteConfirmAnchor = null;
-      if (_openStackRefundConfirm && _openStackRefundConfirm.skillId === skillId) {
-        _openStackRefundConfirm = null;
-      }
+      _openStackRefundConfirm = null;
       if (info.index < 0) return;
       info.list.splice(info.index, 1);
       scheduleSave();
       renderSkills(state);
-      return;
-    }
-
-    const cancelDeleteBtn = e.target?.closest?.("[data-action='cancelDeleteSkill']");
-    if (cancelDeleteBtn) {
-      const previousOpen = _openDeleteConfirm ? { ..._openDeleteConfirm } : null;
-      _openDeleteConfirm = null;
-      _openDeleteConfirmAnchor = null;
-      if (previousOpen) updateSkillCardActions(state, previousOpen.skillId, previousOpen.kind);
       return;
     }
 
@@ -676,8 +579,6 @@ function setupSkillsEventHandlers() {
           return;
         }
         setAvailableXp(state, getAvailableXp(state) - totalCost);
-        _openDeleteConfirm = null;
-        _openDeleteConfirmAnchor = null;
         _openStackRefundConfirm = null;
         refreshCharacterStats();
       } else {

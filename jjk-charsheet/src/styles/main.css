@@ -6,7 +6,7 @@
       --parchment-dark: #e2d9c8;
       --parchment-darker: #cfc4b0;
       --accent: #8b1a1a;
-  --border-light: rgba(26,20,16,0.38);
+      --border-light: rgba(26,20,16,0.38);
       --border: rgba(26,20,16,0.22);
       --border-strong: rgba(26,20,16,0.55);
     }

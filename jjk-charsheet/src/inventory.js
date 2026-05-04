@@ -20,8 +20,6 @@ let openEquipPickerItemId = null;
 let openMovePickerItemId = null;
 let openYenAdjustMode = null;
 let openOverflowChoice = null;
-let openDeleteConfirmItemId = null;
-let openDeleteConfirmAnchor = null;
 let draftItemModifiers = [];
 let editingModifierIndex = null;
 let isModifierEditMode = false;
@@ -917,7 +915,6 @@ function deleteInventoryItem(itemId) {
   expandedDescriptionIds.delete(itemId);
   if (openEquipPickerItemId === itemId) openEquipPickerItemId = null;
   if (openMovePickerItemId === itemId) openMovePickerItemId = null;
-  if (openDeleteConfirmItemId === itemId) openDeleteConfirmItemId = null;
   removeItemFromContainers(item);
   state.inventoryItems = state.inventoryItems.filter(entry => entry.id !== itemId);
   if (editingItemId === itemId) resetItemEditor();
@@ -942,25 +939,12 @@ function renderEditButton() {
 }
 
 function renderDeleteButton(itemId, forceAlignLeft = false) {
-  const showConfirm = openDeleteConfirmItemId === itemId;
-  const confirmClasses = forceAlignLeft
-    ? "skills-delete-confirm confirm-align-left confirm-force-left confirm-cursor-anchor confirm-anchor-left-corner"
-    : "skills-delete-confirm confirm-cursor-anchor confirm-anchor-left-corner";
-  return `
-    <span class="skills-delete-wrap">
-      <button type="button" class="inventory-mini-btn inventory-icon-btn danger" data-action="deleteItem" aria-label="Delete item" title="Delete item">
-        <svg class="inventory-icon-trash" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-          <path fill="currentColor" d="M9 3h6a1 1 0 0 1 1 1v1h4v2h-1l-1 12a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 7H4V5h4V4a1 1 0 0 1 1-1Zm1 2v0h4V5h-4Zm-1 4h2v9H9V9Zm4 0h2v9h-2V9Z"/>
-          <path fill="none" stroke="currentColor" stroke-width="1.5" d="M6 7.5h12"/>
-        </svg>
-      </button>
-      ${showConfirm ? `<div class="${confirmClasses}" role="menu">
-        <span class="skills-delete-confirm-text">Delete item?</span>
-        <button type="button" class="inventory-mini-btn danger" data-action="confirmDeleteItem">Delete</button>
-        <button type="button" class="inventory-mini-btn" data-action="cancelDeleteItem">Cancel</button>
-      </div>` : ""}
-    </span>
-  `;
+  return `<button type="button" class="inventory-mini-btn inventory-icon-btn danger" data-action="deleteItem" aria-label="Delete item" title="Delete item">
+    <svg class="inventory-icon-trash" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path fill="currentColor" d="M9 3h6a1 1 0 0 1 1 1v1h4v2h-1l-1 12a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 7H4V5h4V4a1 1 0 0 1 1-1Zm1 2v0h4V5h-4Zm-1 4h2v9H9V9Zm4 0h2v9h-2V9Z"/>
+      <path fill="none" stroke="currentColor" stroke-width="1.5" d="M6 7.5h12"/>
+    </svg>
+  </button>`;
 }
 
 function renderMoveButton() {
@@ -1498,37 +1482,10 @@ function handleInventoryActions(event) {
 
   const action = button.dataset.action;
   if (action === "deleteItem") {
-    const triggerRect = button.getBoundingClientRect();
-    const anchorX = triggerRect.left + (triggerRect.width / 2);
-    const anchorY = triggerRect.top;
     openEquipPickerItemId = null;
     openMovePickerItemId = null;
     openOverflowChoice = null;
-    if (openDeleteConfirmItemId === item.id) {
-      openDeleteConfirmItemId = null;
-      openDeleteConfirmAnchor = null;
-    } else {
-      openDeleteConfirmItemId = item.id;
-      openDeleteConfirmAnchor = { itemId: item.id, x: anchorX, y: anchorY };
-    }
-    renderInventory();
-    return;
-  }
-
-  if (action === "confirmDeleteItem") {
-    openEquipPickerItemId = null;
-    openMovePickerItemId = null;
-    openOverflowChoice = null;
-    openDeleteConfirmItemId = null;
-    openDeleteConfirmAnchor = null;
     deleteInventoryItem(item.id);
-    return;
-  }
-
-  if (action === "cancelDeleteItem") {
-    openDeleteConfirmItemId = null;
-    openDeleteConfirmAnchor = null;
-    renderInventory();
     return;
   }
 
@@ -1536,8 +1493,6 @@ function handleInventoryActions(event) {
     openEquipPickerItemId = null;
     openMovePickerItemId = null;
     openOverflowChoice = null;
-    openDeleteConfirmItemId = null;
-    openDeleteConfirmAnchor = null;
     startItemEdit(item.id);
     return;
   }
@@ -1546,8 +1501,6 @@ function handleInventoryActions(event) {
     openEquipPickerItemId = null;
     openMovePickerItemId = null;
     openOverflowChoice = null;
-    openDeleteConfirmItemId = null;
-    openDeleteConfirmAnchor = null;
     if (expandedDescriptionIds.has(item.id)) expandedDescriptionIds.delete(item.id);
     else expandedDescriptionIds.add(item.id);
     const isExpanded = expandedDescriptionIds.has(item.id);
@@ -1563,8 +1516,6 @@ function handleInventoryActions(event) {
   if (action === "equipItem") {
     openMovePickerItemId = null;
     openOverflowChoice = null;
-    openDeleteConfirmItemId = null;
-    openDeleteConfirmAnchor = null;
     if (shouldShowEquipTargetSelect(item)) {
       openEquipPickerItemId = openEquipPickerItemId === item.id ? null : item.id;
       renderInventory();
@@ -1594,8 +1545,6 @@ function handleInventoryActions(event) {
     openEquipPickerItemId = null;
     openMovePickerItemId = null;
     openOverflowChoice = null;
-    openDeleteConfirmItemId = null;
-    openDeleteConfirmAnchor = null;
     const result = moveItemToEquippedSlot(item, selectedSlot);
     if (result.requiresOverflowChoice) {
       openOverflowChoice = {
@@ -1619,8 +1568,6 @@ function handleInventoryActions(event) {
     openEquipPickerItemId = null;
     openMovePickerItemId = null;
     openOverflowChoice = null;
-    openDeleteConfirmItemId = null;
-    openDeleteConfirmAnchor = null;
     const result = moveItemToEquippedSlot(item, pending.targetSlotKey || null, {
       allowOverflowToStorage: true,
       forcedTargetSlots: pending.targetSlots || null,
@@ -1637,8 +1584,6 @@ function handleInventoryActions(event) {
 
   if (action === "cancelOverflowChoice") {
     openOverflowChoice = null;
-    openDeleteConfirmItemId = null;
-    openDeleteConfirmAnchor = null;
     renderInventory();
     return;
   }
@@ -1646,8 +1591,6 @@ function handleInventoryActions(event) {
   if (action === "moveItem") {
     openEquipPickerItemId = null;
     openOverflowChoice = null;
-    openDeleteConfirmItemId = null;
-    openDeleteConfirmAnchor = null;
     const options = getMoveDestinationOptions(item);
     if (!options.length) return;
     openMovePickerItemId = openMovePickerItemId === item.id ? null : item.id;
@@ -1660,8 +1603,6 @@ function handleInventoryActions(event) {
     openEquipPickerItemId = null;
     openMovePickerItemId = null;
     openOverflowChoice = null;
-    openDeleteConfirmItemId = null;
-    openDeleteConfirmAnchor = null;
     const result = moveItemToDestination(item, destination);
     if (!result.ok) {
       setItemFormError(result.message || "Could not move item.");
@@ -1694,8 +1635,6 @@ function handleInventoryActions(event) {
     openEquipPickerItemId = null;
     openMovePickerItemId = null;
     openOverflowChoice = null;
-    openDeleteConfirmItemId = null;
-    openDeleteConfirmAnchor = null;
     if (isItemTypeDormRestricted(item)) {
       setItemFormError("Items cannot be sent to storage.");
       return;
@@ -1710,8 +1649,6 @@ function handleInventoryActions(event) {
     openEquipPickerItemId = null;
     openMovePickerItemId = null;
     openOverflowChoice = null;
-    openDeleteConfirmItemId = null;
-    openDeleteConfirmAnchor = null;
     if (!placeItemInFirstFreeInventorySlot(item)) {
       setItemFormError("Active inventory is full. Free a slot first.");
       return;
@@ -2071,102 +2008,6 @@ export function renderInventory() {
   renderEquippedSlots();
   renderInventorySlots();
   renderDormInventory();
-  requestAnimationFrame(() => {
-    const menus = document.querySelectorAll(".skills-delete-confirm");
-    const viewportPad = 8;
-    const forcedLeftNudgePx = 16;
-    menus.forEach(menu => {
-      const parentItemId = menu.closest("[data-item-id]")?.dataset?.itemId || null;
-      const cursorAnchored = menu.classList.contains("confirm-cursor-anchor")
-        && Boolean(openDeleteConfirmAnchor)
-        && openDeleteConfirmAnchor.itemId
-        && parentItemId === openDeleteConfirmAnchor.itemId;
-
-      if (cursorAnchored) {
-        menu.classList.remove("confirm-below", "confirm-align-left", "confirm-align-right");
-        menu.style.position = "fixed";
-        menu.style.left = `${Math.round(openDeleteConfirmAnchor.x)}px`;
-        menu.style.top = `${Math.round(openDeleteConfirmAnchor.y - 8)}px`;
-        menu.style.right = "auto";
-        menu.style.bottom = "auto";
-        menu.style.marginLeft = "0px";
-        menu.style.transform = "translate(0, -100%)";
-        menu.style.transformOrigin = "bottom left";
-
-        let anchoredRect = menu.getBoundingClientRect();
-        const overflowLeft = viewportPad - anchoredRect.left;
-        const overflowRight = anchoredRect.right - (window.innerWidth - viewportPad);
-        const overflowTop = viewportPad - anchoredRect.top;
-
-        let offsetX = 0;
-        if (overflowLeft > 0) offsetX += Math.ceil(overflowLeft);
-        if (overflowRight > 0) offsetX -= Math.ceil(overflowRight);
-
-        if (offsetX !== 0) {
-          const currentLeft = parseInt(menu.style.left, 10) || Math.round(openDeleteConfirmAnchor.x);
-          menu.style.left = `${currentLeft + offsetX}px`;
-          anchoredRect = menu.getBoundingClientRect();
-        }
-
-        if (overflowTop > 0) {
-          menu.style.top = `${Math.round(openDeleteConfirmAnchor.y + 8)}px`;
-          menu.style.transform = "translate(0, 0)";
-          menu.style.transformOrigin = "top left";
-        }
-
-        return;
-      }
-
-      const forceAlignLeft = menu.classList.contains("confirm-force-left");
-      const tabContent = menu.closest(".tab-content");
-      const tabRect = tabContent ? tabContent.getBoundingClientRect() : null;
-      const leftBoundary = Math.max(viewportPad, (tabRect?.left ?? viewportPad) + 2);
-      const rightBoundary = Math.min(window.innerWidth - viewportPad, (tabRect?.right ?? window.innerWidth - viewportPad) - 2);
-
-      // Reset any previous horizontal clamp offset before recalculating.
-      menu.style.marginLeft = "";
-
-      menu.classList.remove("confirm-below", "confirm-align-right");
-      if (!forceAlignLeft) menu.classList.remove("confirm-align-left");
-      const rect = menu.getBoundingClientRect();
-      if (rect.top < viewportPad) menu.classList.add("confirm-below");
-      if (!forceAlignLeft) {
-        if (rect.right > rightBoundary) menu.classList.add("confirm-align-left");
-        // Inventory uses delete confirms (right-anchored by default), so left overflow
-        // needs a left anchor to push the popup back into the viewport.
-        if (rect.left < leftBoundary) menu.classList.add("confirm-align-left");
-      }
-
-      if (forceAlignLeft) {
-        // Keep inventory/storage confirms consistently nudged right.
-        menu.style.marginLeft = `${forcedLeftNudgePx}px`;
-      }
-
-      // Second pass: if still clipped on either side, try the opposite anchor.
-      let adjusted = menu.getBoundingClientRect();
-      if (!forceAlignLeft && adjusted.left < leftBoundary) {
-        menu.classList.remove("confirm-align-left");
-        menu.classList.add("confirm-align-right");
-        adjusted = menu.getBoundingClientRect();
-      }
-      if (!forceAlignLeft && adjusted.right > rightBoundary) {
-        menu.classList.remove("confirm-align-right");
-        menu.classList.add("confirm-align-left");
-        adjusted = menu.getBoundingClientRect();
-      }
-
-      // Final hard clamp: preserve chosen anchor, then nudge the popup back inside bounds.
-      const overflowLeft = leftBoundary - adjusted.left;
-      const overflowRight = adjusted.right - rightBoundary;
-      if (overflowLeft > 0) {
-        const currentOffset = parseInt(menu.style.marginLeft, 10) || 0;
-        menu.style.marginLeft = `${currentOffset + Math.ceil(overflowLeft)}px`;
-      } else if (overflowRight > 0) {
-        const currentOffset = parseInt(menu.style.marginLeft, 10) || 0;
-        menu.style.marginLeft = `${currentOffset - Math.ceil(overflowRight)}px`;
-      }
-    });
-  });
   if (_refreshCharacterStats) _refreshCharacterStats();
 }
 
@@ -2244,16 +2085,6 @@ export function initInventory({ getState: getStateFn, scheduleSave: scheduleSave
       const clickedInsideOverflowPicker = event.target.closest(".inventory-overflow-picker");
       const clickedEquipBtn = event.target.closest("button[data-action='equipItem'], button[data-action='equipToSlot']");
       if (!clickedInsideOverflowPicker && !clickedEquipBtn) closeOverflowChoice();
-    }
-
-    if (openDeleteConfirmItemId) {
-      const clickedInsideDeleteConfirm = event.target.closest(".skills-delete-confirm");
-      const clickedDeleteBtn = event.target.closest("button[data-action='deleteItem']");
-      if (!clickedInsideDeleteConfirm && !clickedDeleteBtn) {
-        openDeleteConfirmItemId = null;
-        openDeleteConfirmAnchor = null;
-        renderInventory();
-      }
     }
 
     if (openYenAdjustMode) {
