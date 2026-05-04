@@ -12,7 +12,7 @@ const _expandedAppIndices = new Map();
 let _pendingNewApplicationIndex = null;
 let _pendingNewVowIndex = null;
 
-const JUJUTSU_SUBTABS = new Set(["technique", "vows", "training"]);
+const JUJUTSU_SUBTABS = new Set(["technique", "vows", "training", "skills"]);
 const APPLICATION_RANGE_TYPES = new Set(["self", "melee", "range", "aoe"]);
 const APPLICATION_AOE_SHAPES = ["cone", "cube", "sphere", "cylinder", "line"];
 

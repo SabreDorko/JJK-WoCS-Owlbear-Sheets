@@ -82,6 +82,10 @@ export function defaultState() {
         activeTrainings: [],
       },
     },
+    skills: {
+      xpSkills: [],
+      jujutsuSkills: [],
+    },
     archetypeProgress: {
       unlockedAbilityIds: [],
       permanentAptitudeSelections: [],

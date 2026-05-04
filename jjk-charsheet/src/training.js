@@ -120,6 +120,57 @@ function isSkillInActiveTraining(state, statKey, skillIndex, excludeTrainingId =
   });
 }
 
+function ensureSkillsState(state) {
+  if (!state || typeof state !== "object") return;
+  if (!state.skills || typeof state.skills !== "object") {
+    state.skills = {
+      xpSkills: [],
+      jujutsuSkills: [],
+    };
+  }
+  if (!Array.isArray(state.skills.xpSkills)) state.skills.xpSkills = [];
+  if (!Array.isArray(state.skills.jujutsuSkills)) state.skills.jujutsuSkills = [];
+}
+
+function parsePositiveInt(rawValue, fallback = 1) {
+  const parsed = parseInt(rawValue, 10);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.max(1, parsed);
+}
+
+function recordCompletedJujutsuSkill(state, skill) {
+  ensureSkillsState(state);
+  const skillDefId = String(skill.skillDefId || skill.id || "").trim();
+  if (!skillDefId) return;
+
+  const existing = state.skills.jujutsuSkills.find(entry => String(entry?.skillDefId || "") === skillDefId);
+  if (existing) {
+    existing.title = String(skill.title || existing.title || "");
+    existing.description = String(skill.description || existing.description || "");
+    existing.maxLearnCount = parsePositiveInt(skill.maxLearnCount, parsePositiveInt(existing.maxLearnCount, 1));
+    existing.requirements = String(skill.requirements || existing.requirements || "");
+    existing.requiredMissions = parsePositiveInt(skill.requiredMissions, parsePositiveInt(existing.requiredMissions, 1));
+    existing.multiMission = Boolean(existing.requiredMissions > 1);
+    existing.timesLearned = Math.min(
+      parsePositiveInt(existing.timesLearned, 1) + 1,
+      parsePositiveInt(existing.maxLearnCount, 1),
+    );
+    return;
+  }
+
+  state.skills.jujutsuSkills.push({
+    id: `learned-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    skillDefId,
+    title: String(skill.title || ""),
+    description: String(skill.description || ""),
+    requirements: String(skill.requirements || ""),
+    requiredMissions: parsePositiveInt(skill.requiredMissions, 1),
+    multiMission: Boolean(parsePositiveInt(skill.requiredMissions, 1) > 1),
+    maxLearnCount: parsePositiveInt(skill.maxLearnCount, 1),
+    timesLearned: 1,
+  });
+}
+
 function getSkillOptions(statKey) {
   const statDef = getStatDefinition(statKey);
   if (!statDef) return [];
@@ -326,6 +377,10 @@ function renderJujutsuSkillInput() {
             <input type="checkbox" id="skillMultiMissionCheckbox" class="checkbox-input" />
             <label for="skillMultiMissionCheckbox" class="checkbox-label">Requires 2 missions</label>
           </div>
+        </div>
+        <div class="skill-input-field">
+          <label for="skillMaxLearnCountInput" class="field-label">Max Learn Count</label>
+          <input type="number" id="skillMaxLearnCountInput" class="skill-input" min="1" max="99" value="1" />
         </div>
         <div class="skill-input-field full-width">
           <label for="skillDescriptionInput" class="field-label">Description</label>
@@ -594,6 +649,7 @@ function handleAddSkill() {
   const titleInput = document.getElementById("skillTitleInput");
   const requirementsInput = document.getElementById("skillRequirementsInput");
   const multiMissionCheckbox = document.getElementById("skillMultiMissionCheckbox");
+  const maxLearnCountInput = document.getElementById("skillMaxLearnCountInput");
   const descriptionInput = document.getElementById("skillDescriptionInput");
   
   // Debug: verify inputs exist
@@ -626,11 +682,13 @@ function handleAddSkill() {
   
   const newSkill = {
     id: generateUniqueId(),
+    skillDefId: generateUniqueId(),
     title,
     requirements,
     description: String(descriptionInput?.value || "").trim(),
     multiMission: Boolean(multiMissionCheckbox?.checked),
     requiredMissions: Boolean(multiMissionCheckbox?.checked) ? 2 : 1,
+    maxLearnCount: parsePositiveInt(maxLearnCountInput?.value, 1),
     progress: 0,
   };
   
@@ -706,13 +764,13 @@ function handleCompleteSkill(skillId) {
   
   const skill = state.training.jujutsuSkills.find(s => s.id === skillId);
   if (skill && skill.progress >= skill.requiredMissions) {
-    alert(`Skill "${skill.title}" completed! This will be moved to the Skills tab when we implement it.`);
+    recordCompletedJujutsuSkill(state, skill);
     
     const index = state.training.jujutsuSkills.findIndex(s => s.id === skillId);
     if (index >= 0) {
       state.training.jujutsuSkills.splice(index, 1);
       scheduleSave();
-      refreshUI();
+      refreshAll();
     }
   }
 }

@@ -48,6 +48,7 @@ import {
 import { initUiShell } from "./ui-shell.js";
 import { initNotes, applyNotesStateToUI } from "./notes.js";
 import { initTraining, renderTraining } from "./training.js";
+import { initSkills, renderSkills } from "./skills.js";
 
 // ── RUNTIME STATE ─────────────────────────────────────────────────────────────
 let state           = defaultState();
@@ -152,6 +153,7 @@ function applyStateToUI() {
   applyArchetypeStateToUI();
   applyNotesStateToUI();
   renderTraining(state);
+  renderSkills(state);
 
   renderRollHistory();
   renderPartyList();
@@ -223,6 +225,12 @@ async function init() {
     showRollToast,
     refreshUI: () => renderTraining(state),
     refreshAll: applyStateToUI,
+  });
+
+  initSkills({
+    getState: () => state,
+    scheduleSave,
+    refreshTraining: () => renderTraining(state),
   });
 
   // Re-render training slots whenever grade changes (slot unlock is grade-gated)
