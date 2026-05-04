@@ -33,7 +33,7 @@
     "itemType": "clothing",
     "allowedSlots": ["body"],
     "slotsNeeded": 1,
-    "description": "Rugged uniform for close combat. Can be torn off for advantage on one Intimidation roll.",
+    "description": "Rugged uniform for close combat. Grants +1 AC and +1 Strength. Can be torn off for advantage on one Intimidation roll.",
     "modifiers": [],
     "aliases": ["tearaway uniform"],
     "stackable": false
@@ -42,7 +42,7 @@
     "id": "knuckle-guards",
     "name": "Knuckle Guards",
     "itemType": "item",
-    "description": "Hand protection used for brawling.",
+    "description": "Hand protection used for brawling. Adds +1 damage to the Punch action.",
     "modifiers": [],
     "aliases": ["knuckle guards"],
     "stackable": false
@@ -64,7 +64,7 @@
     "id": "camouflage-paint",
     "name": "Camouflage Paint",
     "itemType": "item",
-    "description": "Consumable stealth prep. (2/day)",
+    "description": "Consumable stealth prep. Grants +2 to Stealth checks for two turns. (2/day)",
     "modifiers": [],
     "aliases": ["camouflage paint"],
     "stackable": false
@@ -99,7 +99,7 @@
     "itemType": "clothing",
     "allowedSlots": ["body"],
     "slotsNeeded": 1,
-    "description": "Protective chest armor.",
+    "description": "Protective chest armor. Reduces incoming damage by 2.",
     "modifiers": [],
     "aliases": ["body armor"],
     "stackable": false
@@ -110,7 +110,7 @@
     "itemType": "clothing",
     "allowedSlots": ["accessory"],
     "slotsNeeded": 1,
-    "description": "Protective eyewear. Effective against wind and dust attacks.",
+    "description": "Protective eyewear. Reduces wind or dust projectile damage by 2.",
     "modifiers": [],
     "aliases": ["motorcycle goggles"],
     "stackable": false
@@ -143,7 +143,7 @@
     "id": "token-from-the-past",
     "name": "A Token From The Past",
     "itemType": "item",
-    "description": "Lucky keepsake tied to old memories. Recharges with a successful deception roll. (3/day)",
+    "description": "Lucky keepsake tied to old memories. On any check, reroll the lowest die. Recharges with a successful deception roll. (3/day)",
     "modifiers": [],
     "aliases": ["a token from the past", "token from the past"],
     "stackable": false
@@ -152,7 +152,7 @@
     "id": "notebook",
     "name": "Notebook",
     "itemType": "item",
-    "description": "A journal for notes and planning.",
+    "description": "A journal for notes and planning. Grants +1 to General Education and Jujutsu Education.",
     "modifiers": [],
     "aliases": ["notebook"],
     "stackable": false
@@ -174,7 +174,7 @@
     "id": "sword-polish",
     "name": "Sword Polish",
     "itemType": "item",
-    "description": "Consumable polish for blade maintenance. (5 uses)",
+    "description": "Consumable polish for blade maintenance. First attack of the day gains +1 to hit. (5 uses)",
     "modifiers": [],
     "aliases": ["sword polish"],
     "stackable": true,
@@ -184,7 +184,7 @@
     "id": "first-aid-kit",
     "name": "First Aid Kit",
     "itemType": "item",
-    "description": "Basic emergency medical supplies. (2 uses)",
+    "description": "Basic emergency medical supplies. Heals 1d12 + IL + Med Ed. (2 uses)",
     "modifiers": [],
     "aliases": ["first aid kit"],
     "stackable": false,
@@ -194,7 +194,7 @@
     "id": "cigarettes",
     "name": "Cigarettes",
     "itemType": "item",
-    "description": "Consumable stress and CE management item. (10 uses)",
+    "description": "Consumable stress and CE management item. Bonus action: regain 4 CE. First 4 uses require Fortitude DC 10; on fail, take 1d4 damage. (10 uses)",
     "modifiers": [],
     "aliases": ["cigarettes"],
     "stackable": true,
@@ -204,7 +204,7 @@
     "id": "sentimental-possession",
     "name": "Sentimental Possession",
     "itemType": "item",
-    "description": "Personal keepsake with latent power. Recharges weekly. (1/week)",
+    "description": "Personal keepsake with latent power. Grants advantage on one CT-based roll, then recharges weekly. (1/week)",
     "modifiers": [],
     "aliases": ["sentimental possession"],
     "stackable": false
@@ -268,7 +268,7 @@
     "id": "lucky-dice",
     "name": "Lucky Dice",
     "itemType": "item",
-    "description": "Risk-reward dice set. (3/day)",
+    "description": "Risk-reward dice set. Add 1d6 to a chosen roll (excluding Black Flash/training). Recharge requires applying -1d6 to two rolls. (3/day)",
     "modifiers": [],
     "aliases": ["lucky dice"],
     "stackable": true
@@ -286,7 +286,7 @@
     "id": "tinkers-kit",
     "name": "Tinker's Kit",
     "itemType": "item",
-    "description": "General purpose tinkering tools.",
+    "description": "General purpose tinkering tools. Grants +2 to Tech Education.",
     "modifiers": [],
     "aliases": ["tinker's kit", "tinker's kit", "tinkers kit"],
     "stackable": false
