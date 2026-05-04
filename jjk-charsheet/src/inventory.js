@@ -2049,7 +2049,7 @@ export function renderInventory() {
   requestAnimationFrame(() => {
     const menus = document.querySelectorAll(".skills-delete-confirm");
     const viewportPad = 8;
-    const forcedLeftNudgePx = 10;
+    const forcedLeftNudgePx = 16;
     menus.forEach(menu => {
       const forceAlignLeft = menu.classList.contains("confirm-force-left");
       const tabContent = menu.closest(".tab-content");
