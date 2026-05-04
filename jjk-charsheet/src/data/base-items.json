@@ -6,17 +6,21 @@
     "allowedSlots": ["feet"],
     "slotsNeeded": 1,
     "description": "Light performance shoes for mobility-focused builds.",
-    "modifiers": [],
+    "modifiers": [
+      { "kind": "ac", "value": 1 },
+      { "kind": "skill", "statKey": "speed", "skillIndex": 3, "value": 1 },
+      { "kind": "skill", "statKey": "technique", "skillIndex": 0, "value": 1 }
+    ],
     "aliases": ["dancing shoes", "running shoes"]
   },
   {
     "id": "tonfa",
     "name": "Tonfa",
     "itemType": "weapon",
-    "weaponGrip": "oneHanded",
+    "weaponGrip": "twoHanded",
     "weaponType": "bludgeoning",
-    "weaponStat": "power",
-    "weaponDamageParts": [{ "count": 1, "die": "d6" }],
+    "weaponStat": "technique",
+    "weaponDamageParts": [{ "count": 2, "die": "d6" }],
     "description": "Training tonfa.",
     "modifiers": [],
     "aliases": ["tonfa"]
