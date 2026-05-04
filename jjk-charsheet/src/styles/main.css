@@ -2240,6 +2240,7 @@
       border: 1px solid var(--border-light);
       color: var(--ink);
       padding: 4px 6px;
+      cursor: pointer;
     }
     .skill-input:focus {
       outline: none;
@@ -2392,14 +2393,6 @@
       letter-spacing: 0.5px;
       text-transform: uppercase;
       color: var(--ink-faint);
-    }
-    .skill-input:is(select) {
-      appearance: none;
-      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none'%3E%3Cpath stroke='%23333' stroke-width='2' d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
-      background-repeat: no-repeat;
-      background-position: right 5px center;
-      background-size: 18px;
-      padding-right: 28px;
     }
 
     @media (max-width: 760px) {

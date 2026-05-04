@@ -224,15 +224,24 @@ function handleAddSkill() {
   const multiMissionCheckbox = document.getElementById("skillMultiMissionCheckbox");
   const descriptionInput = document.getElementById("skillDescriptionInput");
   
-  const title = titleInput?.value?.trim() || "";
-  const requirements = requirementsInput?.value?.trim() || "";
+  // Debug: verify inputs exist
+  if (!titleInput || !requirementsInput) {
+    console.error("Form inputs not found in DOM");
+    alert("Error: Form elements not found. Please try again.");
+    return;
+  }
+  
+  const title = String(titleInput.value || "").trim();
+  const requirements = String(requirementsInput.value || "").trim();
   
   if (!title) {
     alert("Please enter a skill title.");
+    titleInput.focus();
     return;
   }
   if (!requirements) {
     alert("Please select a requirement grade.");
+    requirementsInput.focus();
     return;
   }
   
@@ -248,13 +257,20 @@ function handleAddSkill() {
     id: generateUniqueId(),
     title,
     requirements,
-    description: descriptionInput?.value?.trim() || "",
-    multiMission: multiMissionCheckbox?.checked || false,
-    requiredMissions: multiMissionCheckbox?.checked ? 2 : 1,
+    description: String(descriptionInput?.value || "").trim(),
+    multiMission: Boolean(multiMissionCheckbox?.checked),
+    requiredMissions: Boolean(multiMissionCheckbox?.checked) ? 2 : 1,
     progress: 0,
   };
   
   state.training.jujutsuSkills.push(newSkill);
+  
+  // Clear the form container to hide the form and show the updated slots
+  const container = document.getElementById("skillInputContainer");
+  if (container) {
+    container.innerHTML = "";
+  }
+  
   scheduleSave();
   refreshUI();
 }
