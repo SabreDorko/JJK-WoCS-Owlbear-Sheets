@@ -42,6 +42,15 @@ function scheduleSave() {
   if (_scheduleSave) _scheduleSave();
 }
 
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
 function makeStarterItemId() {
   return `starter_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
@@ -77,6 +86,207 @@ function ensureStarterItemGrantState(state) {
   if (!Array.isArray(state.archetypeProgress.starterItemGrantHistory)) {
     state.archetypeProgress.starterItemGrantHistory = [];
   }
+  if (!state.archetypeProgress.startingEquipmentSelections || typeof state.archetypeProgress.startingEquipmentSelections !== "object") {
+    state.archetypeProgress.startingEquipmentSelections = {};
+  }
+  if (!state.archetypeProgress.grantedStarterItems || typeof state.archetypeProgress.grantedStarterItems !== "object") {
+    state.archetypeProgress.grantedStarterItems = {};
+  }
+}
+
+function parseStartingEquipmentChoices(line) {
+  const sourceLine = String(line || "").trim();
+  if (!sourceLine) return { sourceLine: "", detail: "", options: [] };
+
+  const [headPart, ...detailParts] = sourceLine.split(":");
+  const detail = detailParts.join(":").trim();
+  const head = String(headPart || "").trim();
+  const sharedSuffixMatch = head.match(/^(.*?)(\s*\([^)]*\))$/);
+  const baseLabel = sharedSuffixMatch && sharedSuffixMatch[1].includes("/")
+    ? sharedSuffixMatch[1].trim()
+    : head;
+  const sharedSuffix = sharedSuffixMatch && sharedSuffixMatch[1].includes("/")
+    ? sharedSuffixMatch[2].trim()
+    : "";
+
+  const rawOptions = baseLabel.split("/").map(option => option.trim()).filter(Boolean);
+  const options = (rawOptions.length ? rawOptions : [head]).map(option => {
+    const label = `${option}${sharedSuffix ? ` ${sharedSuffix}` : ""}`.trim();
+    return {
+      label,
+      line: detail ? `${label}: ${detail}` : label,
+    };
+  });
+
+  return { sourceLine, detail, options };
+}
+
+function buildStarterItemFromLine(line) {
+  const template = resolveBaseItemTemplateByStartingEquipmentLine(line);
+  if (template) return buildInventoryItemFromBaseTemplate(template);
+
+  const [namePart, ...detailParts] = String(line || "").split(":");
+  return {
+    id: makeStarterItemId(),
+    name: String(namePart || "Starter Item").trim() || "Starter Item",
+    modifier: "",
+    modifiers: [],
+    description: detailParts.join(":").trim(),
+    itemType: "item",
+    weaponGrip: null,
+    weaponType: null,
+    weaponStat: null,
+    weaponDamageParts: [],
+    weaponRange: null,
+    weaponPolearmReach: false,
+    allowedSlots: ["rightHand", "leftHand"],
+    slotsNeeded: 1,
+    stackable: false,
+    quantity: 1,
+    location: "dorm",
+    inventorySlot: null,
+    equippedSlots: [],
+    baseItemId: "",
+  };
+}
+
+function getStartingEquipmentSelections(state, archetypeKey, rule) {
+  ensureStarterItemGrantState(state);
+  const key = String(archetypeKey || "").trim();
+  const lines = Array.isArray(rule?.startingEquipment) ? rule.startingEquipment : [];
+  const saved = Array.isArray(state.archetypeProgress.startingEquipmentSelections[key])
+    ? state.archetypeProgress.startingEquipmentSelections[key]
+    : [];
+
+  const normalized = lines.map((line, index) => {
+    const parsed = parseStartingEquipmentChoices(line);
+    const selectedIndex = Math.max(0, Math.min(parsed.options.length - 1, parseInt(saved[index], 10) || 0));
+    return Number.isFinite(selectedIndex) ? selectedIndex : 0;
+  });
+
+  state.archetypeProgress.startingEquipmentSelections[key] = normalized;
+  return normalized;
+}
+
+function getSelectedStartingEquipmentLines(state, archetypeKey, rule) {
+  const lines = Array.isArray(rule?.startingEquipment) ? rule.startingEquipment : [];
+  const selections = getStartingEquipmentSelections(state, archetypeKey, rule);
+  return lines
+    .map((line, index) => {
+      const parsed = parseStartingEquipmentChoices(line);
+      const selected = parsed.options[selections[index]] || parsed.options[0];
+      return selected?.line || line;
+    })
+    .filter(Boolean);
+}
+
+function getGrantedStarterItems(state, archetypeKey) {
+  ensureStarterItemGrantState(state);
+  const key = String(archetypeKey || "").trim();
+  const records = Array.isArray(state.archetypeProgress.grantedStarterItems[key])
+    ? state.archetypeProgress.grantedStarterItems[key]
+    : [];
+
+  const normalized = records
+    .map(record => ({
+      slotIndex: parseInt(record?.slotIndex, 10),
+      itemId: String(record?.itemId || "").trim(),
+      selectedLine: String(record?.selectedLine || "").trim(),
+    }))
+    .filter(record => Number.isFinite(record.slotIndex) && record.slotIndex >= 0 && record.itemId);
+
+  state.archetypeProgress.grantedStarterItems[key] = normalized;
+  return normalized;
+}
+
+function getStarterGrantStatus(state, archetypeKey, rule) {
+  const selectedLines = getSelectedStartingEquipmentLines(state, archetypeKey, rule);
+  const records = getGrantedStarterItems(state, archetypeKey);
+  const inventoryIds = new Set(Array.isArray(state?.inventoryItems) ? state.inventoryItems.map(item => item?.id).filter(Boolean) : []);
+  const bySlot = new Map(records.map(record => [record.slotIndex, record]));
+
+  const pendingSlots = selectedLines
+    .map((line, slotIndex) => {
+      const record = bySlot.get(slotIndex) || null;
+      const isPresent = Boolean(record && inventoryIds.has(record.itemId));
+      const isMismatched = Boolean(record && isPresent && record.selectedLine && record.selectedLine !== line);
+      return {
+        line,
+        slotIndex,
+        record,
+        isPresent,
+        isMismatched,
+      };
+    })
+    .filter(entry => !entry.record || !entry.isPresent || entry.isMismatched);
+
+  return {
+    records,
+    selectedLines,
+    pendingSlots,
+    missingSlots: pendingSlots.filter(entry => !entry.record || !entry.isPresent),
+    replaceableSlots: pendingSlots.filter(entry => entry.isMismatched),
+    hasAnyPresent: records.some(record => inventoryIds.has(record.itemId)),
+  };
+}
+
+function upsertGrantedStarterRecord(state, archetypeKey, slotIndex, itemId, selectedLine) {
+  const records = getGrantedStarterItems(state, archetypeKey).filter(record => record.slotIndex !== slotIndex);
+  records.push({ slotIndex, itemId, selectedLine: String(selectedLine || "").trim() });
+  state.archetypeProgress.grantedStarterItems[archetypeKey] = records.sort((a, b) => a.slotIndex - b.slotIndex);
+}
+
+function removeStarterItemsFromState(state, itemIds) {
+  const toRemove = new Set((itemIds || []).map(value => String(value || "").trim()).filter(Boolean));
+  if (!toRemove.size) return;
+
+  state.inventoryItems = (state.inventoryItems || []).filter(item => !toRemove.has(item.id));
+  state.inventorySlots = (state.inventorySlots || []).map(id => (toRemove.has(id) ? null : id));
+  state.dormItemIds = (state.dormItemIds || []).filter(id => !toRemove.has(id));
+
+  if (state.equippedSlots && typeof state.equippedSlots === "object") {
+    Object.keys(state.equippedSlots).forEach(slot => {
+      if (toRemove.has(state.equippedSlots[slot])) state.equippedSlots[slot] = null;
+    });
+  }
+}
+
+function addStarterItemsForPrimaryArchetype() {
+  const state = getState();
+  if (!state?.archetype) return;
+
+  const rule = getArchetypeRule(state, state.archetype);
+  if (!rule) return;
+
+  if (!Array.isArray(state.inventoryItems)) state.inventoryItems = [];
+  if (!Array.isArray(state.dormItemIds)) state.dormItemIds = [];
+
+  const status = getStarterGrantStatus(state, state.archetype, rule);
+  if (!status.pendingSlots.length) return;
+
+  status.pendingSlots.forEach(({ line, slotIndex, record, isMismatched }) => {
+    if (isMismatched && record?.itemId) removeStarterItemsFromState(state, [record.itemId]);
+    const item = buildStarterItemFromLine(line);
+    state.inventoryItems.push(item);
+    if (!state.dormItemIds.includes(item.id)) state.dormItemIds.push(item.id);
+    upsertGrantedStarterRecord(state, state.archetype, slotIndex, item.id, line);
+  });
+
+  applyArchetypeStateToUI();
+  scheduleSave();
+}
+
+function removeStarterItemsForPrimaryArchetype() {
+  const state = getState();
+  if (!state?.archetype) return;
+
+  const records = getGrantedStarterItems(state, state.archetype);
+  if (!records.length) return;
+
+  removeStarterItemsFromState(state, records.map(record => record.itemId));
+  state.archetypeProgress.grantedStarterItems[state.archetype] = [];
+  applyArchetypeStateToUI();
+  scheduleSave();
 }
 
 function maybeGrantStarterItemsForPrimaryArchetype(state, archetypeKey) {
@@ -86,25 +296,21 @@ function maybeGrantStarterItemsForPrimaryArchetype(state, archetypeKey) {
   if (!rule) return false;
 
   ensureStarterItemGrantState(state);
-  const history = state.archetypeProgress.starterItemGrantHistory;
-  if (history.includes(archetypeKey)) return false;
+  const status = getStarterGrantStatus(state, archetypeKey, rule);
+  if (!status.pendingSlots.length) return false;
 
   if (!Array.isArray(state.inventoryItems)) state.inventoryItems = [];
   if (!Array.isArray(state.dormItemIds)) state.dormItemIds = [];
 
-  const lines = Array.isArray(rule.startingEquipment) ? rule.startingEquipment : [];
-  const templates = lines
-    .map(line => resolveBaseItemTemplateByStartingEquipmentLine(line))
-    .filter(Boolean);
-
-  templates.forEach(template => {
-    const item = buildInventoryItemFromBaseTemplate(template);
+  status.pendingSlots.forEach(({ line, slotIndex, record, isMismatched }) => {
+    if (isMismatched && record?.itemId) removeStarterItemsFromState(state, [record.itemId]);
+    const item = buildStarterItemFromLine(line);
     state.inventoryItems.push(item);
     if (!state.dormItemIds.includes(item.id)) state.dormItemIds.push(item.id);
+    upsertGrantedStarterRecord(state, archetypeKey, slotIndex, item.id, line);
   });
 
-  history.push(archetypeKey);
-  return templates.length > 0;
+  return true;
 }
 
 function toTitleCase(value) {
@@ -473,6 +679,13 @@ function ensureArchetypeState(state) {
     .map(value => String(value || "").trim())
     .filter(value => knownIds.has(value));
 
+  state.archetypeProgress.starterItemGrantHistory = state.archetypeProgress.starterItemGrantHistory
+    .map(value => String(value || "").trim())
+    .filter(Boolean);
+  Object.keys(state.archetypeProgress.grantedStarterItems).forEach(key => {
+    state.archetypeProgress.grantedStarterItems[key] = getGrantedStarterItems(state, key);
+  });
+
   if (!state.archetypeProgress.collapsedSections || typeof state.archetypeProgress.collapsedSections !== "object") {
     state.archetypeProgress.collapsedSections = {
       benefits: false,
@@ -517,6 +730,35 @@ function getSlotSummary(state) {
     usedSlots: Math.min(unlockedSlots, usedSlots),
     openSlots: Math.max(0, unlockedSlots - usedSlots),
   };
+}
+
+function getAllowedAbilityIdsForCurrentSelections(state) {
+  const allowed = new Set();
+  selectedArchetypeEntries(state).forEach(entry => {
+    const selectedSub = entry.type === "primary" ? state.subArchetype : state.subArchetype2;
+    getTieredAbilities(entry.key, selectedSub, state).forEach(ability => {
+      if (ability?.id) allowed.add(abilityGlobalId(entry.key, ability.id));
+    });
+  });
+  return allowed;
+}
+
+function cleanupArchetypeSelections(state) {
+  ensureArchetypeState(state);
+
+  const allowed = getAllowedAbilityIdsForCurrentSelections(state);
+  state.archetypeProgress.unlockedAbilityIds = state.archetypeProgress.unlockedAbilityIds.filter(value => allowed.has(value));
+
+  if (!state.archetype) {
+    state.archetypeProgress.permanentAptitudeSelections = [];
+    return;
+  }
+
+  const rule = getArchetypeRule(state, state.archetype);
+  const maxSlots = getPermanentAptitudeRequirementSlots(rule).length;
+  state.archetypeProgress.permanentAptitudeSelections = (state.archetypeProgress.permanentAptitudeSelections || [])
+    .filter(selection => selection?.sourceArchetype === state.archetype || !selection?.sourceArchetype)
+    .slice(0, maxSlots);
 }
 
 function isExtraAbilitySlot(state, slotIndex) {
@@ -660,43 +902,6 @@ function renderBenefits(state) {
     return;
   }
 
-  const aptitudes = getPermanentAptitudeRuleLines(rule).map(item => `<li>${item}</li>`).join("");
-  const equipment = rule.startingEquipment.map(item => `<li>${item}</li>`).join("");
-
-  benefitsList.innerHTML = `
-    <article class="archetype-benefit-card">
-      <div class="archetype-benefit-title">${rule.label}</div>
-      <div class="archetype-benefit-sub">Scales with ${toTitleCase(rule.scaleStat)}</div>
-      <div class="archetype-benefit-grid">
-        <div>
-          <div class="field-label">Permanent Aptitudes</div>
-          <ul class="archetype-mini-list">${aptitudes}</ul>
-        </div>
-        <div>
-          <div class="field-label">Starting Equipment</div>
-          <ul class="archetype-mini-list">${equipment}</ul>
-        </div>
-      </div>
-      <div class="techniques-muted">Only your first archetype grants starting aptitudes and starting equipment.</div>
-    </article>
-  `;
-}
-
-function renderPermanentAptitudePicker(state) {
-  const container = document.getElementById("archetypePermanentAptitudes");
-  if (!container) return;
-
-  if (!state.archetype) {
-    container.innerHTML = '<div class="techniques-app-empty">Pick a primary archetype to configure permanent aptitude skills.</div>';
-    return;
-  }
-
-  const rule = getArchetypeRule(state, state.archetype);
-  if (!rule) {
-    container.innerHTML = '<div class="techniques-app-empty">No permanent aptitude rule is defined for this archetype.</div>';
-    return;
-  }
-
   const slots = getPermanentAptitudeRequirementSlots(rule);
   ensurePermanentAptitudeState(state);
   const previous = state.archetypeProgress.permanentAptitudeSelections || [];
@@ -723,35 +928,102 @@ function renderPermanentAptitudePicker(state) {
   });
   state.archetypeProgress.permanentAptitudeSelections = nextSelections;
 
-  container.innerHTML = slots.length
-    ? `
-      <div class="techniques-muted">Selections here immediately become Permanent Aptitudes on the main sheet and stay locked unless Override mode is enabled.</div>
-      <div class="archetype-aptitude-picks">
+  const aptitudeMarkup = slots.length
+    ? `<div class="archetype-aptitude-picks">
         ${slots.map((slot, index) => {
           const entry = nextSelections[index];
           const isDuplicate = (seen.get(aptitudeSelectionSignature(entry)) || 0) > 1;
-          const statOptions = slot.allowedStats
-            .map(stat => `<option value="${stat}"${entry.statKey === stat ? " selected" : ""}>${toTitleCase(stat)}</option>`)
-            .join("");
           const skills = SKILL_LABELS_BY_STAT[entry.statKey] || [];
           const skillOptions = skills
-            .map((label, skillIndex) => `<option value="${skillIndex}"${entry.skillIndex === skillIndex ? " selected" : ""}>${label}</option>`)
+            .map((label, skillIndex) => `<option value="${skillIndex}"${entry.skillIndex === skillIndex ? " selected" : ""}>${escapeHtml(label)}</option>`)
             .join("");
           const selectedSkillLabel = skills[entry.skillIndex] || "Unknown";
+          const statTitle = slot.allowedStats.length === 1
+            ? `${toTitleCase(slot.allowedStats[0])} Aptitude`
+            : `Permanent Aptitude ${index + 1}`;
+          const statControl = slot.allowedStats.length > 1
+            ? `<select class="meta-select" data-perm-apt-stat="${index}">${slot.allowedStats.map(stat => `<option value="${stat}"${entry.statKey === stat ? " selected" : ""}>${toTitleCase(stat)}</option>`).join("")}</select>`
+            : "";
+
           return `
             <div class="archetype-aptitude-row${isDuplicate ? " archetype-aptitude-row--warning" : ""}">
-              <div class="archetype-aptitude-row-label">Pick ${index + 1}</div>
-              <select class="meta-select" data-perm-apt-stat="${index}">${statOptions}</select>
+              <div class="archetype-aptitude-row-label">${escapeHtml(statTitle)}</div>
+              ${statControl}
               <select class="meta-select" data-perm-apt-skill="${index}">${skillOptions}</select>
-              <div class="archetype-aptitude-preview">Selected: ${selectedSkillLabel}</div>
-              <div class="techniques-muted">${slot.ruleText}</div>
+              <div class="archetype-aptitude-preview">Selected: ${escapeHtml(selectedSkillLabel)}</div>
+              <div class="techniques-muted">${escapeHtml(slot.ruleText)}</div>
               ${isDuplicate ? '<div class="archetype-aptitude-warning">Duplicate pick detected. Choose a different skill.</div>' : ""}
             </div>
           `;
         }).join("")}
+      </div>`
+    : '<div class="techniques-app-empty">This archetype has no permanent aptitude requirements.</div>';
+
+  const equipmentLines = Array.isArray(rule.startingEquipment) ? rule.startingEquipment : [];
+  const selections = getStartingEquipmentSelections(state, state.archetype, rule);
+  const starterStatus = getStarterGrantStatus(state, state.archetype, rule);
+  const equipmentButtonLabel = starterStatus.records.length
+    ? (starterStatus.replaceableSlots.length
+      ? "Replace Equipment"
+      : starterStatus.missingSlots.length
+        ? "Add Missing Equipment"
+        : "Equipment Added")
+    : "Add Equipment";
+  const equipmentMarkup = equipmentLines.length
+    ? `
+      <div class="archetype-aptitude-picks">
+        ${equipmentLines.map((line, index) => {
+          const parsed = parseStartingEquipmentChoices(line);
+          const selectedIndex = selections[index] || 0;
+          const selected = parsed.options[selectedIndex] || parsed.options[0] || null;
+          const selectMarkup = parsed.options.length > 1
+            ? `<select class="meta-select" data-starting-equipment-choice="${index}">
+                ${parsed.options.map((option, optionIndex) => `<option value="${optionIndex}"${optionIndex === selectedIndex ? " selected" : ""}>${escapeHtml(option.label)}</option>`).join("")}
+              </select>`
+            : `<div class="archetype-aptitude-preview">${escapeHtml(selected?.label || line)}</div>`;
+
+          return `
+            <div class="archetype-aptitude-row">
+              <div class="archetype-aptitude-row-label">Equipment ${index + 1}</div>
+              ${selectMarkup}
+              ${parsed.detail ? `<div class="techniques-muted">${escapeHtml(parsed.detail)}</div>` : ""}
+            </div>
+          `;
+        }).join("")}
+        <div class="inventory-form-actions">
+          <button type="button" class="meta-toggle-btn" data-add-starting-equipment="true"${starterStatus.pendingSlots.length ? "" : " disabled"}>${equipmentButtonLabel}</button>
+          <button type="button" class="inventory-secondary-btn" data-remove-starting-equipment="true"${starterStatus.hasAnyPresent ? "" : " disabled"}>Remove Granted Equipment</button>
+        </div>
       </div>
     `
-    : '<div class="techniques-app-empty">This archetype has no permanent aptitude requirements.</div>';
+    : '<div class="techniques-app-empty">This archetype has no starting equipment configured.</div>';
+
+  benefitsList.innerHTML = `
+    <article class="archetype-benefit-card">
+      <div class="archetype-benefit-title">${rule.label}</div>
+      <div class="archetype-benefit-sub">Scales with ${toTitleCase(rule.scaleStat)}</div>
+      <div class="archetype-benefit-grid">
+        <div>
+          <div class="field-label">Permanent Aptitudes</div>
+          ${aptitudeMarkup}
+        </div>
+        <div>
+          <div class="field-label">Starting Equipment</div>
+          ${equipmentMarkup}
+        </div>
+      </div>
+      <div class="techniques-muted">Only your first archetype grants starting aptitudes and starting equipment.</div>
+    </article>
+  `;
+}
+
+function renderPermanentAptitudePicker(state) {
+  const container = document.getElementById("archetypePermanentAptitudes");
+  const panel = document.getElementById("archetypePermanentAptitudesPanel");
+  const toggle = document.getElementById("archetypePermanentAptitudesToggleBtn");
+  if (container) container.innerHTML = "";
+  if (panel) panel.style.display = "none";
+  if (toggle) toggle.style.display = "none";
 }
 
 function renderCustomBuilder(state) {
@@ -1119,7 +1391,10 @@ function removeAbilityFromSlots(globalId) {
 function refreshFromArchetypeSelectors() {
   const state = getState();
   if (!state) return;
-  setTimeout(() => applyArchetypeStateToUI(), 0);
+  setTimeout(() => {
+    cleanupArchetypeSelections(state);
+    applyArchetypeStateToUI();
+  }, 0);
 }
 
 function setCustomFieldValue(state, fieldPath, value) {
@@ -1287,9 +1562,9 @@ export function initArchetype({ getState: getStateFn, scheduleSave: scheduleSave
     });
   }
 
-  const aptitudePicker = document.getElementById("archetypePermanentAptitudes");
-  if (aptitudePicker) {
-    aptitudePicker.addEventListener("change", e => {
+  const benefitsList = document.getElementById("archetypeBenefitsList");
+  if (benefitsList) {
+    benefitsList.addEventListener("change", e => {
       const state = getState();
       if (!state) return;
       ensureArchetypeState(state);
@@ -1315,22 +1590,50 @@ export function initArchetype({ getState: getStateFn, scheduleSave: scheduleSave
       }
 
       const skillSelect = e.target?.closest?.("[data-perm-apt-skill]");
-      if (!skillSelect) return;
-      const index = parseInt(skillSelect.dataset.permAptSkill, 10);
-      const nextSkill = parseInt(skillSelect.value, 10) || 0;
-      const selections = state.archetypeProgress.permanentAptitudeSelections || [];
-      const current = selections[index] || {};
-      const statKey = current.statKey || "power";
-      const resolvedSkill = findFirstNonDuplicateSkillIndex(selections, index, statKey, nextSkill);
-      selections[index] = {
-        ...current,
-        skillIndex: resolvedSkill,
-        sourceArchetype: state.archetype,
-        sourceLabel: getArchetypeLabel(state.archetype),
-      };
-      state.archetypeProgress.permanentAptitudeSelections = selections;
+      if (skillSelect) {
+        const index = parseInt(skillSelect.dataset.permAptSkill, 10);
+        const nextSkill = parseInt(skillSelect.value, 10) || 0;
+        const selections = state.archetypeProgress.permanentAptitudeSelections || [];
+        const current = selections[index] || {};
+        const statKey = current.statKey || "power";
+        const resolvedSkill = findFirstNonDuplicateSkillIndex(selections, index, statKey, nextSkill);
+        selections[index] = {
+          ...current,
+          skillIndex: resolvedSkill,
+          sourceArchetype: state.archetype,
+          sourceLabel: getArchetypeLabel(state.archetype),
+        };
+        state.archetypeProgress.permanentAptitudeSelections = selections;
+        applyArchetypeStateToUI();
+        scheduleSave();
+        return;
+      }
+
+      if (!state.archetype) return;
+      ensureStarterItemGrantState(state);
+
+      const equipmentSelect = e.target?.closest?.("[data-starting-equipment-choice]");
+      if (!equipmentSelect) return;
+      const rule = getArchetypeRule(state, state.archetype);
+      if (!rule) return;
+
+      const index = parseInt(equipmentSelect.dataset.startingEquipmentChoice, 10);
+      const selections = getStartingEquipmentSelections(state, state.archetype, rule);
+      selections[index] = Math.max(0, parseInt(equipmentSelect.value, 10) || 0);
+      state.archetypeProgress.startingEquipmentSelections[state.archetype] = selections;
       applyArchetypeStateToUI();
       scheduleSave();
+    });
+
+    benefitsList.addEventListener("click", e => {
+      const addEquipmentTrigger = e.target?.closest?.("[data-add-starting-equipment]");
+      if (addEquipmentTrigger) {
+        addStarterItemsForPrimaryArchetype();
+        return;
+      }
+
+      const removeEquipmentTrigger = e.target?.closest?.("[data-remove-starting-equipment]");
+      if (removeEquipmentTrigger) removeStarterItemsForPrimaryArchetype();
     });
   }
 
