@@ -493,6 +493,34 @@ function handleStartAptitudeTraining() {
   refreshUI();
 }
 
+function updateAptitudeTrainingProgressUI(trainingId, progress, required) {
+  const card = document.querySelector(`.aptitude-active-card[data-training-id="${trainingId}"]`);
+  if (!card) return;
+
+  const pipButtons = card.querySelectorAll("[data-action='setAptitudeProgress']");
+  pipButtons.forEach(btn => {
+    const pipValue = parseNonNegativeInt(btn.dataset.progress);
+    btn.classList.toggle("filled", pipValue <= progress);
+  });
+
+  const progressText = card.querySelector(".progress-text");
+  if (progressText) progressText.textContent = `${progress}/${required}`;
+
+  const actions = card.querySelector(".skill-card-actions");
+  if (!actions) return;
+  const existingCompleteBtn = actions.querySelector("[data-action='completeAptitudeTraining']");
+  if (progress >= required) {
+    if (!existingCompleteBtn) {
+      actions.insertAdjacentHTML(
+        "afterbegin",
+        `<button type="button" class="training-complete-btn training-complete-btn-small" data-action="completeAptitudeTraining" data-training-id="${trainingId}">Complete Training</button>`,
+      );
+    }
+  } else if (existingCompleteBtn) {
+    existingCompleteBtn.remove();
+  }
+}
+
 function handleSetAptitudeProgress(trainingId, nextProgressRaw) {
   const state = getState();
   if (!state) return;
@@ -505,7 +533,7 @@ function handleSetAptitudeProgress(trainingId, nextProgressRaw) {
   const nextProgress = Math.max(0, Math.min(required, parseNonNegativeInt(nextProgressRaw)));
   active.progress = nextProgress;
   scheduleSave();
-  refreshUI();
+  updateAptitudeTrainingProgressUI(trainingId, nextProgress, required);
 }
 
 function handleCancelAptitudeTraining(trainingId) {
@@ -626,6 +654,34 @@ function handleDeleteSkill(skillId) {
   }
 }
 
+function updateJujutsuSkillProgressUI(skillId, progress, required) {
+  const card = document.querySelector(`.training-skill-card[data-skill-id="${skillId}"]`);
+  if (!card) return;
+
+  const pipButtons = card.querySelectorAll("[data-action='setSkillProgress']");
+  pipButtons.forEach(btn => {
+    const pipValue = parseNonNegativeInt(btn.dataset.progress);
+    btn.classList.toggle("filled", pipValue <= progress);
+  });
+
+  const progressText = card.querySelector(".progress-text");
+  if (progressText) progressText.textContent = `${progress}/${required}`;
+
+  const actions = card.querySelector(".skill-card-actions");
+  if (!actions) return;
+  const existingCompleteBtn = actions.querySelector("[data-action='completeSkill']");
+  if (progress >= required) {
+    if (!existingCompleteBtn) {
+      actions.insertAdjacentHTML(
+        "beforeend",
+        `<button type="button" class="training-complete-btn" data-action="completeSkill" data-skill-id="${skillId}" aria-label="Move to Skills tab">Complete</button>`,
+      );
+    }
+  } else if (existingCompleteBtn) {
+    existingCompleteBtn.remove();
+  }
+}
+
 function handleSetSkillProgress(skillId, nextProgressRaw) {
   const state = getState();
   if (!state) return;
@@ -639,7 +695,7 @@ function handleSetSkillProgress(skillId, nextProgressRaw) {
   const nextProgress = Math.max(0, Math.min(required, parseNonNegativeInt(nextProgressRaw)));
   skill.progress = nextProgress;
   scheduleSave();
-  refreshUI();
+  updateJujutsuSkillProgressUI(skillId, nextProgress, required);
 }
 
 function handleCompleteSkill(skillId) {
