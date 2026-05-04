@@ -61,23 +61,51 @@ function sortByTitle(a, b) {
   return String(a?.title || "").localeCompare(String(b?.title || ""), undefined, { sensitivity: "base" });
 }
 
+function renderInteractivePips(action, current, total) {
+  let html = "";
+  for (let i = 0; i < total; i += 1) {
+    const filled = i < current;
+    html += `<button type="button" class="progress-pip${filled ? " filled" : ""}" data-action="${action}" data-value="${i + 1}" aria-label="Set value to ${i + 1} of ${total}" title="${i + 1}/${total}"></button>`;
+  }
+  return html;
+}
+
+function renderStaticPips(current, total) {
+  let html = "";
+  for (let i = 0; i < total; i += 1) {
+    const filled = i < current;
+    html += `<span class="progress-pip skills-readonly-pip${filled ? " filled" : ""}" aria-hidden="true"></span>`;
+  }
+  return html;
+}
+
+function renderSkillActionIcons() {
+  return `
+    <button type="button" class="inventory-icon-btn inventory-icon-btn-edit" data-action="editSkill" aria-label="Edit skill" title="Edit skill">✎</button>
+    <button type="button" class="inventory-icon-btn danger" data-action="deleteSkill" aria-label="Delete skill" title="Delete skill">
+      <svg class="inventory-icon-trash" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <path fill="currentColor" d="M9 3h6a1 1 0 0 1 1 1v1h4v2h-1l-1 12a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 7H4V5h4V4a1 1 0 0 1 1-1Zm1 2v0h4V5h-4Zm-1 4h2v9H9V9Zm4 0h2v9h-2V9Z"/>
+        <path fill="none" stroke="currentColor" stroke-width="1.5" d="M6 7.5h12"/>
+      </svg>
+    </button>
+  `;
+}
+
 function renderXpSkillCard(skill) {
   const maxStacks = parsePositiveInt(skill.maxStacks, 1);
-  const currentStacks = Math.min(parseNonNegativeInt(skill.currentStacks, 0), maxStacks);
-  const canDecrease = currentStacks > 0;
-  const canIncrease = currentStacks < maxStacks;
+  const currentStacks = Math.min(parsePositiveInt(skill.currentStacks, 1), maxStacks);
   return `
     <article class="skills-card" data-kind="xp" data-skill-id="${skill.id}">
       <div class="skills-card-title">${skill.title || "Untitled XP Skill"}</div>
       ${skill.description ? `<div class="skills-card-desc">${skill.description}</div>` : ""}
-      <div class="skills-card-meta">Stacks: ${currentStacks}/${maxStacks}</div>
-      <div class="skills-stack-controls">
-        <button type="button" class="inventory-mini-btn" data-action="decreaseXpStack" ${canDecrease ? "" : "disabled"}>-</button>
-        <button type="button" class="inventory-mini-btn" data-action="increaseXpStack" ${canIncrease ? "" : "disabled"}>+</button>
+      <div class="skills-card-meta-row">
+        <span class="skills-card-meta">Stacks:</span>
+        <div class="progress-pips skills-progress-pips" aria-label="Stacks ${currentStacks} of ${maxStacks}">
+          ${renderInteractivePips("setXpStack", currentStacks, maxStacks)}
+        </div>
       </div>
       <div class="skills-card-actions">
-        <button type="button" class="inventory-mini-btn" data-action="editSkill">Edit</button>
-        <button type="button" class="inventory-mini-btn danger" data-action="deleteSkill">Delete</button>
+        ${renderSkillActionIcons()}
       </div>
     </article>
   `;
@@ -102,11 +130,16 @@ function renderJujutsuSkillCard(state, skill) {
     <article class="skills-card" data-kind="jujutsu" data-skill-id="${skill.id}">
       <div class="skills-card-title">${skill.title || "Untitled Jujutsu Skill"}</div>
       ${skill.description ? `<div class="skills-card-desc">${skill.description}</div>` : ""}
-      <div class="skills-card-meta">Learned: ${timesLearned}/${maxLearnCount}${inTraining ? " (In Training)" : ""}</div>
+      <div class="skills-card-meta-row">
+        <span class="skills-card-meta">Learned:</span>
+        <div class="progress-pips skills-progress-pips" aria-label="Learned ${timesLearned} of ${maxLearnCount}">
+          ${renderStaticPips(timesLearned, maxLearnCount)}
+        </div>
+        ${inTraining ? '<span class="skills-card-meta">(In Training)</span>' : ""}
+      </div>
       <div class="skills-card-actions">
-        ${canRelearn ? '<button type="button" class="inventory-mini-btn" data-action="relearnSkill">Learn Again</button>' : ""}
-        <button type="button" class="inventory-mini-btn" data-action="editSkill">Edit</button>
-        <button type="button" class="inventory-mini-btn danger" data-action="deleteSkill">Delete</button>
+        ${canRelearn ? '<button type="button" class="inventory-icon-btn skills-icon-relearn-btn" data-action="relearnSkill" aria-label="Learn Again" title="Learn Again">↻</button>' : ""}
+        ${renderSkillActionIcons()}
       </div>
     </article>
   `;
@@ -119,7 +152,7 @@ function renderSkillEditForm(skill, kind) {
   const requirements = normalizeText(skill?.requirements);
   const requiredMissions = parsePositiveInt(skill?.requiredMissions, 1);
   const maxStacks = parsePositiveInt(skill?.maxStacks, 1);
-  const currentStacks = Math.min(parseNonNegativeInt(skill?.currentStacks, 0), maxStacks);
+  const currentStacks = Math.min(parsePositiveInt(skill?.currentStacks, 1), maxStacks);
 
   return `
     <div class="skills-edit-card" data-kind="${kind}" data-skill-id="${skill.id}">
@@ -139,7 +172,7 @@ function renderSkillEditForm(skill, kind) {
           </div>
           <div class="skill-input-field">
             <label class="field-label">Current Stacks</label>
-            <input type="number" min="0" class="skill-input" data-field="currentStacks" value="${currentStacks}" />
+            <input type="number" min="1" class="skill-input" data-field="currentStacks" value="${currentStacks}" />
           </div>
         ` : ""}
         ${kind === "jujutsu" ? `
@@ -341,7 +374,7 @@ function setupSkillsEventHandlers() {
         alert("Please provide an XP skill title.");
         return;
       }
-      state.skills.xpSkills.push({ id: createId("xp-skill"), title, description, maxStacks, currentStacks: 0 });
+      state.skills.xpSkills.push({ id: createId("xp-skill"), title, description, maxStacks, currentStacks: 1 });
       _showXpSkillForm = false;
       scheduleSave();
       renderSkills(state);
@@ -372,24 +405,13 @@ function setupSkillsEventHandlers() {
       return;
     }
 
-    const increaseStackBtn = e.target?.closest?.("[data-action='increaseXpStack']");
-    if (increaseStackBtn) {
+    const setXpStackBtn = e.target?.closest?.("[data-action='setXpStack']");
+    if (setXpStackBtn) {
       const info = findSkillById(state, "xp", skillId);
       if (!info.skill) return;
       const maxStacks = parsePositiveInt(info.skill.maxStacks, 1);
-      const currentStacks = parseNonNegativeInt(info.skill.currentStacks, 0);
-      info.skill.currentStacks = Math.min(currentStacks + 1, maxStacks);
-      scheduleSave();
-      renderSkills(state);
-      return;
-    }
-
-    const decreaseStackBtn = e.target?.closest?.("[data-action='decreaseXpStack']");
-    if (decreaseStackBtn) {
-      const info = findSkillById(state, "xp", skillId);
-      if (!info.skill) return;
-      const currentStacks = parseNonNegativeInt(info.skill.currentStacks, 0);
-      info.skill.currentStacks = Math.max(currentStacks - 1, 0);
+      const requested = parsePositiveInt(setXpStackBtn.dataset.value, 1);
+      info.skill.currentStacks = Math.min(requested, maxStacks);
       scheduleSave();
       renderSkills(state);
       return;
@@ -430,7 +452,7 @@ function setupSkillsEventHandlers() {
 
       if (editKind === "xp") {
         const maxStacks = parsePositiveInt(editCard.querySelector("[data-field='maxStacks']")?.value, 1);
-        const currentStacks = parseNonNegativeInt(editCard.querySelector("[data-field='currentStacks']")?.value, 0);
+        const currentStacks = parsePositiveInt(editCard.querySelector("[data-field='currentStacks']")?.value, 1);
         info.skill.maxStacks = maxStacks;
         info.skill.currentStacks = Math.min(currentStacks, maxStacks);
       }

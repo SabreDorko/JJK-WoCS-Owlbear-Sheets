@@ -708,7 +708,7 @@ function handleDeleteSkill(skillId) {
   if (index >= 0) {
     state.training.jujutsuSkills.splice(index, 1);
     scheduleSave();
-    refreshUI();
+    refreshAll();
   }
 }
 

@@ -1523,7 +1523,7 @@
       margin-bottom: 2px;
     }
     .archetype-desc-toggle[aria-expanded="false"] .archetype-desc-chevron {
-      transform: rotate(-135deg);
+      transform: rotate(-45deg);
     }
     .archetype-ability-notes {
       overflow: hidden;
@@ -2578,22 +2578,37 @@
       color: var(--ink-faint);
       text-transform: uppercase;
     }
+    .skills-card-meta-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .skills-progress-pips {
+      gap: 5px;
+    }
+    .skills-progress-pips .progress-pip {
+      width: 12px;
+      height: 12px;
+    }
+    .skills-readonly-pip {
+      pointer-events: none;
+      cursor: default;
+    }
     .skills-card-actions {
       display: flex;
       flex-wrap: wrap;
       gap: 6px;
       align-items: center;
     }
-    .skills-stack-controls {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
+    .skills-icon-relearn-btn {
+      color: var(--ink-faint);
+      min-width: auto;
+      padding: 0 4px;
+      font-size: 16px;
     }
-    .skills-stack-controls .inventory-mini-btn {
-      min-width: 24px;
-      padding: 1px 6px;
-      font-size: 10px;
-      line-height: 1;
+    .skills-icon-relearn-btn:hover {
+      color: var(--ink);
     }
     .skills-add-form .skill-input,
     .skills-edit-card .skill-input,
