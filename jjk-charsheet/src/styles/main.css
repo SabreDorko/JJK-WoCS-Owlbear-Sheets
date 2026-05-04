@@ -1497,11 +1497,19 @@
       color: var(--ink);
     }
     .archetype-desc-chevron {
-      width: 10px;
-      text-align: center;
-      line-height: 1;
-      color: var(--accent);
-      font-size: 12px;
+      display: inline-block;
+      width: 7px;
+      height: 7px;
+      border-right: 1.6px solid var(--accent);
+      border-bottom: 1.6px solid var(--accent);
+      transform: rotate(45deg);
+      transform-origin: center;
+      transition: transform 220ms ease;
+      flex-shrink: 0;
+      margin-bottom: 2px;
+    }
+    .archetype-desc-toggle[aria-expanded="false"] .archetype-desc-chevron {
+      transform: rotate(-45deg);
     }
     .archetype-ability-notes {
       display: none;
@@ -2004,6 +2012,317 @@
       min-width: 120px;
       padding-left: 10px;
       padding-right: 10px;
+    }
+
+    /* ── TRAINING SECTION ── */
+    .training-shell {
+      display: grid;
+      gap: 12px;
+    }
+    .training-section {
+      border: 1px solid var(--border);
+      background: rgba(240, 235, 224, 0.65);
+      padding: 8px;
+      display: grid;
+      gap: 8px;
+    }
+    .training-section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+    }
+    .training-section-title {
+      font-family: 'Cinzel', serif;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      color: var(--ink);
+      margin: 0;
+    }
+    .training-add-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 24px;
+      height: 24px;
+      padding: 0;
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--ink-faint);
+      cursor: pointer;
+      transition: color 120ms ease, border-color 120ms ease;
+    }
+    .training-add-btn:hover {
+      color: var(--ink);
+      border-color: var(--ink);
+    }
+    .training-empty {
+      font-family: 'Crimson Text', serif;
+      font-size: 13px;
+      color: var(--ink-light);
+      font-style: italic;
+      text-align: center;
+      padding: 12px 8px;
+    }
+    .training-skill-card {
+      border: 1px solid var(--border-light);
+      background: var(--parchment);
+      padding: 7px 8px;
+      display: grid;
+      gap: 6px;
+      animation: sectionRiseIn 220ms ease both;
+    }
+    .skill-card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+    }
+    .skill-card-title {
+      font-family: 'Cinzel', serif;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--ink);
+      flex: 1;
+      min-width: 0;
+      word-break: break-word;
+    }
+    .training-skill-delete-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 18px;
+      height: 18px;
+      padding: 0;
+      background: transparent;
+      border: none;
+      color: var(--ink-faint);
+      cursor: pointer;
+      flex-shrink: 0;
+      transition: color 120ms ease;
+    }
+    .training-skill-delete-btn:hover {
+      color: var(--ink);
+    }
+    .training-icon-trash {
+      width: 100%;
+      height: 100%;
+    }
+    .skill-card-meta {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .skill-requirement {
+      font-family: 'Crimson Text', serif;
+      font-size: 12px;
+      color: var(--ink-light);
+    }
+    .skill-multi-mission {
+      font-family: 'Cinzel', serif;
+      font-size: 8px;
+      letter-spacing: 0.4px;
+      text-transform: uppercase;
+      color: var(--accent);
+      background: rgba(193, 157, 98, 0.1);
+      padding: 2px 6px;
+      border-radius: 2px;
+    }
+    .skill-card-description {
+      font-family: 'Crimson Text', serif;
+      font-size: 12px;
+      color: var(--ink);
+      line-height: 1.35;
+      padding: 4px 0;
+      border-left: 2px solid var(--border-light);
+      padding-left: 6px;
+    }
+    .skill-card-progress {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 4px 0;
+    }
+    .progress-pips {
+      display: flex;
+      gap: 4px;
+      align-items: center;
+    }
+    .progress-pip {
+      width: 10px;
+      height: 10px;
+      border: 1.5px solid var(--border-light);
+      border-radius: 2px;
+      background: transparent;
+      transition: background 120ms ease, border-color 120ms ease;
+    }
+    .progress-pip.filled {
+      background: var(--accent);
+      border-color: var(--accent);
+    }
+    .progress-text {
+      font-family: 'Crimson Text', serif;
+      font-size: 11px;
+      color: var(--ink-light);
+    }
+    .skill-card-actions {
+      display: flex;
+      gap: 5px;
+      align-items: center;
+      margin-top: 2px;
+    }
+    .training-progress-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 26px;
+      height: 24px;
+      padding: 0;
+      background: var(--parchment-dark);
+      border: 1px solid var(--border);
+      color: var(--ink-faint);
+      font-family: 'Cinzel', serif;
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 120ms ease;
+    }
+    .training-progress-btn:hover {
+      background: var(--border-strong);
+      color: var(--ink);
+    }
+    .training-progress-btn.minus {
+      font-size: 16px;
+    }
+    .training-complete-btn {
+      flex: 1;
+      padding: 4px 8px;
+      background: var(--accent);
+      border: none;
+      color: white;
+      font-family: 'Cinzel', serif;
+      font-size: 9px;
+      font-weight: 600;
+      letter-spacing: 0.4px;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: all 120ms ease;
+      margin-left: 4px;
+    }
+    .training-complete-btn:hover {
+      background: rgba(193, 157, 98, 0.85);
+    }
+    .training-skill-input-card {
+      border: 1px solid var(--accent);
+      background: rgba(193, 157, 98, 0.08);
+      padding: 8px;
+      display: grid;
+      gap: 8px;
+      animation: sectionRiseIn 220ms ease both;
+    }
+    .skill-input-grid {
+      display: grid;
+      gap: 8px;
+    }
+    .skill-input-field {
+      display: grid;
+      gap: 3px;
+    }
+    .skill-input-field.full-width {
+      grid-column: 1 / -1;
+    }
+    .skill-input {
+      font-family: 'Crimson Text', serif;
+      font-size: 12px;
+      background: var(--parchment);
+      border: 1px solid var(--border-light);
+      color: var(--ink);
+      padding: 4px 6px;
+    }
+    .skill-input:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px rgba(193, 157, 98, 0.15);
+    }
+    .skill-textarea {
+      font-family: 'Crimson Text', serif;
+      font-size: 12px;
+      background: var(--parchment);
+      border: 1px solid var(--border-light);
+      color: var(--ink);
+      padding: 5px 6px;
+      resize: vertical;
+    }
+    .skill-textarea:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px rgba(193, 157, 98, 0.15);
+    }
+    .checkbox-wrapper {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .checkbox-input {
+      width: 16px;
+      height: 16px;
+      accent-color: var(--accent);
+      cursor: pointer;
+    }
+    .checkbox-label {
+      font-family: 'Crimson Text', serif;
+      font-size: 12px;
+      color: var(--ink);
+      cursor: pointer;
+      user-select: none;
+    }
+    .skill-input-actions {
+      display: flex;
+      gap: 6px;
+      justify-content: flex-end;
+      margin-top: 4px;
+    }
+    .training-add-skill-btn {
+      padding: 4px 10px;
+      background: var(--accent);
+      border: none;
+      color: white;
+      font-family: 'Cinzel', serif;
+      font-size: 9px;
+      font-weight: 600;
+      letter-spacing: 0.4px;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: all 120ms ease;
+    }
+    .training-add-skill-btn:hover {
+      background: rgba(193, 157, 98, 0.85);
+    }
+    .training-cancel-btn {
+      padding: 4px 10px;
+      background: var(--parchment-dark);
+      border: 1px solid var(--border);
+      color: var(--ink-faint);
+      font-family: 'Cinzel', serif;
+      font-size: 9px;
+      font-weight: 600;
+      letter-spacing: 0.4px;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: all 120ms ease;
+    }
+    .training-cancel-btn:hover {
+      border-color: var(--ink);
+      color: var(--ink);
+    }
+    .training-muted {
+      font-family: 'Crimson Text', serif;
+      font-size: 13px;
+      color: var(--ink-light);
+      font-style: italic;
+      padding: 8px 0;
     }
 
     @media (max-width: 760px) {
@@ -2578,9 +2897,6 @@
       background: transparent;
       border: none;
       color: var(--ink-light);
-      font-family: 'Cinzel', serif;
-      font-size: 18px;
-      line-height: 1;
       width: 24px;
       height: 22px;
       padding: 0;
@@ -2591,8 +2907,22 @@
       justify-content: center;
       flex: 0 0 auto;
     }
-    .inventory-desc-toggle-btn:hover {
-      color: var(--ink);
+    .inventory-desc-toggle-btn::after {
+      content: "";
+      display: inline-block;
+      width: 7px;
+      height: 7px;
+      border-right: 1.6px solid var(--ink-light);
+      border-bottom: 1.6px solid var(--ink-light);
+      transform: rotate(45deg);
+      transform-origin: center;
+      transition: transform 220ms ease, border-color 150ms ease;
+    }
+    .inventory-desc-toggle-btn[aria-expanded="false"]::after {
+      transform: rotate(-45deg);
+    }
+    .inventory-desc-toggle-btn:hover::after {
+      border-color: var(--ink);
     }
     .inventory-slot-card .inventory-item-card {
       border: none;

@@ -931,8 +931,7 @@ function shouldShowEquipTargetSelect(item) {
 
 function renderDescriptionToggleButton(isDescriptionExpanded) {
   const ariaLabel = isDescriptionExpanded ? "Collapse description" : "Expand description";
-  const chevron = isDescriptionExpanded ? "&#9662;" : "&#9656;";
-  return `<button type="button" class="inventory-desc-toggle-btn" data-action="toggleDescription" aria-label="${ariaLabel}" title="${ariaLabel}" aria-expanded="${isDescriptionExpanded ? "true" : "false"}">${chevron}</button>`;
+  return `<button type="button" class="inventory-desc-toggle-btn" data-action="toggleDescription" aria-label="${ariaLabel}" title="${ariaLabel}" aria-expanded="${isDescriptionExpanded ? "true" : "false"}"></button>`;
 }
 
 function renderEditButton() {

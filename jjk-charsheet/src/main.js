@@ -47,6 +47,7 @@ import {
 } from "./rolls.js";
 import { initUiShell } from "./ui-shell.js";
 import { initNotes, applyNotesStateToUI } from "./notes.js";
+import { initTraining, renderTraining } from "./training.js";
 
 // ── RUNTIME STATE ─────────────────────────────────────────────────────────────
 let state           = defaultState();
@@ -150,6 +151,7 @@ function applyStateToUI() {
   applyTechniquesStateToUI();
   applyArchetypeStateToUI();
   applyNotesStateToUI();
+  renderTraining(state);
 
   renderRollHistory();
   renderPartyList();
@@ -213,6 +215,13 @@ async function init() {
   initNotes({
     getState: () => state,
     scheduleSave,
+  });
+
+  initTraining({
+    getState: () => state,
+    scheduleSave,
+    showRollToast,
+    refreshUI: applyStateToUI,
   });
 
   initUiShell({

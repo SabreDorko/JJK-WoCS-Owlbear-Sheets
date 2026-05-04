@@ -863,7 +863,7 @@ function renderAbilitySlots(state) {
         <div class="archetype-slot-name">${def?.name || abilityId}</div>
         <div class="archetype-slot-meta">${rule?.label || toTitleCase(archKey)} · Tier ${def?.tier || "?"}</div>
         <button type="button" class="archetype-desc-toggle" data-slot-desc-toggle="${descKey}" aria-expanded="${isExpanded ? "true" : "false"}">
-          <span class="archetype-desc-chevron">${isExpanded ? "▾" : "▸"}</span>
+          <span class="archetype-desc-chevron"></span>
           <span>Description</span>
         </button>
         <div class="archetype-ability-notes${isExpanded ? " open" : ""}">${def?.notes || ""}</div>
@@ -1002,7 +1002,7 @@ function renderAbilityTree(state) {
           </div>
           ${statusText ? `<div class="archetype-ability-status">${statusText}</div>` : ""}
           <button type="button" class="archetype-desc-toggle" data-ability-desc-toggle="${descKey}" aria-expanded="${isExpanded ? "true" : "false"}">
-            <span class="archetype-desc-chevron">${isExpanded ? "▾" : "▸"}</span>
+            <span class="archetype-desc-chevron"></span>
             <span>Description</span>
           </button>
           <div class="archetype-ability-notes${isExpanded ? " open" : ""}">${ability.notes || ""}</div>

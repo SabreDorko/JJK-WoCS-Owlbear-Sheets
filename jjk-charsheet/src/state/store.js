@@ -76,6 +76,10 @@ export function defaultState() {
       notes: "",
       bindingVowsNotes: "",
     },
+    training: {
+      jujutsuSkills: [],
+      aptitudeTraining: [],
+    },
     archetypeProgress: {
       unlockedAbilityIds: [],
       permanentAptitudeSelections: [],
