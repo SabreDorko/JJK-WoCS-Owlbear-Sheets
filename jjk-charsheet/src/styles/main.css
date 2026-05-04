@@ -2324,9 +2324,89 @@
       font-style: italic;
       padding: 8px 0;
     }
+    .training-skills-container {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+    .training-slot {
+      display: flex;
+      flex-direction: column;
+      min-height: 120px;
+    }
+    .training-skill-card-locked {
+      background: rgba(240, 235, 224, 0.4);
+      border-color: var(--border-light);
+      opacity: 0.65;
+      pointer-events: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 120px;
+    }
+    .training-locked-message {
+      font-family: 'Crimson Text', serif;
+      font-size: 12px;
+      color: var(--ink-light);
+      text-align: center;
+      line-height: 1.4;
+      padding: 8px;
+    }
+    .training-skill-card-empty {
+      background: rgba(193, 157, 98, 0.08);
+      border: 2px dashed var(--border-light);
+      padding: 0;
+    }
+    .training-empty-slot {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      width: 100%;
+      height: 100%;
+      min-height: 120px;
+      padding: 8px;
+    }
+    .training-add-btn-large {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      height: 32px;
+      padding: 0;
+      background: transparent;
+      border: 2px solid var(--accent);
+      color: var(--accent);
+      cursor: pointer;
+      border-radius: 4px;
+      transition: all 120ms ease;
+    }
+    .training-add-btn-large:hover {
+      background: var(--accent);
+      color: white;
+    }
+    .training-slot-label {
+      font-family: 'Cinzel', serif;
+      font-size: 10px;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      color: var(--ink-faint);
+    }
+    .skill-input:is(select) {
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none'%3E%3Cpath stroke='%23333' stroke-width='2' d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 5px center;
+      background-size: 18px;
+      padding-right: 28px;
+    }
 
     @media (max-width: 760px) {
       .techniques-app-edit-grid {
+        grid-template-columns: 1fr;
+      }
+      .training-skills-container {
         grid-template-columns: 1fr;
       }
     }

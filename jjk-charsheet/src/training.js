@@ -4,6 +4,8 @@ let _showRollToast = null;
 let _refreshUI = null;
 let _initialized = false;
 
+const GRADE_RANK = { "4": 0, "Semi-3": 0.5, "3": 1, "Semi-2": 1.5, "2": 2, "Semi-1": 2.5, "1": 3, "Special Grade": 4 };
+
 function getState() {
   return _getState ? _getState() : null;
 }
@@ -16,8 +18,39 @@ function refreshUI() {
   if (_refreshUI) _refreshUI();
 }
 
+function ensureTrainingState(state) {
+  if (!state) return;
+  if (!state.training) {
+    state.training = {
+      jujutsuSkills: [],
+      aptitudeTraining: [],
+    };
+  }
+  if (!state.training.jujutsuSkills) state.training.jujutsuSkills = [];
+  if (!state.training.aptitudeTraining) state.training.aptitudeTraining = [];
+}
+
 function generateUniqueId() {
   return `skill-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+}
+
+function getCharacterGradeRank(state) {
+  const grade = state?.grade || "";
+  return GRADE_RANK[grade] ?? -1;
+}
+
+function isSlotUnlocked(slotNumber, state) {
+  const gradeRank = getCharacterGradeRank(state);
+  if (slotNumber === 1) return true; // Always unlocked
+  if (slotNumber === 2) return gradeRank >= GRADE_RANK["Semi-1"]; // Semi-1 or better
+  if (slotNumber === 3) return gradeRank >= GRADE_RANK["Special Grade"];
+  return false;
+}
+
+function getSlotLockMessage(slotNumber) {
+  if (slotNumber === 2) return "Locked: Reach Semi-Grade 1";
+  if (slotNumber === 3) return "Locked: Reach Special Grade";
+  return "";
 }
 
 function formatProgressPips(progress, required) {
@@ -71,7 +104,14 @@ function renderJujutsuSkillInput() {
         </div>
         <div class="skill-input-field">
           <label for="skillRequirementsInput" class="field-label">Requirements</label>
-          <input type="text" id="skillRequirementsInput" class="skill-input" placeholder="e.g., Grade 3 Mission" maxlength="100" />
+          <select id="skillRequirementsInput" class="skill-input">
+            <option value="">— Select Grade —</option>
+            <option value="Grade 4">Grade 4</option>
+            <option value="Grade 3">Grade 3</option>
+            <option value="Grade 2">Grade 2</option>
+            <option value="Grade 1">Grade 1</option>
+            <option value="Special Grade">Special Grade</option>
+          </select>
         </div>
         <div class="skill-input-field">
           <label class="field-label">Multi-Mission</label>
@@ -93,6 +133,29 @@ function renderJujutsuSkillInput() {
   `;
 }
 
+function renderLockedSlotCard(lockMessage) {
+  return `
+    <div class="training-skill-card training-skill-card-locked">
+      <div class="training-locked-message">${lockMessage}</div>
+    </div>
+  `;
+}
+
+function renderEmptySlotCard(slotNumber) {
+  return `
+    <div class="training-skill-card training-skill-card-empty">
+      <div class="training-empty-slot">
+        <button type="button" class="training-add-btn-large" data-action="showAddSkillForm" data-slot="${slotNumber}" aria-label="Add skill to slot ${slotNumber}">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false">
+            <path fill="currentColor" d="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6V5z"/>
+          </svg>
+        </button>
+        <div class="training-slot-label">Slot ${slotNumber}</div>
+      </div>
+    </div>
+  `;
+}
+
 function renderJujutsuSkills(state) {
   const skills = state?.training?.jujutsuSkills || [];
   const incompleteSkills = skills.filter(s => s.progress < s.requiredMissions);
@@ -101,23 +164,36 @@ function renderJujutsuSkills(state) {
     <div class="training-section jujutsu-skills-section">
       <div class="training-section-header">
         <h3 class="training-section-title">Jujutsu Skills</h3>
-        <button type="button" class="training-add-btn" data-action="showAddSkillForm" aria-label="Add new skill">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true" focusable="false">
-            <path fill="currentColor" d="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6V5z"/>
-          </svg>
-        </button>
       </div>
+      <div class="training-skills-container">
   `;
   
-  if (incompleteSkills.length === 0) {
-    html += `<div class="training-empty">No active jujutsu skills. Add one to get started.</div>`;
-  } else {
-    incompleteSkills.forEach(skill => {
-      html += renderJujutsuSkillCard(skill);
-    });
+  // Render 3 skill slots
+  for (let slotNum = 1; slotNum <= 3; slotNum++) {
+    const isUnlocked = isSlotUnlocked(slotNum, state);
+    const skill = incompleteSkills[slotNum - 1] || null;
+    
+    html += `<div class="training-slot" data-slot="${slotNum}">`;
+    
+    if (isUnlocked) {
+      if (skill) {
+        html += renderJujutsuSkillCard(skill);
+      } else {
+        html += renderEmptySlotCard(slotNum);
+      }
+    } else {
+      const lockMsg = getSlotLockMessage(slotNum);
+      html += renderLockedSlotCard(lockMsg);
+    }
+    
+    html += `</div>`;
   }
   
-  html += `<div id="skillInputContainer"></div></div>`;
+  html += `
+      </div>
+      <div id="skillInputContainer"></div>
+    </div>
+  `;
   
   return html;
 }
@@ -149,18 +225,29 @@ function handleAddSkill() {
   const descriptionInput = document.getElementById("skillDescriptionInput");
   
   const title = titleInput?.value?.trim() || "";
+  const requirements = requirementsInput?.value?.trim() || "";
+  
   if (!title) {
     alert("Please enter a skill title.");
     return;
   }
+  if (!requirements) {
+    alert("Please select a requirement grade.");
+    return;
+  }
   
   const state = getState();
-  if (!state) return;
+  if (!state) {
+    alert("Error: Unable to get character state.");
+    return;
+  }
+  
+  ensureTrainingState(state);
   
   const newSkill = {
     id: generateUniqueId(),
     title,
-    requirements: requirementsInput?.value?.trim() || "",
+    requirements,
     description: descriptionInput?.value?.trim() || "",
     multiMission: multiMissionCheckbox?.checked || false,
     requiredMissions: multiMissionCheckbox?.checked ? 2 : 1,
@@ -176,6 +263,8 @@ function handleDeleteSkill(skillId) {
   const state = getState();
   if (!state) return;
   
+  ensureTrainingState(state);
+  
   const index = state.training.jujutsuSkills.findIndex(s => s.id === skillId);
   if (index >= 0) {
     state.training.jujutsuSkills.splice(index, 1);
@@ -187,6 +276,8 @@ function handleDeleteSkill(skillId) {
 function handleProgressSkill(skillId) {
   const state = getState();
   if (!state) return;
+  
+  ensureTrainingState(state);
   
   const skill = state.training.jujutsuSkills.find(s => s.id === skillId);
   if (skill && skill.progress < skill.requiredMissions) {
@@ -200,6 +291,8 @@ function handleReggressSkill(skillId) {
   const state = getState();
   if (!state) return;
   
+  ensureTrainingState(state);
+  
   const skill = state.training.jujutsuSkills.find(s => s.id === skillId);
   if (skill && skill.progress > 0) {
     skill.progress--;
@@ -212,12 +305,12 @@ function handleCompleteSkill(skillId) {
   const state = getState();
   if (!state) return;
   
+  ensureTrainingState(state);
+  
   const skill = state.training.jujutsuSkills.find(s => s.id === skillId);
   if (skill && skill.progress >= skill.requiredMissions) {
-    // For now, show a message and remove from jujutsu skills
     alert(`Skill "${skill.title}" completed! This will be moved to the Skills tab when we implement it.`);
     
-    // Remove from incomplete skills
     const index = state.training.jujutsuSkills.findIndex(s => s.id === skillId);
     if (index >= 0) {
       state.training.jujutsuSkills.splice(index, 1);
@@ -271,7 +364,7 @@ function setupTrainingEventHandlers() {
       return;
     }
     
-    const reggressBtn = e.target?.closest?.("[data-action='reggressSkill']");
+    const reggressBtn = e.target?.closest?.("[data-action='regressSkill']");
     if (reggressBtn) {
       handleReggressSkill(reggressBtn.dataset.skillId);
       return;
@@ -297,6 +390,7 @@ export function renderTraining(state) {
   const panel = document.getElementById("jujutsuSubpanelTraining");
   if (!panel) return;
   
+  ensureTrainingState(state);
   panel.innerHTML = renderTrainingPanel(state);
   setupTrainingEventHandlers();
 }
