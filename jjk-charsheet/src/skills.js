@@ -114,7 +114,7 @@ function renderXpSkillCard(skill) {
 const _SLOT_GRADE_RANK = { "4": 0, "Semi-3": 0.5, "3": 1, "Semi-2": 1.5, "2": 2, "Semi-1": 2.5, "1": 3, "Special Grade": 4 };
 
 function hasAvailableTrainingSlot(state) {
-  const grade = String(state?.character?.grade || "").trim();
+  const grade = String(state?.grade || "").trim();
   const gradeRank = _SLOT_GRADE_RANK[grade] ?? 0;
   let unlockedSlots = 1;
   if (gradeRank >= 2.5) unlockedSlots = 2;
