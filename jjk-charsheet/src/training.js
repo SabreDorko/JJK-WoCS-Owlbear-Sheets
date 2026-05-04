@@ -10,6 +10,7 @@ let _initialized = false;
 let _trainingActionInFlight = false;
 let _activeSkillFormSlot = null;
 let _showAptitudeBuilder = false;
+let _openDeleteConfirm = null; // skillId string
 
 const GRADE_RANK = { "4": 0, "Semi-3": 0.5, "3": 1, "Semi-2": 1.5, "2": 2, "Semi-1": 2.5, "1": 3, "Special Grade": 4 };
 
@@ -312,16 +313,24 @@ function renderJujutsuSkillCard(skill) {
   const progressHtml = formatProgressPips(skill.progress, skill.requiredMissions);
   const isComplete = skill.progress >= skill.requiredMissions;
   
+  const showConfirm = _openDeleteConfirm === skill.id;
   return `
     <div class="training-skill-card" data-skill-id="${skill.id}">
       <div class="skill-card-header">
         <div class="skill-card-title">${skill.title || "Untitled Skill"}</div>
-        <button type="button" class="training-skill-delete-btn" data-action="deleteSkill" data-skill-id="${skill.id}" aria-label="Delete skill">
-          <svg class="training-icon-trash" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-            <path fill="currentColor" d="M9 3h6a1 1 0 0 1 1 1v1h4v2h-1l-1 12a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 7H4V5h4V4a1 1 0 0 1 1-1Zm1 2v0h4V5h-4Zm-1 4h2v9H9V9Zm4 0h2v9h-2V9Z"/>
-            <path fill="none" stroke="currentColor" stroke-width="1.5" d="M6 7.5h12"/>
-          </svg>
-        </button>
+        <span class="skills-delete-wrap">
+          <button type="button" class="training-skill-delete-btn" data-action="deleteSkill" data-skill-id="${skill.id}" aria-label="Delete skill">
+            <svg class="training-icon-trash" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <path fill="currentColor" d="M9 3h6a1 1 0 0 1 1 1v1h4v2h-1l-1 12a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 7H4V5h4V4a1 1 0 0 1 1-1Zm1 2v0h4V5h-4Zm-1 4h2v9H9V9Zm4 0h2v9h-2V9Z"/>
+              <path fill="none" stroke="currentColor" stroke-width="1.5" d="M6 7.5h12"/>
+            </svg>
+          </button>
+          ${showConfirm ? `<div class="skills-delete-confirm" role="menu">
+            <span class="skills-delete-confirm-text">Delete skill?</span>
+            <button type="button" class="inventory-mini-btn danger" data-action="confirmDeleteSkill" data-skill-id="${skill.id}">Delete</button>
+            <button type="button" class="inventory-mini-btn" data-action="cancelDeleteSkill">Cancel</button>
+          </div>` : ""}
+        </span>
       </div>
       <div class="skill-card-meta">
         <span class="skill-requirement">Requirements: ${skill.requirements || "—"}</span>
@@ -884,7 +893,31 @@ function setupTrainingEventHandlers() {
     if (deleteBtn) {
       const skillId = deleteBtn.dataset.skillId;
       runTrainingAction(() => {
+        if (_openDeleteConfirm === skillId) {
+          _openDeleteConfirm = null;
+        } else {
+          _openDeleteConfirm = skillId;
+        }
+        refreshUI();
+      });
+      return;
+    }
+
+    const confirmDeleteBtn = e.target?.closest?.("[data-action='confirmDeleteSkill']");
+    if (confirmDeleteBtn) {
+      const skillId = confirmDeleteBtn.dataset.skillId;
+      runTrainingAction(() => {
+        _openDeleteConfirm = null;
         handleDeleteSkill(skillId);
+      });
+      return;
+    }
+
+    const cancelDeleteBtn = e.target?.closest?.("[data-action='cancelDeleteSkill']");
+    if (cancelDeleteBtn) {
+      runTrainingAction(() => {
+        _openDeleteConfirm = null;
+        refreshUI();
       });
       return;
     }

@@ -4,6 +4,7 @@ let _refreshTraining = null;
 let _initialized = false;
 let _skillsSearchQuery = "";
 let _showXpSkillForm = false;
+let _openDeleteConfirm = null; // { skillId, kind }
 
 function getState() {
   return _getState ? _getState() : null;
@@ -31,6 +32,26 @@ function parseNonNegativeInt(raw, fallback = 0) {
   const parsed = parseInt(raw, 10);
   if (!Number.isFinite(parsed)) return fallback;
   return Math.max(0, parsed);
+}
+
+function getAvailableXp(state) {
+  return parseNonNegativeInt(state?.xp, 0);
+}
+
+function setAvailableXp(state, value) {
+  state.xp = String(parseNonNegativeInt(value, 0));
+}
+
+function validateXpCost(state, rawCost) {
+  const parsedCost = parseInt(rawCost, 10);
+  if (!Number.isFinite(parsedCost) || parsedCost < 1) {
+    return { valid: false, xpCost: 0, reason: "XP Cost is Less Than 1" };
+  }
+  const xpCost = Math.max(1, parsedCost);
+  if (getAvailableXp(state) < xpCost) {
+    return { valid: false, xpCost, reason: "Not Enough XP" };
+  }
+  return { valid: true, xpCost, reason: "Add XP Skill" };
 }
 
 function normalizeText(raw) {
@@ -70,6 +91,24 @@ function renderInteractivePips(action, current, total) {
   return html;
 }
 
+function renderXpStackPips(state, skill) {
+  const maxStacks = parsePositiveInt(skill?.maxStacks, 1);
+  const currentStacks = Math.min(parsePositiveInt(skill?.currentStacks, 1), maxStacks);
+  const xpCost = parsePositiveInt(skill?.xpCost, 1);
+  const availableXp = getAvailableXp(state);
+  const affordableAdds = Math.floor(availableXp / xpCost);
+  const maxAffordableStack = Math.min(maxStacks, currentStacks + affordableAdds);
+
+  let html = "";
+  for (let i = 1; i <= maxStacks; i += 1) {
+    const filled = i <= currentStacks;
+    const isDisabled = !filled && i > maxAffordableStack;
+    const title = isDisabled ? "Not Enough XP" : `${i}/${maxStacks}`;
+    html += `<button type="button" class="progress-pip${filled ? " filled" : ""}${isDisabled ? " is-disabled" : ""}" data-action="setXpStack" data-value="${i}"${isDisabled ? ' data-disabled="true" aria-disabled="true"' : ""} aria-label="Set value to ${i} of ${maxStacks}" title="${title}"></button>`;
+  }
+  return html;
+}
+
 function renderStaticPips(current, total) {
   let html = "";
   for (let i = 0; i < total; i += 1) {
@@ -79,21 +118,30 @@ function renderStaticPips(current, total) {
   return html;
 }
 
-function renderSkillActionIcons() {
+function renderSkillActionIcons(skillId, kind) {
+  const showConfirm = _openDeleteConfirm && _openDeleteConfirm.skillId === skillId && _openDeleteConfirm.kind === kind;
   return `
     <button type="button" class="inventory-icon-btn inventory-icon-btn-edit" data-action="editSkill" aria-label="Edit skill" title="Edit skill">✎</button>
-    <button type="button" class="inventory-icon-btn danger" data-action="deleteSkill" aria-label="Delete skill" title="Delete skill">
-      <svg class="inventory-icon-trash" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-        <path fill="currentColor" d="M9 3h6a1 1 0 0 1 1 1v1h4v2h-1l-1 12a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 7H4V5h4V4a1 1 0 0 1 1-1Zm1 2v0h4V5h-4Zm-1 4h2v9H9V9Zm4 0h2v9h-2V9Z"/>
-        <path fill="none" stroke="currentColor" stroke-width="1.5" d="M6 7.5h12"/>
-      </svg>
-    </button>
+    <span class="skills-delete-wrap">
+      <button type="button" class="inventory-icon-btn danger" data-action="deleteSkill" aria-label="Delete skill" title="Delete skill">
+        <svg class="inventory-icon-trash" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path fill="currentColor" d="M9 3h6a1 1 0 0 1 1 1v1h4v2h-1l-1 12a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 7H4V5h4V4a1 1 0 0 1 1-1Zm1 2v0h4V5h-4Zm-1 4h2v9H9V9Zm4 0h2v9h-2V9Z"/>
+          <path fill="none" stroke="currentColor" stroke-width="1.5" d="M6 7.5h12"/>
+        </svg>
+      </button>
+      ${showConfirm ? `<div class="skills-delete-confirm" role="menu">
+        <span class="skills-delete-confirm-text">Delete skill?</span>
+        <button type="button" class="inventory-mini-btn danger" data-action="confirmDeleteSkill">Delete</button>
+        <button type="button" class="inventory-mini-btn" data-action="cancelDeleteSkill">Cancel</button>
+      </div>` : ""}
+    </span>
   `;
 }
 
-function renderXpSkillCard(skill) {
+function renderXpSkillCard(state, skill) {
   const maxStacks = parsePositiveInt(skill.maxStacks, 1);
   const currentStacks = Math.min(parsePositiveInt(skill.currentStacks, 1), maxStacks);
+  const xpCost = parsePositiveInt(skill.xpCost, 1);
   return `
     <article class="skills-card" data-kind="xp" data-skill-id="${skill.id}">
       <div class="skills-card-title">${skill.title || "Untitled XP Skill"}</div>
@@ -101,11 +149,14 @@ function renderXpSkillCard(skill) {
       <div class="skills-card-meta-row">
         <span class="skills-card-meta">Stacks:</span>
         <div class="progress-pips skills-progress-pips" aria-label="Stacks ${currentStacks} of ${maxStacks}">
-          ${renderInteractivePips("setXpStack", currentStacks, maxStacks)}
+          ${renderXpStackPips(state, skill)}
         </div>
       </div>
+      <div class="skills-card-meta-row">
+        <span class="skills-card-meta">Cost: ${xpCost} XP per stack</span>
+      </div>
       <div class="skills-card-actions">
-        ${renderSkillActionIcons()}
+        ${renderSkillActionIcons(skill.id, "xp")}
       </div>
     </article>
   `;
@@ -154,7 +205,7 @@ function renderJujutsuSkillCard(state, skill) {
       </div>
       <div class="skills-card-actions">
         ${canRelearn ? `<button type="button" class="inventory-icon-btn skills-icon-relearn-btn${slotAvailable ? "" : " skills-icon-relearn-disabled"}" data-action="relearnSkill" aria-label="${relearnTitle}" title="${relearnTitle}"${slotAvailable ? "" : " disabled"}>↻</button>` : ""}
-        ${renderSkillActionIcons()}
+        ${renderSkillActionIcons(skill.id, "jujutsu")}
       </div>
     </article>
   `;
@@ -168,6 +219,7 @@ function renderSkillEditForm(skill, kind) {
   const requiredMissions = parsePositiveInt(skill?.requiredMissions, 1);
   const maxStacks = parsePositiveInt(skill?.maxStacks, 1);
   const currentStacks = Math.min(parsePositiveInt(skill?.currentStacks, 1), maxStacks);
+  const xpCost = parsePositiveInt(skill?.xpCost, 1);
 
   return `
     <div class="skills-edit-card" data-kind="${kind}" data-skill-id="${skill.id}">
@@ -188,6 +240,10 @@ function renderSkillEditForm(skill, kind) {
           <div class="skill-input-field">
             <label class="field-label">Current Stacks</label>
             <input type="number" min="1" class="skill-input" data-field="currentStacks" value="${currentStacks}" />
+          </div>
+          <div class="skill-input-field">
+            <label class="field-label">XP Cost</label>
+            <input type="number" min="1" class="skill-input" data-field="xpCost" value="${xpCost}" />
           </div>
         ` : ""}
         ${kind === "jujutsu" ? `
@@ -220,7 +276,8 @@ function renderSkillEditForm(skill, kind) {
   `;
 }
 
-function renderAddXpSkillForm() {
+function renderAddXpSkillForm(state) {
+  const costValidation = validateXpCost(state, 0);
   return `
     <div class="skills-add-form" data-kind="xp">
       <div class="skill-input-grid">
@@ -236,13 +293,34 @@ function renderAddXpSkillForm() {
           <label class="field-label">Max Stacks</label>
           <input type="number" min="1" class="skill-input" data-field="maxStacks" value="1" />
         </div>
+        <div class="skill-input-field">
+          <label class="field-label">XP Cost</label>
+          <input type="number" min="0" class="skill-input" data-field="xpCost" value="0" />
+        </div>
       </div>
       <div class="skill-input-actions">
-        <button type="button" class="training-add-skill-btn" data-action="saveNewXpSkill">Add XP Skill</button>
+        <button type="button" class="training-add-skill-btn${costValidation.valid ? "" : " is-disabled"}" data-action="saveNewXpSkill" title="${costValidation.reason}"${costValidation.valid ? "" : ' data-disabled="true" aria-disabled="true"'}>Add XP Skill</button>
         <button type="button" class="training-cancel-btn" data-action="cancelNewXpSkill">Cancel</button>
       </div>
     </div>
   `;
+}
+
+function updateAddXpSkillButtonState(form, state) {
+  const button = form?.querySelector("[data-action='saveNewXpSkill']");
+  if (!button) return;
+  const rawCost = form?.querySelector("[data-field='xpCost']")?.value;
+  const validation = validateXpCost(state, rawCost);
+  button.title = validation.reason;
+  if (validation.valid) {
+    button.classList.remove("is-disabled");
+    button.removeAttribute("data-disabled");
+    button.removeAttribute("aria-disabled");
+  } else {
+    button.classList.add("is-disabled");
+    button.setAttribute("data-disabled", "true");
+    button.setAttribute("aria-disabled", "true");
+  }
 }
 
 function applySearchFilter(skills, search) {
@@ -285,9 +363,9 @@ function renderSkillsPanel(state) {
           <h3 class="training-section-title">XP Skills</h3>
           <button type="button" class="training-add-skill-btn" data-action="showNewXpSkillForm">Add XP Skill</button>
         </div>
-        ${_showXpSkillForm ? renderAddXpSkillForm() : ""}
+        ${_showXpSkillForm ? renderAddXpSkillForm(state) : ""}
         <div class="skills-grid">
-          ${xpSkills.length ? xpSkills.map(renderXpSkillCard).join("") : `<div class="training-muted">${xpEmptyMessage}</div>`}
+          ${xpSkills.length ? xpSkills.map(skill => renderXpSkillCard(state, skill)).join("") : `<div class="training-muted">${xpEmptyMessage}</div>`}
         </div>
       </div>
     </div>
@@ -357,6 +435,14 @@ function setupSkillsEventHandlers() {
       if (!state) return;
       _skillsSearchQuery = String(e.target.value || "");
       rerenderSkillsPreserveSearchFocus(state, e.target);
+      return;
+    }
+
+    const addForm = e.target?.closest?.(".skills-add-form[data-kind='xp']");
+    if (addForm) {
+      const state = getState();
+      if (!state) return;
+      updateAddXpSkillButtonState(addForm, state);
     }
   });
 
@@ -382,14 +468,22 @@ function setupSkillsEventHandlers() {
     const addXpBtn = e.target?.closest?.("[data-action='saveNewXpSkill']");
     if (addXpBtn) {
       const form = addXpBtn.closest(".skills-add-form");
+      if (addXpBtn.dataset.disabled === "true") return;
       const title = normalizeText(form?.querySelector("[data-field='title']")?.value);
       const description = normalizeText(form?.querySelector("[data-field='description']")?.value);
       const maxStacks = parsePositiveInt(form?.querySelector("[data-field='maxStacks']")?.value, 1);
+      const rawCost = form?.querySelector("[data-field='xpCost']")?.value;
+      const costValidation = validateXpCost(state, rawCost);
       if (!title) {
         alert("Please provide an XP skill title.");
         return;
       }
-      state.skills.xpSkills.push({ id: createId("xp-skill"), title, description, maxStacks, currentStacks: 1 });
+      if (!costValidation.valid) {
+        updateAddXpSkillButtonState(form, state);
+        return;
+      }
+      setAvailableXp(state, getAvailableXp(state) - costValidation.xpCost);
+      state.skills.xpSkills.push({ id: createId("xp-skill"), title, description, maxStacks, currentStacks: 1, xpCost: costValidation.xpCost });
       _showXpSkillForm = false;
       scheduleSave();
       renderSkills(state);
@@ -411,7 +505,19 @@ function setupSkillsEventHandlers() {
 
     const deleteBtn = e.target?.closest?.("[data-action='deleteSkill']");
     if (deleteBtn) {
+      if (_openDeleteConfirm && _openDeleteConfirm.skillId === skillId && _openDeleteConfirm.kind === kind) {
+        _openDeleteConfirm = null;
+      } else {
+        _openDeleteConfirm = { skillId, kind };
+      }
+      renderSkills(state);
+      return;
+    }
+
+    const confirmDeleteBtn = e.target?.closest?.("[data-action='confirmDeleteSkill']");
+    if (confirmDeleteBtn) {
       const info = findSkillById(state, kind, skillId);
+      _openDeleteConfirm = null;
       if (info.index < 0) return;
       info.list.splice(info.index, 1);
       scheduleSave();
@@ -419,13 +525,32 @@ function setupSkillsEventHandlers() {
       return;
     }
 
+    const cancelDeleteBtn = e.target?.closest?.("[data-action='cancelDeleteSkill']");
+    if (cancelDeleteBtn) {
+      _openDeleteConfirm = null;
+      renderSkills(state);
+      return;
+    }
+
     const setXpStackBtn = e.target?.closest?.("[data-action='setXpStack']");
     if (setXpStackBtn) {
+      if (setXpStackBtn.dataset.disabled === "true") return;
       const info = findSkillById(state, "xp", skillId);
       if (!info.skill) return;
       const maxStacks = parsePositiveInt(info.skill.maxStacks, 1);
       const requested = parsePositiveInt(setXpStackBtn.dataset.value, 1);
-      info.skill.currentStacks = Math.min(requested, maxStacks);
+      const clamped = Math.min(requested, maxStacks);
+      const currentStacks = Math.min(parsePositiveInt(info.skill.currentStacks, 1), maxStacks);
+      if (clamped > currentStacks) {
+        const xpCost = parsePositiveInt(info.skill.xpCost, 1);
+        const totalCost = (clamped - currentStacks) * xpCost;
+        if (getAvailableXp(state) < totalCost) {
+          renderSkills(state);
+          return;
+        }
+        setAvailableXp(state, getAvailableXp(state) - totalCost);
+      }
+      info.skill.currentStacks = clamped;
       scheduleSave();
       renderSkills(state);
       return;
@@ -467,8 +592,10 @@ function setupSkillsEventHandlers() {
       if (editKind === "xp") {
         const maxStacks = parsePositiveInt(editCard.querySelector("[data-field='maxStacks']")?.value, 1);
         const currentStacks = parsePositiveInt(editCard.querySelector("[data-field='currentStacks']")?.value, 1);
+        const xpCost = parsePositiveInt(editCard.querySelector("[data-field='xpCost']")?.value, 1);
         info.skill.maxStacks = maxStacks;
         info.skill.currentStacks = Math.min(currentStacks, maxStacks);
+        info.skill.xpCost = xpCost;
       }
 
       if (editKind === "jujutsu") {
