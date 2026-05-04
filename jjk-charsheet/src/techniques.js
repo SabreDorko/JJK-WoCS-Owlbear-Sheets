@@ -14,7 +14,7 @@ let _pendingNewVowIndex = null;
 let _pendingInlineApplicationDeleteIndex = null;
 let _pendingEditorApplicationDeleteIndex = null;
 let _pendingVowDeleteIndex = null;
-let _pendingInlineApplicationDeleteAnchor = null; // { idx, x, y, mode }
+let _pendingInlineApplicationDeleteAnchor = null; // { idx, x, y }
 let _pendingEditorApplicationDeleteAnchor = null; // { idx, x, y }
 let _pendingVowDeleteAnchor = null; // { idx, x, y }
 
@@ -431,7 +431,7 @@ function refreshApplicationCards(state) {
   setTechniqueAddButtonState();
 }
 
-function getAnchoredDeleteConfirmStyle(anchor, mode = "center") {
+function getAnchoredDeleteConfirmStyle(anchor, mode = "left-corner") {
   if (!anchor) return "";
   const x = Math.round(anchor.x);
   const y = Math.round(anchor.y - 8);
@@ -446,9 +446,11 @@ function renderInlineApplicationDeleteWrap(idx) {
   const anchor = showConfirm && _pendingInlineApplicationDeleteAnchor && _pendingInlineApplicationDeleteAnchor.idx === idx
     ? _pendingInlineApplicationDeleteAnchor
     : null;
-  const mode = anchor?.mode === "left-corner" ? "left-corner" : "center";
-  const style = getAnchoredDeleteConfirmStyle(anchor, mode);
-  const modeClass = mode === "left-corner" ? " confirm-anchor-left-corner" : " confirm-cursor-anchor";
+  const anchorMode = anchor?.mode === "left-corner" ? "left-corner" : "center";
+  const style = getAnchoredDeleteConfirmStyle(anchor, anchorMode);
+  const modeClass = anchor
+    ? (anchorMode === "left-corner" ? " confirm-cursor-anchor confirm-anchor-left-corner" : " confirm-cursor-anchor")
+    : "";
   return `
     <span class="skills-delete-wrap">
       <button type="button" class="inventory-mini-btn inventory-icon-btn danger" data-app-remove-inline="${idx}" aria-label="Delete application" title="Delete">
@@ -471,11 +473,11 @@ function renderEditorApplicationDeleteWrap(idx) {
   const anchor = showConfirm && _pendingEditorApplicationDeleteAnchor && _pendingEditorApplicationDeleteAnchor.idx === idx
     ? _pendingEditorApplicationDeleteAnchor
     : null;
-  const style = getAnchoredDeleteConfirmStyle(anchor, "center");
+  const style = getAnchoredDeleteConfirmStyle(anchor, "left-corner");
   return `
     <span class="skills-delete-wrap">
       <button type="button" class="inventory-secondary-btn techniques-app-remove-btn" data-app-remove="${idx}">Remove</button>
-      ${showConfirm ? `<div class="skills-delete-confirm confirm-cursor-anchor" data-tech-delete-kind="editor-app" data-tech-delete-idx="${idx}" role="menu"${style}>
+      ${showConfirm ? `<div class="skills-delete-confirm confirm-cursor-anchor confirm-anchor-left-corner" data-tech-delete-kind="editor-app" data-tech-delete-idx="${idx}" role="menu"${style}>
         <span class="skills-delete-confirm-text">Delete application?</span>
         <button type="button" class="inventory-mini-btn danger" data-app-remove-confirm="${idx}">Delete</button>
         <button type="button" class="inventory-mini-btn" data-app-remove-cancel="${idx}">Cancel</button>
@@ -486,10 +488,6 @@ function renderEditorApplicationDeleteWrap(idx) {
 
 function renderVowDeleteWrap(idx) {
   const showConfirm = _pendingVowDeleteIndex === idx;
-  const anchor = showConfirm && _pendingVowDeleteAnchor && _pendingVowDeleteAnchor.idx === idx
-    ? _pendingVowDeleteAnchor
-    : null;
-  const style = getAnchoredDeleteConfirmStyle(anchor, "center");
   return `
     <span class="skills-delete-wrap" style="margin-left:auto;">
       <button type="button" class="inventory-mini-btn inventory-icon-btn danger" data-vow-remove="${idx}" aria-label="Delete vow" title="Delete vow">
@@ -498,7 +496,7 @@ function renderVowDeleteWrap(idx) {
           <path fill="none" stroke="currentColor" stroke-width="1.5" d="M6 7.5h12"/>
         </svg>
       </button>
-      ${showConfirm ? `<div class="skills-delete-confirm confirm-cursor-anchor" data-tech-delete-kind="vow" data-tech-delete-idx="${idx}" role="menu"${style}>
+      ${showConfirm ? `<div class="skills-delete-confirm" role="menu">
         <span class="skills-delete-confirm-text">Delete vow?</span>
         <button type="button" class="inventory-mini-btn danger" data-vow-remove-confirm="${idx}">Delete</button>
         <button type="button" class="inventory-mini-btn" data-vow-remove-cancel="${idx}">Cancel</button>
@@ -551,14 +549,11 @@ function repositionTechniquesFloatingMenus() {
     const idx = parseNonNegativeInt(menu.dataset.techDeleteIdx);
 
     let anchor = null;
-    let mode = "center";
+    let mode = "left-corner";
     if (kind === "inline-app" && _pendingInlineApplicationDeleteAnchor?.idx === idx) {
       anchor = _pendingInlineApplicationDeleteAnchor;
-      mode = _pendingInlineApplicationDeleteAnchor.mode === "left-corner" ? "left-corner" : "center";
     } else if (kind === "editor-app" && _pendingEditorApplicationDeleteAnchor?.idx === idx) {
       anchor = _pendingEditorApplicationDeleteAnchor;
-    } else if (kind === "vow" && _pendingVowDeleteAnchor?.idx === idx) {
-      anchor = _pendingVowDeleteAnchor;
     }
 
     if (anchor) {
@@ -1349,23 +1344,25 @@ export function initTechniques({ getState: getStateFn, scheduleSave: scheduleSav
           _pendingInlineApplicationDeleteIndex = null;
           _pendingInlineApplicationDeleteAnchor = null;
         } else {
+          const summaryGridRect = summaryGrid.getBoundingClientRect();
+          const cardRect = removeTrigger.closest(".techniques-app-card")?.getBoundingClientRect();
+          const cardCenterX = cardRect ? (cardRect.left + (cardRect.width / 2)) : null;
+          const gridCenterX = summaryGridRect.left + (summaryGridRect.width / 2);
+          const isLeftColumnCard = cardCenterX === null ? (removeIdx % 2 === 0) : (cardCenterX <= gridCenterX);
+
           const triggerRect = removeTrigger.getBoundingClientRect();
-          const anchorX = Number.isFinite(e.clientX) ? e.clientX : (triggerRect.left + (triggerRect.width / 2));
-          const anchorY = Number.isFinite(e.clientY) ? e.clientY : triggerRect.top;
-          const cardEl = removeTrigger.closest(".techniques-app-card");
-          const gridEl = document.getElementById("techniqueApplicationsSummary");
-          const cardRect = cardEl?.getBoundingClientRect();
-          const gridRect = gridEl?.getBoundingClientRect();
-          const isLeftColumn = !!cardRect && !!gridRect
-            && cardRect.left < (gridRect.left + (gridRect.width / 2));
+          const anchorX = triggerRect.left + (triggerRect.width / 2);
+          const anchorY = triggerRect.top;
 
           _pendingInlineApplicationDeleteIndex = removeIdx;
-          _pendingInlineApplicationDeleteAnchor = {
-            idx: removeIdx,
-            x: anchorX,
-            y: anchorY,
-            mode: isLeftColumn ? "left-corner" : "center",
-          };
+          _pendingInlineApplicationDeleteAnchor = isLeftColumnCard
+            ? {
+              idx: removeIdx,
+              x: anchorX,
+              y: anchorY,
+              mode: "left-corner",
+            }
+            : null;
         }
 
         if (Number.isInteger(previousIdx) && previousIdx !== removeIdx) {
@@ -1656,8 +1653,8 @@ export function initTechniques({ getState: getStateFn, scheduleSave: scheduleSav
       } else {
         const trigger = e.target?.closest?.("[data-app-remove]");
         const triggerRect = trigger?.getBoundingClientRect();
-        const anchorX = Number.isFinite(e.clientX) ? e.clientX : (triggerRect ? triggerRect.left + (triggerRect.width / 2) : 0);
-        const anchorY = Number.isFinite(e.clientY) ? e.clientY : (triggerRect ? triggerRect.top : 0);
+        const anchorX = triggerRect ? (triggerRect.left + (triggerRect.width / 2)) : 0;
+        const anchorY = triggerRect ? triggerRect.top : 0;
         _pendingEditorApplicationDeleteIndex = removeIdx;
         _pendingEditorApplicationDeleteAnchor = { idx: removeIdx, x: anchorX, y: anchorY };
       }
@@ -1776,11 +1773,8 @@ export function initTechniques({ getState: getStateFn, scheduleSave: scheduleSav
         _pendingVowDeleteIndex = null;
         _pendingVowDeleteAnchor = null;
       } else {
-        const triggerRect = removeTrigger.getBoundingClientRect();
-        const anchorX = Number.isFinite(e.clientX) ? e.clientX : (triggerRect.left + (triggerRect.width / 2));
-        const anchorY = Number.isFinite(e.clientY) ? e.clientY : triggerRect.top;
         _pendingVowDeleteIndex = removeIdx;
-        _pendingVowDeleteAnchor = { idx: removeIdx, x: anchorX, y: anchorY };
+        _pendingVowDeleteAnchor = null;
       }
 
       if (Number.isInteger(previousIdx) && previousIdx !== removeIdx) {

@@ -944,8 +944,8 @@ function renderEditButton() {
 function renderDeleteButton(itemId, forceAlignLeft = false) {
   const showConfirm = openDeleteConfirmItemId === itemId;
   const confirmClasses = forceAlignLeft
-    ? "skills-delete-confirm confirm-align-left confirm-force-left confirm-cursor-anchor"
-    : "skills-delete-confirm confirm-cursor-anchor";
+    ? "skills-delete-confirm confirm-align-left confirm-force-left confirm-cursor-anchor confirm-anchor-left-corner"
+    : "skills-delete-confirm confirm-cursor-anchor confirm-anchor-left-corner";
   return `
     <span class="skills-delete-wrap">
       <button type="button" class="inventory-mini-btn inventory-icon-btn danger" data-action="deleteItem" aria-label="Delete item" title="Delete item">
@@ -1499,8 +1499,8 @@ function handleInventoryActions(event) {
   const action = button.dataset.action;
   if (action === "deleteItem") {
     const triggerRect = button.getBoundingClientRect();
-    const anchorX = Number.isFinite(event.clientX) ? event.clientX : (triggerRect.left + (triggerRect.width / 2));
-    const anchorY = Number.isFinite(event.clientY) ? event.clientY : triggerRect.top;
+    const anchorX = triggerRect.left + (triggerRect.width / 2);
+    const anchorY = triggerRect.top;
     openEquipPickerItemId = null;
     openMovePickerItemId = null;
     openOverflowChoice = null;
@@ -2090,8 +2090,8 @@ export function renderInventory() {
         menu.style.right = "auto";
         menu.style.bottom = "auto";
         menu.style.marginLeft = "0px";
-        menu.style.transform = "translate(-50%, -100%)";
-        menu.style.transformOrigin = "bottom center";
+        menu.style.transform = "translate(0, -100%)";
+        menu.style.transformOrigin = "bottom left";
 
         let anchoredRect = menu.getBoundingClientRect();
         const overflowLeft = viewportPad - anchoredRect.left;
@@ -2110,8 +2110,8 @@ export function renderInventory() {
 
         if (overflowTop > 0) {
           menu.style.top = `${Math.round(openDeleteConfirmAnchor.y + 8)}px`;
-          menu.style.transform = "translate(-50%, 0)";
-          menu.style.transformOrigin = "top center";
+          menu.style.transform = "translate(0, 0)";
+          menu.style.transformOrigin = "top left";
         }
 
         return;

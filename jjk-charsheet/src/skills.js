@@ -136,10 +136,10 @@ function renderSkillActionIcons(skillId, kind) {
     && _openDeleteConfirmAnchor.skillId === skillId
     && _openDeleteConfirmAnchor.kind === kind;
   const confirmClassName = anchoredDeleteConfirm
-    ? "skills-delete-confirm confirm-cursor-anchor"
+    ? "skills-delete-confirm confirm-cursor-anchor confirm-anchor-left-corner"
     : "skills-delete-confirm";
   const confirmStyle = anchoredDeleteConfirm
-    ? ` style="position:fixed;left:${Math.round(_openDeleteConfirmAnchor.x)}px;top:${Math.round(_openDeleteConfirmAnchor.y - 8)}px;right:auto;bottom:auto;margin-left:0;transform:translate(-50%, -100%);transform-origin:bottom center;"`
+    ? ` style="position:fixed;left:${Math.round(_openDeleteConfirmAnchor.x)}px;top:${Math.round(_openDeleteConfirmAnchor.y - 8)}px;right:auto;bottom:auto;margin-left:0;transform:translate(0, -100%);transform-origin:bottom left;"`
     : "";
   return `
     <button type="button" class="inventory-icon-btn inventory-icon-btn-edit" data-action="editSkill" aria-label="Edit skill" title="Edit skill">✎</button>
@@ -386,8 +386,8 @@ function repositionSkillsFloatingMenus(panel) {
       menu.style.right = "auto";
       menu.style.bottom = "auto";
       menu.style.marginLeft = "0px";
-      menu.style.transform = "translate(-50%, -100%)";
-      menu.style.transformOrigin = "bottom center";
+      menu.style.transform = "translate(0, -100%)";
+      menu.style.transformOrigin = "bottom left";
 
       let rect = menu.getBoundingClientRect();
       const minLeft = viewportPad;
@@ -400,8 +400,8 @@ function repositionSkillsFloatingMenus(panel) {
 
       if (rect.top < viewportPad) {
         menu.style.top = `${Math.round(_openDeleteConfirmAnchor.y + 8)}px`;
-        menu.style.transform = "translate(-50%, 0)";
-        menu.style.transformOrigin = "top center";
+        menu.style.transform = "translate(0, 0)";
+        menu.style.transformOrigin = "top left";
       }
       return;
     }
@@ -616,8 +616,8 @@ function setupSkillsEventHandlers() {
     if (deleteBtn) {
       const previousOpen = _openDeleteConfirm ? { ..._openDeleteConfirm } : null;
       const triggerRect = deleteBtn.getBoundingClientRect();
-      const anchorX = Number.isFinite(e.clientX) ? e.clientX : (triggerRect.left + (triggerRect.width / 2));
-      const anchorY = Number.isFinite(e.clientY) ? e.clientY : triggerRect.top;
+      const anchorX = triggerRect.left + (triggerRect.width / 2);
+      const anchorY = triggerRect.top;
       _openStackRefundConfirm = null;
       if (_openDeleteConfirm && _openDeleteConfirm.skillId === skillId && _openDeleteConfirm.kind === kind) {
         _openDeleteConfirm = null;
