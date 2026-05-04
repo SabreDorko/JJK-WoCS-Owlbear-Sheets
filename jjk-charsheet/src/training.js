@@ -394,11 +394,11 @@ function setupTrainingEventHandlers() {
   });
 }
 
-export function initTraining(getStateFn, scheduleSaveFn, showRollToastFn, refreshUIFn) {
-  _getState = getStateFn;
-  _scheduleSave = scheduleSaveFn;
-  _showRollToast = showRollToastFn;
-  _refreshUI = refreshUIFn;
+export function initTraining(deps = {}) {
+  _getState = deps.getState || null;
+  _scheduleSave = deps.scheduleSave || null;
+  _showRollToast = deps.showRollToast || null;
+  _refreshUI = deps.refreshUI || null;
   _initialized = true;
 }
 
