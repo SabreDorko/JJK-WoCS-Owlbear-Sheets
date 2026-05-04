@@ -1,10 +1,12 @@
 let _getState = null;
 let _scheduleSave = null;
 let _refreshTraining = null;
+let _refreshCharacterStats = null;
 let _initialized = false;
 let _skillsSearchQuery = "";
 let _showXpSkillForm = false;
 let _openDeleteConfirm = null; // { skillId, kind }
+let _openStackRefundConfirm = null; // { skillId, targetStacks, refundAmount }
 
 function getState() {
   return _getState ? _getState() : null;
@@ -16,6 +18,10 @@ function scheduleSave() {
 
 function refreshTraining() {
   if (_refreshTraining) _refreshTraining();
+}
+
+function refreshCharacterStats() {
+  if (_refreshCharacterStats) _refreshCharacterStats();
 }
 
 function createId(prefix = "id") {
@@ -142,14 +148,22 @@ function renderXpSkillCard(state, skill) {
   const maxStacks = parsePositiveInt(skill.maxStacks, 1);
   const currentStacks = Math.min(parsePositiveInt(skill.currentStacks, 1), maxStacks);
   const xpCost = parsePositiveInt(skill.xpCost, 1);
+  const showRefundConfirm = _openStackRefundConfirm && _openStackRefundConfirm.skillId === skill.id;
   return `
     <article class="skills-card" data-kind="xp" data-skill-id="${skill.id}">
       <div class="skills-card-title">${skill.title || "Untitled XP Skill"}</div>
       ${skill.description ? `<div class="skills-card-desc">${skill.description}</div>` : ""}
       <div class="skills-card-meta-row">
         <span class="skills-card-meta">Stacks:</span>
-        <div class="progress-pips skills-progress-pips" aria-label="Stacks ${currentStacks} of ${maxStacks}">
-          ${renderXpStackPips(state, skill)}
+        <div class="skills-pips-wrap">
+          <div class="progress-pips skills-progress-pips" aria-label="Stacks ${currentStacks} of ${maxStacks}">
+            ${renderXpStackPips(state, skill)}
+          </div>
+          ${showRefundConfirm ? `<div class="skills-refund-confirm" role="menu">
+            <span class="skills-delete-confirm-text">Refund ${_openStackRefundConfirm.refundAmount} XP?</span>
+            <button type="button" class="inventory-mini-btn" data-action="confirmRefundStacks">Refund</button>
+            <button type="button" class="inventory-mini-btn" data-action="cancelRefundStacks">Cancel</button>
+          </div>` : ""}
         </div>
       </div>
       <div class="skills-card-meta-row">
@@ -323,6 +337,19 @@ function updateAddXpSkillButtonState(form, state) {
   }
 }
 
+function repositionSkillsFloatingMenus(panel) {
+  if (!panel) return;
+  const floatingMenus = panel.querySelectorAll(".skills-delete-confirm, .skills-refund-confirm");
+  const viewportPad = 8;
+  floatingMenus.forEach(menu => {
+    menu.classList.remove("confirm-below", "confirm-align-left", "confirm-align-right");
+    const rect = menu.getBoundingClientRect();
+    if (rect.top < viewportPad) menu.classList.add("confirm-below");
+    if (rect.right > window.innerWidth - viewportPad) menu.classList.add("confirm-align-left");
+    if (rect.left < viewportPad) menu.classList.add("confirm-align-right");
+  });
+}
+
 function applySearchFilter(skills, search) {
   if (!search) return skills;
   return skills.filter(skill => {
@@ -454,6 +481,7 @@ function setupSkillsEventHandlers() {
     const showXpFormBtn = e.target?.closest?.("[data-action='showNewXpSkillForm']");
     if (showXpFormBtn) {
       _showXpSkillForm = true;
+      _openStackRefundConfirm = null;
       renderSkills(state);
       return;
     }
@@ -461,6 +489,7 @@ function setupSkillsEventHandlers() {
     const cancelNewXpBtn = e.target?.closest?.("[data-action='cancelNewXpSkill']");
     if (cancelNewXpBtn) {
       _showXpSkillForm = false;
+      _openStackRefundConfirm = null;
       renderSkills(state);
       return;
     }
@@ -485,7 +514,9 @@ function setupSkillsEventHandlers() {
       setAvailableXp(state, getAvailableXp(state) - costValidation.xpCost);
       state.skills.xpSkills.push({ id: createId("xp-skill"), title, description, maxStacks, currentStacks: 1, xpCost: costValidation.xpCost });
       _showXpSkillForm = false;
+      _openStackRefundConfirm = null;
       scheduleSave();
+      refreshCharacterStats();
       renderSkills(state);
       return;
     }
@@ -505,6 +536,7 @@ function setupSkillsEventHandlers() {
 
     const deleteBtn = e.target?.closest?.("[data-action='deleteSkill']");
     if (deleteBtn) {
+      _openStackRefundConfirm = null;
       if (_openDeleteConfirm && _openDeleteConfirm.skillId === skillId && _openDeleteConfirm.kind === kind) {
         _openDeleteConfirm = null;
       } else {
@@ -518,6 +550,9 @@ function setupSkillsEventHandlers() {
     if (confirmDeleteBtn) {
       const info = findSkillById(state, kind, skillId);
       _openDeleteConfirm = null;
+      if (_openStackRefundConfirm && _openStackRefundConfirm.skillId === skillId) {
+        _openStackRefundConfirm = null;
+      }
       if (info.index < 0) return;
       info.list.splice(info.index, 1);
       scheduleSave();
@@ -541,6 +576,7 @@ function setupSkillsEventHandlers() {
       const requested = parsePositiveInt(setXpStackBtn.dataset.value, 1);
       const clamped = Math.min(requested, maxStacks);
       const currentStacks = Math.min(parsePositiveInt(info.skill.currentStacks, 1), maxStacks);
+      if (clamped === currentStacks) return;
       if (clamped > currentStacks) {
         const xpCost = parsePositiveInt(info.skill.xpCost, 1);
         const totalCost = (clamped - currentStacks) * xpCost;
@@ -549,9 +585,50 @@ function setupSkillsEventHandlers() {
           return;
         }
         setAvailableXp(state, getAvailableXp(state) - totalCost);
+        _openStackRefundConfirm = null;
+        refreshCharacterStats();
+      } else {
+        const xpCost = parsePositiveInt(info.skill.xpCost, 1);
+        const refundAmount = (currentStacks - clamped) * xpCost;
+        _openStackRefundConfirm = { skillId, targetStacks: clamped, refundAmount };
+        renderSkills(state);
+        return;
       }
       info.skill.currentStacks = clamped;
       scheduleSave();
+      renderSkills(state);
+      return;
+    }
+
+    const confirmRefundBtn = e.target?.closest?.("[data-action='confirmRefundStacks']");
+    if (confirmRefundBtn) {
+      const pending = _openStackRefundConfirm;
+      if (!pending || pending.skillId !== skillId) return;
+      const info = findSkillById(state, "xp", skillId);
+      if (!info.skill) {
+        _openStackRefundConfirm = null;
+        renderSkills(state);
+        return;
+      }
+      const maxStacks = parsePositiveInt(info.skill.maxStacks, 1);
+      const currentStacks = Math.min(parsePositiveInt(info.skill.currentStacks, 1), maxStacks);
+      const targetStacks = Math.max(1, Math.min(parsePositiveInt(pending.targetStacks, 1), currentStacks));
+      const xpCost = parsePositiveInt(info.skill.xpCost, 1);
+      const refundAmount = (currentStacks - targetStacks) * xpCost;
+      if (refundAmount > 0) {
+        setAvailableXp(state, getAvailableXp(state) + refundAmount);
+        info.skill.currentStacks = targetStacks;
+        scheduleSave();
+        refreshCharacterStats();
+      }
+      _openStackRefundConfirm = null;
+      renderSkills(state);
+      return;
+    }
+
+    const cancelRefundBtn = e.target?.closest?.("[data-action='cancelRefundStacks']");
+    if (cancelRefundBtn) {
+      _openStackRefundConfirm = null;
       renderSkills(state);
       return;
     }
@@ -625,6 +702,7 @@ export function initSkills(deps = {}) {
   _getState = deps.getState || null;
   _scheduleSave = deps.scheduleSave || null;
   _refreshTraining = deps.refreshTraining || null;
+  _refreshCharacterStats = deps.refreshCharacterStats || null;
   _initialized = true;
 }
 
@@ -634,4 +712,5 @@ export function renderSkills(state) {
   ensureSkillsState(state);
   panel.innerHTML = renderSkillsPanel(state);
   setupSkillsEventHandlers();
+  requestAnimationFrame(() => repositionSkillsFloatingMenus(panel));
 }

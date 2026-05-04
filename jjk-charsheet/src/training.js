@@ -361,6 +361,19 @@ function runTrainingAction(action) {
   }
 }
 
+function repositionTrainingFloatingMenus(panel) {
+  if (!panel) return;
+  const floatingMenus = panel.querySelectorAll(".skills-delete-confirm");
+  const viewportPad = 8;
+  floatingMenus.forEach(menu => {
+    menu.classList.remove("confirm-below", "confirm-align-left", "confirm-align-right");
+    const rect = menu.getBoundingClientRect();
+    if (rect.top < viewportPad) menu.classList.add("confirm-below");
+    if (rect.right > window.innerWidth - viewportPad) menu.classList.add("confirm-align-left");
+    if (rect.left < viewportPad) menu.classList.add("confirm-align-right");
+  });
+}
+
 function renderJujutsuSkillInput() {
   return `
     <div class="training-skill-input-card">
@@ -948,4 +961,5 @@ export function renderTraining(state) {
   ensureTrainingState(state);
   panel.innerHTML = renderTrainingPanel(state);
   setupTrainingEventHandlers();
+  requestAnimationFrame(() => repositionTrainingFloatingMenus(panel));
 }

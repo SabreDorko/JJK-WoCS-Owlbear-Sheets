@@ -2584,6 +2584,11 @@
       gap: 6px;
       flex-wrap: wrap;
     }
+    .skills-pips-wrap {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+    }
     .skills-progress-pips {
       gap: 5px;
     }
@@ -2635,6 +2640,39 @@
       box-shadow: 1px 2px 0 rgba(26, 20, 16, 0.2);
       white-space: nowrap;
       animation: inventorySurfaceSlideIn 160ms ease;
+      transform-origin: bottom right;
+    }
+    .skills-refund-confirm {
+      position: absolute;
+      left: 0;
+      bottom: calc(100% + 4px);
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      border: 1px solid var(--border);
+      background: var(--parchment);
+      padding: 5px 6px;
+      z-index: 30;
+      box-shadow: 1px 2px 0 rgba(26, 20, 16, 0.2);
+      white-space: nowrap;
+      animation: inventorySurfaceSlideIn 160ms ease;
+      transform-origin: bottom left;
+    }
+    .skills-delete-confirm.confirm-below,
+    .skills-refund-confirm.confirm-below {
+      top: calc(100% + 4px);
+      bottom: auto;
+    }
+    .skills-delete-confirm.confirm-align-left,
+    .skills-refund-confirm.confirm-align-left {
+      left: 0;
+      right: auto;
+      transform-origin: bottom left;
+    }
+    .skills-delete-confirm.confirm-align-right,
+    .skills-refund-confirm.confirm-align-right {
+      right: 0;
+      left: auto;
       transform-origin: bottom right;
     }
     .skills-delete-confirm-text {

@@ -20,6 +20,7 @@ let openEquipPickerItemId = null;
 let openMovePickerItemId = null;
 let openYenAdjustMode = null;
 let openOverflowChoice = null;
+let openDeleteConfirmItemId = null;
 let draftItemModifiers = [];
 let editingModifierIndex = null;
 let isModifierEditMode = false;
@@ -915,6 +916,7 @@ function deleteInventoryItem(itemId) {
   expandedDescriptionIds.delete(itemId);
   if (openEquipPickerItemId === itemId) openEquipPickerItemId = null;
   if (openMovePickerItemId === itemId) openMovePickerItemId = null;
+  if (openDeleteConfirmItemId === itemId) openDeleteConfirmItemId = null;
   removeItemFromContainers(item);
   state.inventoryItems = state.inventoryItems.filter(entry => entry.id !== itemId);
   if (editingItemId === itemId) resetItemEditor();
@@ -938,14 +940,22 @@ function renderEditButton() {
   return '<button type="button" class="inventory-mini-btn inventory-icon-btn inventory-icon-btn-edit" data-action="editItem" aria-label="Edit item" title="Edit item">&#9998;</button>';
 }
 
-function renderDeleteButton() {
+function renderDeleteButton(itemId) {
+  const showConfirm = openDeleteConfirmItemId === itemId;
   return `
-    <button type="button" class="inventory-mini-btn inventory-icon-btn danger" data-action="deleteItem" aria-label="Delete item" title="Delete item">
-      <svg class="inventory-icon-trash" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-        <path fill="currentColor" d="M9 3h6a1 1 0 0 1 1 1v1h4v2h-1l-1 12a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 7H4V5h4V4a1 1 0 0 1 1-1Zm1 2v0h4V5h-4Zm-1 4h2v9H9V9Zm4 0h2v9h-2V9Z"/>
-        <path fill="none" stroke="currentColor" stroke-width="1.5" d="M6 7.5h12"/>
-      </svg>
-    </button>
+    <span class="skills-delete-wrap">
+      <button type="button" class="inventory-mini-btn inventory-icon-btn danger" data-action="deleteItem" aria-label="Delete item" title="Delete item">
+        <svg class="inventory-icon-trash" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path fill="currentColor" d="M9 3h6a1 1 0 0 1 1 1v1h4v2h-1l-1 12a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 7H4V5h4V4a1 1 0 0 1 1-1Zm1 2v0h4V5h-4Zm-1 4h2v9H9V9Zm4 0h2v9h-2V9Z"/>
+          <path fill="none" stroke="currentColor" stroke-width="1.5" d="M6 7.5h12"/>
+        </svg>
+      </button>
+      ${showConfirm ? `<div class="skills-delete-confirm" role="menu">
+        <span class="skills-delete-confirm-text">Delete item?</span>
+        <button type="button" class="inventory-mini-btn danger" data-action="confirmDeleteItem">Delete</button>
+        <button type="button" class="inventory-mini-btn" data-action="cancelDeleteItem">Cancel</button>
+      </div>` : ""}
+    </span>
   `;
 }
 
@@ -1374,7 +1384,7 @@ function renderEquippedSlots() {
           ${renderMoveButton()}
           ${renderMovePickerMenu(item, slot)}
           ${renderEditButton()}
-          ${renderDeleteButton()}
+          ${renderDeleteButton(item.id)}
         </div>
       </div>
     `;
@@ -1433,7 +1443,7 @@ function renderInventorySlots() {
       ${renderMoveButton()}
       ${renderMovePickerMenu(item)}
       ${renderEditButton()}
-      ${renderDeleteButton()}
+      ${renderDeleteButton(item.id)}
     `;
 
     return `
@@ -1465,7 +1475,7 @@ function renderDormInventory() {
       ${renderMoveButton()}
       ${renderMovePickerMenu(item)}
       ${renderEditButton()}
-      ${renderDeleteButton()}
+      ${renderDeleteButton(item.id)}
     `;
 
     return renderInventoryItemCard(item, controls, "Storage");
@@ -1487,7 +1497,23 @@ function handleInventoryActions(event) {
     openEquipPickerItemId = null;
     openMovePickerItemId = null;
     openOverflowChoice = null;
+    openDeleteConfirmItemId = openDeleteConfirmItemId === item.id ? null : item.id;
+    renderInventory();
+    return;
+  }
+
+  if (action === "confirmDeleteItem") {
+    openEquipPickerItemId = null;
+    openMovePickerItemId = null;
+    openOverflowChoice = null;
+    openDeleteConfirmItemId = null;
     deleteInventoryItem(item.id);
+    return;
+  }
+
+  if (action === "cancelDeleteItem") {
+    openDeleteConfirmItemId = null;
+    renderInventory();
     return;
   }
 
@@ -1495,6 +1521,7 @@ function handleInventoryActions(event) {
     openEquipPickerItemId = null;
     openMovePickerItemId = null;
     openOverflowChoice = null;
+    openDeleteConfirmItemId = null;
     startItemEdit(item.id);
     return;
   }
@@ -1503,6 +1530,7 @@ function handleInventoryActions(event) {
     openEquipPickerItemId = null;
     openMovePickerItemId = null;
     openOverflowChoice = null;
+    openDeleteConfirmItemId = null;
     if (expandedDescriptionIds.has(item.id)) expandedDescriptionIds.delete(item.id);
     else expandedDescriptionIds.add(item.id);
     const isExpanded = expandedDescriptionIds.has(item.id);
@@ -1518,6 +1546,7 @@ function handleInventoryActions(event) {
   if (action === "equipItem") {
     openMovePickerItemId = null;
     openOverflowChoice = null;
+    openDeleteConfirmItemId = null;
     if (shouldShowEquipTargetSelect(item)) {
       openEquipPickerItemId = openEquipPickerItemId === item.id ? null : item.id;
       renderInventory();
@@ -1547,6 +1576,7 @@ function handleInventoryActions(event) {
     openEquipPickerItemId = null;
     openMovePickerItemId = null;
     openOverflowChoice = null;
+    openDeleteConfirmItemId = null;
     const result = moveItemToEquippedSlot(item, selectedSlot);
     if (result.requiresOverflowChoice) {
       openOverflowChoice = {
@@ -1570,6 +1600,7 @@ function handleInventoryActions(event) {
     openEquipPickerItemId = null;
     openMovePickerItemId = null;
     openOverflowChoice = null;
+    openDeleteConfirmItemId = null;
     const result = moveItemToEquippedSlot(item, pending.targetSlotKey || null, {
       allowOverflowToStorage: true,
       forcedTargetSlots: pending.targetSlots || null,
@@ -1586,6 +1617,7 @@ function handleInventoryActions(event) {
 
   if (action === "cancelOverflowChoice") {
     openOverflowChoice = null;
+    openDeleteConfirmItemId = null;
     renderInventory();
     return;
   }
@@ -1593,6 +1625,7 @@ function handleInventoryActions(event) {
   if (action === "moveItem") {
     openEquipPickerItemId = null;
     openOverflowChoice = null;
+    openDeleteConfirmItemId = null;
     const options = getMoveDestinationOptions(item);
     if (!options.length) return;
     openMovePickerItemId = openMovePickerItemId === item.id ? null : item.id;
@@ -2010,6 +2043,17 @@ export function renderInventory() {
   renderEquippedSlots();
   renderInventorySlots();
   renderDormInventory();
+  requestAnimationFrame(() => {
+    const menus = document.querySelectorAll(".skills-delete-confirm");
+    const viewportPad = 8;
+    menus.forEach(menu => {
+      menu.classList.remove("confirm-below", "confirm-align-left", "confirm-align-right");
+      const rect = menu.getBoundingClientRect();
+      if (rect.top < viewportPad) menu.classList.add("confirm-below");
+      if (rect.right > window.innerWidth - viewportPad) menu.classList.add("confirm-align-left");
+      if (rect.left < viewportPad) menu.classList.add("confirm-align-right");
+    });
+  });
   if (_refreshCharacterStats) _refreshCharacterStats();
 }
 
@@ -2087,6 +2131,15 @@ export function initInventory({ getState: getStateFn, scheduleSave: scheduleSave
       const clickedInsideOverflowPicker = event.target.closest(".inventory-overflow-picker");
       const clickedEquipBtn = event.target.closest("button[data-action='equipItem'], button[data-action='equipToSlot']");
       if (!clickedInsideOverflowPicker && !clickedEquipBtn) closeOverflowChoice();
+    }
+
+    if (openDeleteConfirmItemId) {
+      const clickedInsideDeleteConfirm = event.target.closest(".skills-delete-confirm");
+      const clickedDeleteBtn = event.target.closest("button[data-action='deleteItem']");
+      if (!clickedInsideDeleteConfirm && !clickedDeleteBtn) {
+        openDeleteConfirmItemId = null;
+        renderInventory();
+      }
     }
 
     if (openYenAdjustMode) {

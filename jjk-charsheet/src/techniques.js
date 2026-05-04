@@ -11,6 +11,9 @@ let _editSnapshot = null;
 const _expandedAppIndices = new Map();
 let _pendingNewApplicationIndex = null;
 let _pendingNewVowIndex = null;
+let _pendingInlineApplicationDeleteIndex = null;
+let _pendingEditorApplicationDeleteIndex = null;
+let _pendingVowDeleteIndex = null;
 
 const JUJUTSU_SUBTABS = new Set(["technique", "vows", "training", "skills"]);
 const APPLICATION_RANGE_TYPES = new Set(["self", "melee", "range", "aoe"]);
@@ -421,7 +424,378 @@ function refreshApplicationCards(state) {
   setTechniqueAddButtonState();
 }
 
+function repositionTechniquesFloatingMenus() {
+  const menus = document.querySelectorAll(".skills-delete-confirm");
+  const viewportPad = 8;
+  menus.forEach(menu => {
+    menu.classList.remove("confirm-below", "confirm-align-left", "confirm-align-right");
+    const rect = menu.getBoundingClientRect();
+    if (rect.top < viewportPad) menu.classList.add("confirm-below");
+    if (rect.right > window.innerWidth - viewportPad) menu.classList.add("confirm-align-left");
+    if (rect.left < viewportPad) menu.classList.add("confirm-align-right");
+  });
+}
+
 function renderApplicationsSummary(state) {
+  const grid = document.getElementById("techniqueApplicationsSummary");
+  if (!grid) return;
+
+  const mode = state?.techniques?.mode || "none";
+  const apps = Array.isArray(state?.techniques?.applications) ? state.techniques.applications : [];
+  if (_pendingInlineApplicationDeleteIndex !== null && !apps[_pendingInlineApplicationDeleteIndex]) {
+    _pendingInlineApplicationDeleteIndex = null;
+  }
+
+  if (mode === "none") {
+    grid.innerHTML = "";
+    return;
+  }
+
+  if (!apps.length) {
+    grid.innerHTML = '<div class="techniques-app-empty">No applications added yet.</div>';
+    return;
+  }
+
+  grid.innerHTML = apps.map((app, idx) => {
+    const normalized = normalizeApplication(app, idx);
+    if (_expandedAppIndices.has(idx)) {
+      return `
+        <article class="techniques-app-card techniques-app-card--editing" data-app-idx="${idx}">
+          <div class="techniques-app-edit-grid">
+          <label class="techniques-field" for="appCardTitle${idx}">
+            <span class="field-label">Title</span>
+            <input id="appCardTitle${idx}" class="meta-input techniques-app-card-field" data-app-title-inline="${idx}" value="${normalized.title}" />
+          </label>
+          <label class="techniques-field" for="appCardCost${idx}">
+            <span class="field-label">CE Cost</span>
+            <input id="appCardCost${idx}" class="meta-input techniques-app-card-field" type="number" min="0" step="1" inputmode="numeric" data-app-cost-inline="${idx}" value="${normalized.ceCost || 0}" />
+          </label>
+          <label class="techniques-field" for="appCardDc${idx}">
+            <span class="field-label">DC</span>
+            <input id="appCardDc${idx}" class="meta-input techniques-app-card-field" type="number" min="0" step="1" inputmode="numeric" data-app-dc-inline="${idx}" value="${normalized.dc || 0}" />
+          </label>
+          <label class="techniques-field techniques-field--checkbox" for="appCardScaling${idx}">
+            <span class="field-label">Scaling</span>
+            <input id="appCardScaling${idx}" class="techniques-checkbox" type="checkbox" data-app-scaling-inline="${idx}"${normalized.scalingEnabled ? " checked" : ""} />
+          </label>
+          ${normalized.scalingEnabled ? `
+          <label class="techniques-field" for="appCardScalingCe${idx}">
+            <span class="field-label">CE / Step</span>
+            <input id="appCardScalingCe${idx}" class="meta-input techniques-app-card-field" type="number" min="0" step="1" inputmode="numeric" data-app-scaling-ce-inline="${idx}" value="${normalized.scalingCeStep || 0}" />
+          </label>
+          <label class="techniques-field" for="appCardScalingDc${idx}">
+            <span class="field-label">DC / Step</span>
+            <input id="appCardScalingDc${idx}" class="meta-input techniques-app-card-field" type="number" min="0" step="1" inputmode="numeric" data-app-scaling-dc-inline="${idx}" value="${normalized.scalingDcStep || 0}" />
+          </label>
+          ` : ""}
+          <label class="techniques-field" for="appCardRangeType${idx}">
+            <span class="field-label">Range Type</span>
+            <select id="appCardRangeType${idx}" class="meta-select techniques-app-card-field" data-app-range-type-inline="${idx}">
+              <option value="self"${normalized.rangeType === "self" ? " selected" : ""}>Self</option>
+              <option value="melee"${normalized.rangeType === "melee" ? " selected" : ""}>Melee</option>
+              <option value="range"${normalized.rangeType === "range" ? " selected" : ""}>Range</option>
+              <option value="aoe"${normalized.rangeType === "aoe" ? " selected" : ""}>AOE</option>
+            </select>
+          </label>
+          ${normalized.rangeType === "range" ? `
+          <label class="techniques-field" for="appCardRangeValue${idx}">
+            <span class="field-label">Range</span>
+            <input id="appCardRangeValue${idx}" class="meta-input techniques-app-card-field" data-app-range-inline="${idx}" value="${normalized.rangeValue}" placeholder="30 ft" />
+          </label>
+          ` : ""}
+          ${normalized.rangeType === "aoe" ? `
+          <label class="techniques-field" for="appCardAoeShape${idx}">
+            <span class="field-label">AOE Shape</span>
+            <select id="appCardAoeShape${idx}" class="meta-select techniques-app-card-field" data-app-aoe-shape-inline="${idx}">
+              ${APPLICATION_AOE_SHAPES.map(shape => `<option value="${shape}"${normalized.aoeShape === shape ? " selected" : ""}>${getAoeShapeLabel(shape)}</option>`).join("")}
+            </select>
+          </label>
+          <label class="techniques-field" for="appCardAoeSize${idx}">
+            <span class="field-label">AOE Size</span>
+            <input id="appCardAoeSize${idx}" class="meta-input techniques-app-card-field" data-app-aoe-size-inline="${idx}" value="${normalized.aoeSize}" placeholder="15 ft radius" />
+          </label>
+          ` : ""}
+          </div>
+          <label class="techniques-field" for="appCardEffect${idx}">
+            <span class="field-label">Effect</span>
+            <textarea id="appCardEffect${idx}" class="inventory-textarea techniques-app-card-field" data-app-effect-inline="${idx}" rows="3" maxlength="700">${normalized.effect}</textarea>
+          </label>
+          <label class="techniques-field" for="appCardDesc${idx}">
+            <span class="field-label">Notes</span>
+            <textarea id="appCardDesc${idx}" class="inventory-textarea techniques-app-card-field" data-app-desc-inline="${idx}" rows="3" maxlength="360">${normalized.description}</textarea>
+          </label>
+          <div class="techniques-app-card-footer">
+            <span class="skills-delete-wrap">
+              <button type="button" class="inventory-mini-btn inventory-icon-btn danger" data-app-remove-inline="${idx}" aria-label="Delete application" title="Delete">
+                <svg class="inventory-icon-trash" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <path fill="currentColor" d="M9 3h6a1 1 0 0 1 1 1v1h4v2h-1l-1 12a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 7H4V5h4V4a1 1 0 0 1 1-1Zm1 2v0h4V5h-4Zm-1 4h2v9H9V9Zm4 0h2v9h-2V9Z"/>
+                  <path fill="none" stroke="currentColor" stroke-width="1.5" d="M6 7.5h12"/>
+                </svg>
+              </button>
+              ${_pendingInlineApplicationDeleteIndex === idx ? `<div class="skills-delete-confirm" role="menu">
+                <span class="skills-delete-confirm-text">Delete application?</span>
+                <button type="button" class="inventory-mini-btn danger" data-app-remove-inline-confirm="${idx}">Delete</button>
+                <button type="button" class="inventory-mini-btn" data-app-remove-inline-cancel="${idx}">Cancel</button>
+              </div>` : ""}
+            </span>
+            <button type="button" class="inventory-secondary-btn" data-app-cancel-inline="${idx}">Cancel</button>
+            <button type="button" class="meta-toggle-btn techniques-app-save-btn" data-app-save-inline="${idx}">Save</button>
+          </div>
+        </article>
+      `;
+    }
+    const description = normalized.description || "No description yet.";
+    const scaled = getScaledApplicationValues(normalized);
+    const costText = scaled.ceCost > 0 ? String(scaled.ceCost) : "-";
+    const dcText = scaled.dc > 0 ? String(scaled.dc) : "-";
+    const range = getRangeSummary(normalized);
+    const effectText = normalized.effect || "No effect listed.";
+    const btnState = getApplicationButtonState(state, idx);
+    const btnClass = btnState.isAutoPass ? "techniques-app-cast-btn--auto-pass" : "";
+    const btnDisabled = btnState.disabled ? " disabled" : "";
+    const starMarkup = btnState.isAutoPass ? "✦ " : "";
+    return `
+      <article class="techniques-app-card" data-app-idx="${idx}">
+        <button type="button" class="techniques-app-card-edit-btn" data-app-edit-toggle="${idx}" aria-label="Edit application" title="Edit">&#9998;</button>
+        <h4 class="techniques-app-card-title">${normalized.title}</h4>
+        <div class="techniques-app-metrics">
+          <span class="techniques-app-metric"><strong>CE Cost:</strong> <span data-app-metric-cost-value="${idx}">${costText}</span></span>
+          <span class="techniques-app-metric"><strong>DC:</strong> <span data-app-metric-dc-value="${idx}">${dcText}</span></span>
+          <span class="techniques-app-metric"><strong>${range.startsWith("AOE") ? "AOE" : "Range"}:</strong> ${range.replace(/^AOE:\s*|^Range:\s*/, "")}</span>
+          ${normalized.scalingEnabled ? `<span class="techniques-app-metric"><strong>Scaling:</strong> <span data-app-scaling-summary="${idx}">${getScalingSummary(normalized)}</span></span>` : ""}
+        </div>
+        <div class="techniques-app-effect"><strong>Effect:</strong> ${effectText}</div>
+        <p class="techniques-app-card-desc">${description}</p>
+        <div class="techniques-app-card-footer">
+          ${normalized.scalingEnabled ? `
+          <div class="techniques-app-stepper">
+            <button type="button" class="techniques-app-step-btn" data-app-step-down="${idx}"${scaled.currentStep <= 0 ? " disabled" : ""}>-</button>
+            <span class="techniques-app-step-label" data-app-step-label="${idx}">Step ${scaled.currentStep}</span>
+            <button type="button" class="techniques-app-step-btn" data-app-step-up="${idx}">+</button>
+          </div>
+          ` : ""}
+          <button type="button" class="techniques-app-cast-btn ${btnClass}" data-app-cast="${idx}" title="${btnState.tooltip}"${btnDisabled}>${starMarkup}Use</button>
+        </div>
+      </article>
+    `;
+  }).join("");
+
+  requestAnimationFrame(repositionTechniquesFloatingMenus);
+}
+
+function renderApplicationsEditor(state) {
+  const list = document.getElementById("techniqueApplicationsList");
+  if (!list) return;
+
+  const apps = Array.isArray(state?.techniques?.applications) ? state.techniques.applications : [];
+  if (_pendingEditorApplicationDeleteIndex !== null && !apps[_pendingEditorApplicationDeleteIndex]) {
+    _pendingEditorApplicationDeleteIndex = null;
+  }
+  if (!apps.length) {
+    list.innerHTML = '<div class="techniques-app-empty">No applications yet. Add one to get started.</div>';
+    return;
+  }
+
+  list.innerHTML = apps.map((app, idx) => {
+    const normalized = normalizeApplication(app, idx);
+    return `
+      <div class="techniques-app-editor-item">
+        <div class="techniques-app-editor-item-head">
+          <span class="field-label">Application ${idx + 1}</span>
+          <span class="skills-delete-wrap">
+            <button type="button" class="inventory-secondary-btn techniques-app-remove-btn" data-app-remove="${idx}">Remove</button>
+            ${_pendingEditorApplicationDeleteIndex === idx ? `<div class="skills-delete-confirm" role="menu">
+              <span class="skills-delete-confirm-text">Delete application?</span>
+              <button type="button" class="inventory-mini-btn danger" data-app-remove-confirm="${idx}">Delete</button>
+              <button type="button" class="inventory-mini-btn" data-app-remove-cancel="${idx}">Cancel</button>
+            </div>` : ""}
+          </span>
+        </div>
+        <label class="techniques-field" for="techniqueAppTitle${idx}">
+          <span class="field-label">Title</span>
+          <input id="techniqueAppTitle${idx}" class="meta-input" data-app-title="${idx}" value="${normalized.title}" />
+        </label>
+        <label class="techniques-field" for="techniqueAppDesc${idx}">
+          <span class="field-label">Description</span>
+          <textarea id="techniqueAppDesc${idx}" class="inventory-textarea" rows="3" maxlength="360" data-app-description="${idx}">${normalized.description}</textarea>
+        </label>
+        <label class="techniques-field" for="techniqueAppCeCost${idx}">
+          <span class="field-label">CE Cost</span>
+          <input id="techniqueAppCeCost${idx}" class="meta-input" type="number" min="0" step="1" inputmode="numeric" data-app-ce-cost="${idx}" value="${normalized.ceCost || 0}" />
+        </label>
+        <label class="techniques-field" for="techniqueAppDc${idx}">
+          <span class="field-label">DC</span>
+          <input id="techniqueAppDc${idx}" class="meta-input" type="number" min="0" step="1" inputmode="numeric" data-app-dc="${idx}" value="${normalized.dc || 0}" />
+        </label>
+        <label class="techniques-field techniques-field--checkbox" for="techniqueAppScaling${idx}">
+          <span class="field-label">Scaling</span>
+          <input id="techniqueAppScaling${idx}" class="techniques-checkbox" type="checkbox" data-app-scaling="${idx}"${normalized.scalingEnabled ? " checked" : ""} />
+        </label>
+        ${normalized.scalingEnabled ? `
+        <label class="techniques-field" for="techniqueAppScalingCe${idx}">
+          <span class="field-label">CE / Step</span>
+          <input id="techniqueAppScalingCe${idx}" class="meta-input" type="number" min="0" step="1" inputmode="numeric" data-app-scaling-ce="${idx}" value="${normalized.scalingCeStep || 0}" />
+        </label>
+        <label class="techniques-field" for="techniqueAppScalingDc${idx}">
+          <span class="field-label">DC / Step</span>
+          <input id="techniqueAppScalingDc${idx}" class="meta-input" type="number" min="0" step="1" inputmode="numeric" data-app-scaling-dc="${idx}" value="${normalized.scalingDcStep || 0}" />
+        </label>
+        ` : ""}
+        <label class="techniques-field" for="techniqueAppRangeType${idx}">
+          <span class="field-label">Range Type</span>
+          <select id="techniqueAppRangeType${idx}" class="meta-select" data-app-range-type="${idx}">
+            <option value="self"${normalized.rangeType === "self" ? " selected" : ""}>Self</option>
+            <option value="melee"${normalized.rangeType === "melee" ? " selected" : ""}>Melee</option>
+            <option value="range"${normalized.rangeType === "range" ? " selected" : ""}>Range</option>
+            <option value="aoe"${normalized.rangeType === "aoe" ? " selected" : ""}>AOE</option>
+          </select>
+        </label>
+        ${normalized.rangeType === "range" ? `
+        <label class="techniques-field" for="techniqueAppRangeValue${idx}">
+          <span class="field-label">Range</span>
+          <input id="techniqueAppRangeValue${idx}" class="meta-input" data-app-range-value="${idx}" value="${normalized.rangeValue}" placeholder="30 ft" />
+        </label>
+        ` : ""}
+        ${normalized.rangeType === "aoe" ? `
+        <label class="techniques-field" for="techniqueAppAoeShape${idx}">
+          <span class="field-label">AOE Shape</span>
+          <select id="techniqueAppAoeShape${idx}" class="meta-select" data-app-aoe-shape="${idx}">
+            ${APPLICATION_AOE_SHAPES.map(shape => `<option value="${shape}"${normalized.aoeShape === shape ? " selected" : ""}>${getAoeShapeLabel(shape)}</option>`).join("")}
+          </select>
+        </label>
+        <label class="techniques-field" for="techniqueAppAoeSize${idx}">
+          <span class="field-label">AOE Size</span>
+          <input id="techniqueAppAoeSize${idx}" class="meta-input" data-app-aoe-size="${idx}" value="${normalized.aoeSize}" placeholder="15 ft radius" />
+        </label>
+        ` : ""}
+        <label class="techniques-field" for="techniqueAppEffect${idx}">
+          <span class="field-label">Effect</span>
+          <textarea id="techniqueAppEffect${idx}" class="inventory-textarea" rows="3" maxlength="700" data-app-effect="${idx}">${normalized.effect}</textarea>
+        </label>
+      </div>
+    `;
+  }).join("");
+
+  requestAnimationFrame(repositionTechniquesFloatingMenus);
+}
+
+function renderBindingVowsEditor(state) {
+  const list = document.getElementById("bindingVowsList");
+  if (!list) return;
+
+  const vows = Array.isArray(state?.techniques?.bindingVows) ? state.techniques.bindingVows : [];
+  if (_pendingVowDeleteIndex !== null && !vows[_pendingVowDeleteIndex]) {
+    _pendingVowDeleteIndex = null;
+  }
+  if (!vows.length) {
+    list.innerHTML = '<div class="techniques-app-empty">No Vows Made.</div>';
+    return;
+  }
+
+  list.innerHTML = vows.map((vow, idx) => renderBindingVowEditorItem(vow, idx, _pendingNewVowIndex === idx)).join("");
+
+  _pendingNewVowIndex = null;
+  requestAnimationFrame(repositionTechniquesFloatingMenus);
+}
+
+function renderBindingVowEditorItem(vow, idx, isNew = false) {
+  const normalized = normalizeBindingVow(vow, idx);
+  return `
+      <div class="techniques-app-editor-item${isNew ? " vow-enter" : ""}">
+        <label class="techniques-field" for="bindingVowTitle${idx}">
+          <span class="field-label">Title</span>
+          <input id="bindingVowTitle${idx}" class="meta-input" data-vow-title="${idx}" value="${normalized.title}" />
+        </label>
+        <label class="techniques-field" for="bindingVowBenefits${idx}">
+          <span class="field-label">Benefits</span>
+          <textarea id="bindingVowBenefits${idx}" class="inventory-textarea" rows="3" maxlength="700" data-vow-benefits="${idx}">${normalized.benefits}</textarea>
+        </label>
+        <label class="techniques-field" for="bindingVowConditions${idx}">
+          <span class="field-label">Conditions</span>
+          <textarea id="bindingVowConditions${idx}" class="inventory-textarea" rows="3" maxlength="700" data-vow-conditions="${idx}">${normalized.conditions}</textarea>
+        </label>
+        <div class="techniques-vow-footer">
+          <span class="skills-delete-wrap" style="margin-left:auto;">
+            <button type="button" class="inventory-mini-btn inventory-icon-btn danger" data-vow-remove="${idx}" aria-label="Delete vow" title="Delete vow">
+              <svg class="inventory-icon-trash" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path fill="currentColor" d="M9 3h6a1 1 0 0 1 1 1v1h4v2h-1l-1 12a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 7H4V5h4V4a1 1 0 0 1 1-1Zm1 2v0h4V5h-4Zm-1 4h2v9H9V9Zm4 0h2v9h-2V9Z"/>
+                <path fill="none" stroke="currentColor" stroke-width="1.5" d="M6 7.5h12"/>
+              </svg>
+            </button>
+            ${_pendingVowDeleteIndex === idx ? `<div class="skills-delete-confirm" role="menu">
+              <span class="skills-delete-confirm-text">Delete vow?</span>
+              <button type="button" class="inventory-mini-btn danger" data-vow-remove-confirm="${idx}">Delete</button>
+              <button type="button" class="inventory-mini-btn" data-vow-remove-cancel="${idx}">Cancel</button>
+            </div>` : ""}
+          </span>
+        </div>
+      </div>
+    `;
+}
+
+function setEditorVisibility() {
+  const summaryCard = document.getElementById("techniqueSummaryCard");
+  const editor = document.getElementById("techniqueEditor");
+  const modeStep = document.getElementById("techniqueEditorStepMode");
+  const detailsStep = document.getElementById("techniqueEditorStepDetails");
+
+  if (summaryCard) summaryCard.style.display = _isEditing ? "none" : "";
+  if (editor) editor.style.display = _isEditing ? "" : "none";
+  if (modeStep) modeStep.style.display = _isEditing && _editorStep === "mode" ? "" : "none";
+  if (detailsStep) detailsStep.style.display = _isEditing && _editorStep === "details" ? "" : "none";
+}
+
+function getSelectedMode() {
+  if (document.getElementById("techniqueModeDomain")?.checked) return "domain";
+  if (document.getElementById("techniqueModeNone")?.checked) return "none";
+  return "ct";
+}
+
+function setModeUI(mode) {
+  const isNone = mode === "none";
+  const nameField = document.getElementById("techniquesNameField");
+  const noCtSection = document.getElementById("techniquesNoCtSection");
+  const noCtInfoCard = document.getElementById("techniquesNoCtInfoCard");
+
+  if (nameField) nameField.style.display = isNone ? "none" : "";
+  if (noCtSection) noCtSection.style.display = isNone ? "" : "none";
+  if (noCtInfoCard) noCtInfoCard.style.display = isNone ? "" : "none";
+}
+
+function syncTechniqueNameInput() {
+  const nameInput = document.getElementById("techniqueNameInput");
+  const headerInput = document.getElementById("ctInput");
+  if (!nameInput || !headerInput) return;
+  if (document.activeElement === nameInput) return;
+  nameInput.value = headerInput.value;
+
+  const state = getState();
+  if (state) {
+    state.ct = headerInput.value;
+    const summaryEl = document.getElementById("techniqueSummaryText");
+    if (summaryEl) summaryEl.textContent = getTechniqueSummaryText(state);
+  }
+}
+
+export function updateTechniquesDerivedUI(stateArg = null) {
+  const state = stateArg || getState();
+  if (!state) return;
+
+  ensureTechniquesState(state);
+
+  const summaryEl = document.getElementById("techniqueSummaryText");
+  if (summaryEl) summaryEl.textContent = getTechniqueSummaryText(state);
+
+  const typeEl = document.getElementById("techniqueTypeSummary");
+  if (typeEl) typeEl.innerHTML = `<em>${getTechniqueTypeText(state.techniques.mode)}</em>`;
+
+  syncTechniqueThresholdLine(state);
+
+  renderApplicationsSummary(state);
+
+  const hasActiveTechnique = state.techniques.mode !== "none";
+
+  setTechniqueAddButtonState();
   const grid = document.getElementById("techniqueApplicationsSummary");
   if (!grid) return;
 
@@ -554,197 +928,6 @@ function renderApplicationsSummary(state) {
       </article>
     `;
   }).join("");
-}
-
-function renderApplicationsEditor(state) {
-  const list = document.getElementById("techniqueApplicationsList");
-  if (!list) return;
-
-  const apps = Array.isArray(state?.techniques?.applications) ? state.techniques.applications : [];
-  if (!apps.length) {
-    list.innerHTML = '<div class="techniques-app-empty">No applications yet. Add one to get started.</div>';
-    return;
-  }
-
-  list.innerHTML = apps.map((app, idx) => {
-    const normalized = normalizeApplication(app, idx);
-    return `
-      <div class="techniques-app-editor-item">
-        <div class="techniques-app-editor-item-head">
-          <span class="field-label">Application ${idx + 1}</span>
-          <button type="button" class="inventory-secondary-btn techniques-app-remove-btn" data-app-remove="${idx}">Remove</button>
-        </div>
-        <label class="techniques-field" for="techniqueAppTitle${idx}">
-          <span class="field-label">Title</span>
-          <input id="techniqueAppTitle${idx}" class="meta-input" data-app-title="${idx}" value="${normalized.title}" />
-        </label>
-        <label class="techniques-field" for="techniqueAppDesc${idx}">
-          <span class="field-label">Description</span>
-          <textarea id="techniqueAppDesc${idx}" class="inventory-textarea" rows="3" maxlength="360" data-app-description="${idx}">${normalized.description}</textarea>
-        </label>
-        <label class="techniques-field" for="techniqueAppCeCost${idx}">
-          <span class="field-label">CE Cost</span>
-          <input id="techniqueAppCeCost${idx}" class="meta-input" type="number" min="0" step="1" inputmode="numeric" data-app-ce-cost="${idx}" value="${normalized.ceCost || 0}" />
-        </label>
-        <label class="techniques-field" for="techniqueAppDc${idx}">
-          <span class="field-label">DC</span>
-          <input id="techniqueAppDc${idx}" class="meta-input" type="number" min="0" step="1" inputmode="numeric" data-app-dc="${idx}" value="${normalized.dc || 0}" />
-        </label>
-        <label class="techniques-field techniques-field--checkbox" for="techniqueAppScaling${idx}">
-          <span class="field-label">Scaling</span>
-          <input id="techniqueAppScaling${idx}" class="techniques-checkbox" type="checkbox" data-app-scaling="${idx}"${normalized.scalingEnabled ? " checked" : ""} />
-        </label>
-        ${normalized.scalingEnabled ? `
-        <label class="techniques-field" for="techniqueAppScalingCe${idx}">
-          <span class="field-label">CE / Step</span>
-          <input id="techniqueAppScalingCe${idx}" class="meta-input" type="number" min="0" step="1" inputmode="numeric" data-app-scaling-ce="${idx}" value="${normalized.scalingCeStep || 0}" />
-        </label>
-        <label class="techniques-field" for="techniqueAppScalingDc${idx}">
-          <span class="field-label">DC / Step</span>
-          <input id="techniqueAppScalingDc${idx}" class="meta-input" type="number" min="0" step="1" inputmode="numeric" data-app-scaling-dc="${idx}" value="${normalized.scalingDcStep || 0}" />
-        </label>
-        ` : ""}
-        <label class="techniques-field" for="techniqueAppRangeType${idx}">
-          <span class="field-label">Range Type</span>
-          <select id="techniqueAppRangeType${idx}" class="meta-select" data-app-range-type="${idx}">
-            <option value="self"${normalized.rangeType === "self" ? " selected" : ""}>Self</option>
-            <option value="melee"${normalized.rangeType === "melee" ? " selected" : ""}>Melee</option>
-            <option value="range"${normalized.rangeType === "range" ? " selected" : ""}>Range</option>
-            <option value="aoe"${normalized.rangeType === "aoe" ? " selected" : ""}>AOE</option>
-          </select>
-        </label>
-        ${normalized.rangeType === "range" ? `
-        <label class="techniques-field" for="techniqueAppRangeValue${idx}">
-          <span class="field-label">Range</span>
-          <input id="techniqueAppRangeValue${idx}" class="meta-input" data-app-range-value="${idx}" value="${normalized.rangeValue}" placeholder="30 ft" />
-        </label>
-        ` : ""}
-        ${normalized.rangeType === "aoe" ? `
-        <label class="techniques-field" for="techniqueAppAoeShape${idx}">
-          <span class="field-label">AOE Shape</span>
-          <select id="techniqueAppAoeShape${idx}" class="meta-select" data-app-aoe-shape="${idx}">
-            ${APPLICATION_AOE_SHAPES.map(shape => `<option value="${shape}"${normalized.aoeShape === shape ? " selected" : ""}>${getAoeShapeLabel(shape)}</option>`).join("")}
-          </select>
-        </label>
-        <label class="techniques-field" for="techniqueAppAoeSize${idx}">
-          <span class="field-label">AOE Size</span>
-          <input id="techniqueAppAoeSize${idx}" class="meta-input" data-app-aoe-size="${idx}" value="${normalized.aoeSize}" placeholder="15 ft radius" />
-        </label>
-        ` : ""}
-        <label class="techniques-field" for="techniqueAppEffect${idx}">
-          <span class="field-label">Effect</span>
-          <textarea id="techniqueAppEffect${idx}" class="inventory-textarea" rows="3" maxlength="700" data-app-effect="${idx}">${normalized.effect}</textarea>
-        </label>
-      </div>
-    `;
-  }).join("");
-}
-
-function renderBindingVowsEditor(state) {
-  const list = document.getElementById("bindingVowsList");
-  if (!list) return;
-
-  const vows = Array.isArray(state?.techniques?.bindingVows) ? state.techniques.bindingVows : [];
-  if (!vows.length) {
-    list.innerHTML = '<div class="techniques-app-empty">No Vows Made.</div>';
-    return;
-  }
-
-  list.innerHTML = vows.map((vow, idx) => renderBindingVowEditorItem(vow, idx, _pendingNewVowIndex === idx)).join("");
-
-  _pendingNewVowIndex = null;
-}
-
-function renderBindingVowEditorItem(vow, idx, isNew = false) {
-  const normalized = normalizeBindingVow(vow, idx);
-  return `
-      <div class="techniques-app-editor-item${isNew ? " vow-enter" : ""}">
-        <label class="techniques-field" for="bindingVowTitle${idx}">
-          <span class="field-label">Title</span>
-          <input id="bindingVowTitle${idx}" class="meta-input" data-vow-title="${idx}" value="${normalized.title}" />
-        </label>
-        <label class="techniques-field" for="bindingVowBenefits${idx}">
-          <span class="field-label">Benefits</span>
-          <textarea id="bindingVowBenefits${idx}" class="inventory-textarea" rows="3" maxlength="700" data-vow-benefits="${idx}">${normalized.benefits}</textarea>
-        </label>
-        <label class="techniques-field" for="bindingVowConditions${idx}">
-          <span class="field-label">Conditions</span>
-          <textarea id="bindingVowConditions${idx}" class="inventory-textarea" rows="3" maxlength="700" data-vow-conditions="${idx}">${normalized.conditions}</textarea>
-        </label>
-        <div class="techniques-vow-footer">
-          <button type="button" class="inventory-mini-btn inventory-icon-btn danger" data-vow-remove="${idx}" aria-label="Delete vow" title="Delete vow" style="margin-left:auto;">
-            <svg class="inventory-icon-trash" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-              <path fill="currentColor" d="M9 3h6a1 1 0 0 1 1 1v1h4v2h-1l-1 12a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 7H4V5h4V4a1 1 0 0 1 1-1Zm1 2v0h4V5h-4Zm-1 4h2v9H9V9Zm4 0h2v9h-2V9Z"/>
-              <path fill="none" stroke="currentColor" stroke-width="1.5" d="M6 7.5h12"/>
-            </svg>
-          </button>
-        </div>
-      </div>
-    `;
-}
-
-function setEditorVisibility() {
-  const summaryCard = document.getElementById("techniqueSummaryCard");
-  const editor = document.getElementById("techniqueEditor");
-  const modeStep = document.getElementById("techniqueEditorStepMode");
-  const detailsStep = document.getElementById("techniqueEditorStepDetails");
-
-  if (summaryCard) summaryCard.style.display = _isEditing ? "none" : "";
-  if (editor) editor.style.display = _isEditing ? "" : "none";
-  if (modeStep) modeStep.style.display = _isEditing && _editorStep === "mode" ? "" : "none";
-  if (detailsStep) detailsStep.style.display = _isEditing && _editorStep === "details" ? "" : "none";
-}
-
-function getSelectedMode() {
-  if (document.getElementById("techniqueModeDomain")?.checked) return "domain";
-  if (document.getElementById("techniqueModeNone")?.checked) return "none";
-  return "ct";
-}
-
-function setModeUI(mode) {
-  const isNone = mode === "none";
-  const nameField = document.getElementById("techniquesNameField");
-  const noCtSection = document.getElementById("techniquesNoCtSection");
-  const noCtInfoCard = document.getElementById("techniquesNoCtInfoCard");
-
-  if (nameField) nameField.style.display = isNone ? "none" : "";
-  if (noCtSection) noCtSection.style.display = isNone ? "" : "none";
-  if (noCtInfoCard) noCtInfoCard.style.display = isNone ? "" : "none";
-}
-
-function syncTechniqueNameInput() {
-  const nameInput = document.getElementById("techniqueNameInput");
-  const headerInput = document.getElementById("ctInput");
-  if (!nameInput || !headerInput) return;
-  if (document.activeElement === nameInput) return;
-  nameInput.value = headerInput.value;
-
-  const state = getState();
-  if (state) {
-    state.ct = headerInput.value;
-    const summaryEl = document.getElementById("techniqueSummaryText");
-    if (summaryEl) summaryEl.textContent = getTechniqueSummaryText(state);
-  }
-}
-
-export function updateTechniquesDerivedUI(stateArg = null) {
-  const state = stateArg || getState();
-  if (!state) return;
-
-  ensureTechniquesState(state);
-
-  const summaryEl = document.getElementById("techniqueSummaryText");
-  if (summaryEl) summaryEl.textContent = getTechniqueSummaryText(state);
-
-  const typeEl = document.getElementById("techniqueTypeSummary");
-  if (typeEl) typeEl.innerHTML = `<em>${getTechniqueTypeText(state.techniques.mode)}</em>`;
-
-  syncTechniqueThresholdLine(state);
-
-  renderApplicationsSummary(state);
-
-  const hasActiveTechnique = state.techniques.mode !== "none";
-
   const summaryFooter = document.getElementById("techniqueSummaryFooter");
   if (summaryFooter) summaryFooter.style.display = hasActiveTechnique ? "" : "none";
 
@@ -809,6 +992,9 @@ function cancelTechniqueEditing() {
   _isEditing = false;
   _editorStep = "mode";
   _pendingNewApplicationIndex = null;
+  _pendingInlineApplicationDeleteIndex = null;
+  _pendingEditorApplicationDeleteIndex = null;
+  _pendingVowDeleteIndex = null;
   _expandedAppIndices.clear();
   refreshCharacterStats();
   applyTechniquesStateToUI();
@@ -840,6 +1026,9 @@ function saveTechniqueEditing() {
   _isEditing = false;
   _editorStep = "mode";
   _pendingNewApplicationIndex = null;
+  _pendingInlineApplicationDeleteIndex = null;
+  _pendingEditorApplicationDeleteIndex = null;
+  _pendingVowDeleteIndex = null;
   _editSnapshot = null;
   refreshCharacterStats();
   applyTechniquesStateToUI();
@@ -932,6 +1121,7 @@ export function initTechniques({ getState: getStateFn, scheduleSave: scheduleSav
         const state = getState();
         if (!state) return;
         const idx = parseNonNegativeInt(openTrigger.dataset.appEditToggle);
+        _pendingInlineApplicationDeleteIndex = null;
         const snap = JSON.parse(JSON.stringify(state.techniques.applications[idx] || {}));
         _expandedAppIndices.set(idx, snap);
         refreshApplicationCards(state);
@@ -941,6 +1131,7 @@ export function initTechniques({ getState: getStateFn, scheduleSave: scheduleSav
       const saveTrigger = e.target?.closest?.("[data-app-save-inline]");
       if (saveTrigger) {
         const idx = parseNonNegativeInt(saveTrigger.dataset.appSaveInline);
+        _pendingInlineApplicationDeleteIndex = null;
         _expandedAppIndices.delete(idx);
         if (_pendingNewApplicationIndex === idx) _pendingNewApplicationIndex = null;
         const state = getState();
@@ -951,6 +1142,7 @@ export function initTechniques({ getState: getStateFn, scheduleSave: scheduleSav
       const cancelTrigger = e.target?.closest?.("[data-app-cancel-inline]");
       if (cancelTrigger) {
         const idx = parseNonNegativeInt(cancelTrigger.dataset.appCancelInline);
+        _pendingInlineApplicationDeleteIndex = null;
         const snap = _expandedAppIndices.get(idx);
         _expandedAppIndices.delete(idx);
         const state = getState();
@@ -964,19 +1156,36 @@ export function initTechniques({ getState: getStateFn, scheduleSave: scheduleSav
         scheduleSave();
         return;
       }
-      // Delete
-      const removeTrigger = e.target?.closest?.("[data-app-remove-inline]");
-      if (removeTrigger) {
+      const removeConfirmTrigger = e.target?.closest?.("[data-app-remove-inline-confirm]");
+      if (removeConfirmTrigger) {
         const state = getState();
         if (!state) return;
         ensureTechniquesState(state);
-        const removeIdx = parseNonNegativeInt(removeTrigger.dataset.appRemoveInline);
+        const removeIdx = parseNonNegativeInt(removeConfirmTrigger.dataset.appRemoveInlineConfirm);
+        _pendingInlineApplicationDeleteIndex = null;
         state.techniques.applications.splice(removeIdx, 1);
         state.techniques.applications = state.techniques.applications.map((entry, i) => normalizeApplication(entry, i));
         if (_pendingNewApplicationIndex !== null) _pendingNewApplicationIndex = null;
         _expandedAppIndices.clear();
         refreshApplicationCards(state);
         scheduleSave();
+        return;
+      }
+      const removeCancelTrigger = e.target?.closest?.("[data-app-remove-inline-cancel]");
+      if (removeCancelTrigger) {
+        _pendingInlineApplicationDeleteIndex = null;
+        const state = getState();
+        if (state) refreshApplicationCards(state);
+        return;
+      }
+      // Delete
+      const removeTrigger = e.target?.closest?.("[data-app-remove-inline]");
+      if (removeTrigger) {
+        const removeIdx = parseNonNegativeInt(removeTrigger.dataset.appRemoveInline);
+        _pendingInlineApplicationDeleteIndex = _pendingInlineApplicationDeleteIndex === removeIdx ? null : removeIdx;
+        const state = getState();
+        if (state) refreshApplicationCards(state);
+        return;
       }
       const stepDownTrigger = e.target?.closest?.("[data-app-step-down]");
       if (stepDownTrigger) {
@@ -1223,16 +1432,34 @@ export function initTechniques({ getState: getStateFn, scheduleSave: scheduleSav
     });
 
     appList.addEventListener("click", e => {
+      const confirmIdxRaw = e.target?.dataset?.appRemoveConfirm;
+      if (confirmIdxRaw !== undefined) {
+        const state = getState();
+        if (!state) return;
+        ensureTechniquesState(state);
+        const removeIdx = parseNonNegativeInt(confirmIdxRaw);
+        _pendingEditorApplicationDeleteIndex = null;
+        state.techniques.applications.splice(removeIdx, 1);
+        state.techniques.applications = state.techniques.applications.map((entry, idx) => normalizeApplication(entry, idx));
+        renderApplicationsEditor(state);
+        scheduleSave();
+        return;
+      }
+
+      const cancelIdxRaw = e.target?.dataset?.appRemoveCancel;
+      if (cancelIdxRaw !== undefined) {
+        _pendingEditorApplicationDeleteIndex = null;
+        const state = getState();
+        if (state) renderApplicationsEditor(state);
+        return;
+      }
+
       const removeIdxRaw = e.target?.dataset?.appRemove;
       if (removeIdxRaw === undefined) return;
-      const state = getState();
-      if (!state) return;
-      ensureTechniquesState(state);
       const removeIdx = parseNonNegativeInt(removeIdxRaw);
-      state.techniques.applications.splice(removeIdx, 1);
-      state.techniques.applications = state.techniques.applications.map((entry, idx) => normalizeApplication(entry, idx));
-      renderApplicationsEditor(state);
-      scheduleSave();
+      _pendingEditorApplicationDeleteIndex = _pendingEditorApplicationDeleteIndex === removeIdx ? null : removeIdx;
+      const state = getState();
+      if (state) renderApplicationsEditor(state);
     });
   }
 
@@ -1305,17 +1532,37 @@ export function initTechniques({ getState: getStateFn, scheduleSave: scheduleSav
     });
 
     bindingVowsList.addEventListener("click", e => {
+      const confirmTrigger = e.target?.closest?.("[data-vow-remove-confirm]");
+      const confirmIdxRaw = confirmTrigger?.dataset?.vowRemoveConfirm;
+      if (confirmIdxRaw !== undefined) {
+        const state = getState();
+        if (!state) return;
+        ensureTechniquesState(state);
+        const removeIdx = parseNonNegativeInt(confirmIdxRaw);
+        _pendingVowDeleteIndex = null;
+        state.techniques.bindingVows.splice(removeIdx, 1);
+        state.techniques.bindingVows = state.techniques.bindingVows.map((entry, idx) => normalizeBindingVow(entry, idx));
+        renderBindingVowsEditor(state);
+        scheduleSave();
+        return;
+      }
+
+      const cancelTrigger = e.target?.closest?.("[data-vow-remove-cancel]");
+      const cancelIdxRaw = cancelTrigger?.dataset?.vowRemoveCancel;
+      if (cancelIdxRaw !== undefined) {
+        _pendingVowDeleteIndex = null;
+        const state = getState();
+        if (state) renderBindingVowsEditor(state);
+        return;
+      }
+
       const removeTrigger = e.target?.closest?.("[data-vow-remove]");
       const removeIdxRaw = removeTrigger?.dataset?.vowRemove;
       if (removeIdxRaw === undefined) return;
-      const state = getState();
-      if (!state) return;
-      ensureTechniquesState(state);
       const removeIdx = parseNonNegativeInt(removeIdxRaw);
-      state.techniques.bindingVows.splice(removeIdx, 1);
-      state.techniques.bindingVows = state.techniques.bindingVows.map((entry, idx) => normalizeBindingVow(entry, idx));
-      renderBindingVowsEditor(state);
-      scheduleSave();
+      _pendingVowDeleteIndex = _pendingVowDeleteIndex === removeIdx ? null : removeIdx;
+      const state = getState();
+      if (state) renderBindingVowsEditor(state);
     });
   }
 

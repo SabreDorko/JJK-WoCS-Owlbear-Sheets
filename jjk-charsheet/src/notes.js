@@ -2,6 +2,7 @@ let _getState = null;
 let _scheduleSave = null;
 let _initialized = false;
 let _newlyAddedNoteId = null;
+let _pendingDeleteNoteId = null;
 
 function getState() {
   return _getState ? _getState() : null;
@@ -36,12 +37,25 @@ function escapeHtml(value) {
     .replace(/'/g, "&#39;");
 }
 
+function repositionNotesFloatingMenus() {
+  const menus = document.querySelectorAll(".skills-delete-confirm");
+  const viewportPad = 8;
+  menus.forEach(menu => {
+    menu.classList.remove("confirm-below", "confirm-align-left", "confirm-align-right");
+    const rect = menu.getBoundingClientRect();
+    if (rect.top < viewportPad) menu.classList.add("confirm-below");
+    if (rect.right > window.innerWidth - viewportPad) menu.classList.add("confirm-align-left");
+    if (rect.left < viewportPad) menu.classList.add("confirm-align-right");
+  });
+}
+
 function renderNotes(state) {
   const list = document.getElementById("notesList");
   if (!list) return;
 
   ensureNotesState(state);
   const notes = state.notes;
+  if (_pendingDeleteNoteId && !notes.some(note => note.id === _pendingDeleteNoteId)) _pendingDeleteNoteId = null;
 
   if (!notes.length) {
     list.innerHTML = '<div class="notes-empty">No notes yet. Click New Note to start writing.</div>';
@@ -61,11 +75,18 @@ function renderNotes(state) {
             </svg>
           </button>
           <input class="meta-input notes-title-input" data-note-title="${escapeHtml(note.id)}" value="${escapeHtml(note.title)}" placeholder="Untitled Note" />
-          <button type="button" class="notes-delete-btn" data-note-delete="${escapeHtml(note.id)}" aria-label="Delete note" title="Delete">
-            <svg class="notes-delete-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-              <path fill="currentColor" d="M6.7 5.3L5.3 6.7 10.6 12l-5.3 5.3 1.4 1.4 5.3-5.3 5.3 5.3 1.4-1.4-5.3-5.3 5.3-5.3-1.4-1.4-5.3 5.3-5.3-5.3z"/>
-            </svg>
-          </button>
+          <span class="skills-delete-wrap">
+            <button type="button" class="notes-delete-btn" data-note-delete="${escapeHtml(note.id)}" aria-label="Delete note" title="Delete">
+              <svg class="notes-delete-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path fill="currentColor" d="M6.7 5.3L5.3 6.7 10.6 12l-5.3 5.3 1.4 1.4 5.3-5.3 5.3 5.3 1.4-1.4-5.3-5.3 5.3-5.3-1.4-1.4-5.3 5.3-5.3-5.3z"/>
+              </svg>
+            </button>
+            ${_pendingDeleteNoteId === note.id ? `<div class="skills-delete-confirm" role="menu">
+              <span class="skills-delete-confirm-text">Delete note?</span>
+              <button type="button" class="inventory-mini-btn danger" data-note-delete-confirm="${escapeHtml(note.id)}">Delete</button>
+              <button type="button" class="inventory-mini-btn" data-note-delete-cancel="${escapeHtml(note.id)}">Cancel</button>
+            </div>` : ""}
+          </span>
         </div>
         <div class="notes-content-wrap${collapsedClass}" data-note-content-wrap="${escapeHtml(note.id)}">
           <textarea class="inventory-textarea notes-content" data-note-content="${escapeHtml(note.id)}" rows="5" maxlength="3000" placeholder="Write your note here...">${escapeHtml(note.content)}</textarea>
@@ -73,6 +94,8 @@ function renderNotes(state) {
       </article>
     `;
   }).join("");
+
+  requestAnimationFrame(repositionNotesFloatingMenus);
 
   if (_newlyAddedNoteId) {
     const newEntry = list.querySelector(`[data-note-id="${_newlyAddedNoteId}"]`);
@@ -155,9 +178,18 @@ export function initNotes({ getState: getStateFn, scheduleSave: scheduleSaveFn }
       const deleteBtn = e.target?.closest?.("[data-note-delete]");
       if (deleteBtn) {
         const noteId = String(deleteBtn.dataset.noteDelete || "");
+        _pendingDeleteNoteId = _pendingDeleteNoteId === noteId ? null : noteId;
+        renderNotes(state);
+        return;
+      }
+
+      const deleteConfirmBtn = e.target?.closest?.("[data-note-delete-confirm]");
+      if (deleteConfirmBtn) {
+        const noteId = String(deleteConfirmBtn.dataset.noteDeleteConfirm || "");
+        _pendingDeleteNoteId = null;
         const idx = findNoteIndexById(state, noteId);
         if (idx >= 0) {
-          const row = deleteBtn.closest(".notes-item");
+          const row = deleteConfirmBtn.closest(".notes-item");
           if (row) row.classList.add("notes-item--removing");
           setTimeout(() => {
             const nextIdx = findNoteIndexById(state, noteId);
@@ -166,6 +198,13 @@ export function initNotes({ getState: getStateFn, scheduleSave: scheduleSaveFn }
             scheduleSave();
           }, 220);
         }
+        return;
+      }
+
+      const deleteCancelBtn = e.target?.closest?.("[data-note-delete-cancel]");
+      if (deleteCancelBtn) {
+        _pendingDeleteNoteId = null;
+        renderNotes(state);
       }
     });
 
