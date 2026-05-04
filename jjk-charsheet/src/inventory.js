@@ -2049,6 +2049,7 @@ export function renderInventory() {
   requestAnimationFrame(() => {
     const menus = document.querySelectorAll(".skills-delete-confirm");
     const viewportPad = 8;
+    const forcedLeftNudgePx = 10;
     menus.forEach(menu => {
       const forceAlignLeft = menu.classList.contains("confirm-force-left");
       const tabContent = menu.closest(".tab-content");
@@ -2070,6 +2071,11 @@ export function renderInventory() {
         if (rect.left < leftBoundary) menu.classList.add("confirm-align-left");
       }
 
+      if (forceAlignLeft) {
+        // Keep inventory/storage confirms consistently nudged right.
+        menu.style.marginLeft = `${forcedLeftNudgePx}px`;
+      }
+
       // Second pass: if still clipped on either side, try the opposite anchor.
       let adjusted = menu.getBoundingClientRect();
       if (!forceAlignLeft && adjusted.left < leftBoundary) {
@@ -2087,9 +2093,11 @@ export function renderInventory() {
       const overflowLeft = leftBoundary - adjusted.left;
       const overflowRight = adjusted.right - rightBoundary;
       if (overflowLeft > 0) {
-        menu.style.marginLeft = `${Math.ceil(overflowLeft)}px`;
+        const currentOffset = parseInt(menu.style.marginLeft, 10) || 0;
+        menu.style.marginLeft = `${currentOffset + Math.ceil(overflowLeft)}px`;
       } else if (overflowRight > 0) {
-        menu.style.marginLeft = `${-Math.ceil(overflowRight)}px`;
+        const currentOffset = parseInt(menu.style.marginLeft, 10) || 0;
+        menu.style.marginLeft = `${currentOffset - Math.ceil(overflowRight)}px`;
       }
     });
   });
