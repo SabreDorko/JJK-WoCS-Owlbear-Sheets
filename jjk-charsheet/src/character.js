@@ -214,7 +214,7 @@ function getAptitudeBonusValue(state) {
   return 2;
 }
 
-function promoteStatFromFullAptitudes(state, statKey) {
+export function promoteStatFromFullAptitudes(state, statKey) {
   const statState = state?.stats?.[statKey];
   if (!statState || !Array.isArray(statState.skills) || !statState.skills.length) return false;
 

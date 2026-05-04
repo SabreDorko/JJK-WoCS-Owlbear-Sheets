@@ -2156,7 +2156,7 @@
       width: 10px;
       height: 10px;
       padding: 0;
-      border: 1.5px solid var(--border-light);
+      border: 1.5px solid var(--ink-light);
       border-radius: 999px;
       background: transparent;
       cursor: pointer;
@@ -2220,9 +2220,17 @@
     .training-complete-btn-small {
       flex: 0 0 auto;
       margin-left: 0;
-      padding: 3px 8px;
       font-size: 8px;
       letter-spacing: 0.3px;
+    }
+    .aptitude-active-card .skill-card-actions .training-cancel-btn,
+    .aptitude-active-card .skill-card-actions .training-complete-btn-small {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      height: 24px;
+      padding: 0 10px;
+      line-height: 1;
     }
     .training-skill-input-card {
       border: 1px solid var(--accent);

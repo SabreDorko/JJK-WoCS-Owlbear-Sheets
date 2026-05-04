@@ -224,6 +224,9 @@ async function init() {
     refreshUI: applyStateToUI,
   });
 
+  // Re-render training slots whenever grade changes (slot unlock is grade-gated)
+  document.getElementById("gradeSelect")?.addEventListener("change", () => renderTraining(state));
+
   initUiShell({
     activateMainTab,
     getActiveRollTab,

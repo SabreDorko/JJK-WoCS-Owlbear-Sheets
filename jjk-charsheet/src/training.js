@@ -1,4 +1,5 @@
 import { CENTER_STATS, RIGHT_STATS } from "./state/store.js";
+import { promoteStatFromFullAptitudes } from "./character.js";
 
 let _getState = null;
 let _scheduleSave = null;
@@ -6,6 +7,7 @@ let _showRollToast = null;
 let _refreshUI = null;
 let _initialized = false;
 let _trainingActionInFlight = false;
+let _activeSkillFormSlot = null;
 
 const GRADE_RANK = { "4": 0, "Semi-3": 0.5, "3": 1, "Semi-2": 1.5, "2": 2, "Semi-1": 2.5, "1": 3, "Special Grade": 4 };
 
@@ -297,6 +299,10 @@ function renderLockedSlotCard(lockMessage) {
 }
 
 function renderEmptySlotCard(slotNumber) {
+  if (_activeSkillFormSlot === slotNumber) {
+    return renderJujutsuSkillInput();
+  }
+
   return `
     <div class="training-skill-card training-skill-card-empty">
       <div class="training-empty-slot">
@@ -346,7 +352,6 @@ function renderJujutsuSkills(state) {
   
   html += `
       </div>
-      <div id="skillInputContainer"></div>
     </div>
   `;
   
@@ -486,6 +491,10 @@ function handleCompleteAptitudeTraining() {
   skillState.aptitude = 1;
   skillState.trainedAptitude = true;
   state.training.aptitudeTraining.active = null;
+
+  // Attempt stat promotion if all substats now have aptitude
+  promoteStatFromFullAptitudes(state, active.statKey);
+
   scheduleSave();
   refreshUI();
 }
@@ -535,13 +544,7 @@ function handleAddSkill() {
   };
   
   state.training.jujutsuSkills.push(newSkill);
-  
-  // Clear the form container to hide the form and show the updated slots
-  const container = document.getElementById("skillInputContainer");
-  if (container) {
-    container.innerHTML = "";
-  }
-  
+  _activeSkillFormSlot = null;
   scheduleSave();
   refreshUI();
 }
@@ -614,10 +617,9 @@ function setupTrainingEventHandlers() {
     const addBtn = e.target?.closest?.("[data-action='showAddSkillForm']");
     if (addBtn) {
       runTrainingAction(() => {
-        const container = document.getElementById("skillInputContainer");
-        if (container) {
-          container.innerHTML = renderJujutsuSkillInput();
-        }
+        const slot = parseInt(addBtn.dataset.slot, 10);
+        _activeSkillFormSlot = Number.isFinite(slot) ? slot : 1;
+        refreshUI();
       });
       return;
     }
@@ -625,10 +627,8 @@ function setupTrainingEventHandlers() {
     const cancelBtn = e.target?.closest?.("[data-action='cancelAddSkill']");
     if (cancelBtn) {
       runTrainingAction(() => {
-        const container = document.getElementById("skillInputContainer");
-        if (container) {
-          container.innerHTML = "";
-        }
+        _activeSkillFormSlot = null;
+        refreshUI();
       });
       return;
     }
