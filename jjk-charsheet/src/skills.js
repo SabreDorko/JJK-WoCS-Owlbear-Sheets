@@ -111,6 +111,19 @@ function renderXpSkillCard(skill) {
   `;
 }
 
+const _SLOT_GRADE_RANK = { "4": 0, "Semi-3": 0.5, "3": 1, "Semi-2": 1.5, "2": 2, "Semi-1": 2.5, "1": 3, "Special Grade": 4 };
+
+function hasAvailableTrainingSlot(state) {
+  const grade = String(state?.character?.grade || "").trim();
+  const gradeRank = _SLOT_GRADE_RANK[grade] ?? 0;
+  let unlockedSlots = 1;
+  if (gradeRank >= 2.5) unlockedSlots = 2;
+  if (gradeRank >= 4) unlockedSlots = 3;
+  const trainingList = Array.isArray(state?.training?.jujutsuSkills) ? state.training.jujutsuSkills : [];
+  const incompleteCount = trainingList.filter(s => parsePositiveInt(s?.progress, 0) < parsePositiveInt(s?.requiredMissions, 1)).length;
+  return incompleteCount < unlockedSlots;
+}
+
 function isSkillCurrentlyInTraining(state, skill) {
   const skillDefId = String(skill?.skillDefId || skill?.id || "").trim();
   if (!skillDefId) return false;
@@ -126,6 +139,8 @@ function renderJujutsuSkillCard(state, skill) {
   const maxLearnCount = parsePositiveInt(skill.maxLearnCount, 1);
   const inTraining = isSkillCurrentlyInTraining(state, skill);
   const canRelearn = timesLearned < maxLearnCount && !inTraining;
+  const slotAvailable = canRelearn ? hasAvailableTrainingSlot(state) : false;
+  const relearnTitle = slotAvailable ? "Learn Again" : "No Available Training Slot";
   return `
     <article class="skills-card" data-kind="jujutsu" data-skill-id="${skill.id}">
       <div class="skills-card-title">${skill.title || "Untitled Jujutsu Skill"}</div>
@@ -138,7 +153,7 @@ function renderJujutsuSkillCard(state, skill) {
         ${inTraining ? '<span class="skills-card-meta">(In Training)</span>' : ""}
       </div>
       <div class="skills-card-actions">
-        ${canRelearn ? '<button type="button" class="inventory-icon-btn skills-icon-relearn-btn" data-action="relearnSkill" aria-label="Learn Again" title="Learn Again">↻</button>' : ""}
+        ${canRelearn ? `<button type="button" class="inventory-icon-btn skills-icon-relearn-btn${slotAvailable ? "" : " skills-icon-relearn-disabled"}" data-action="relearnSkill" aria-label="${relearnTitle}" title="${relearnTitle}"${slotAvailable ? "" : " disabled"}>↻</button>` : ""}
         ${renderSkillActionIcons()}
       </div>
     </article>
@@ -398,7 +413,6 @@ function setupSkillsEventHandlers() {
     if (deleteBtn) {
       const info = findSkillById(state, kind, skillId);
       if (info.index < 0) return;
-      if (!confirm("Delete this skill?")) return;
       info.list.splice(info.index, 1);
       scheduleSave();
       renderSkills(state);

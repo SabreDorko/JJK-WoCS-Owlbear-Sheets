@@ -2610,6 +2610,12 @@
     .skills-icon-relearn-btn:hover {
       color: var(--ink);
     }
+    .skills-icon-relearn-btn.skills-icon-relearn-disabled,
+    .skills-icon-relearn-btn.skills-icon-relearn-disabled:hover {
+      color: var(--ink-faint);
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
     .skills-add-form .skill-input,
     .skills-edit-card .skill-input,
     .skills-add-form .skill-textarea,

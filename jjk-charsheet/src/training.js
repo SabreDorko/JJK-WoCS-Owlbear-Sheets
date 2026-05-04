@@ -884,9 +884,7 @@ function setupTrainingEventHandlers() {
     if (deleteBtn) {
       const skillId = deleteBtn.dataset.skillId;
       runTrainingAction(() => {
-        if (confirm("Delete this skill?")) {
-          handleDeleteSkill(skillId);
-        }
+        handleDeleteSkill(skillId);
       });
       return;
     }
