@@ -94,6 +94,11 @@ function getWeaponReachInFeet(item) {
   return null;
 }
 
+function shouldDisplayWeaponRange(item) {
+  const weaponType = normalizeWeaponType(item?.weaponType);
+  return weaponType === "ranged" || weaponType === "polearm";
+}
+
 function parseWeaponDamageCount(rawValue) {
   const parsed = parseInt(rawValue, 10);
   if (!Number.isFinite(parsed)) return 1;
@@ -1255,6 +1260,10 @@ function ensureWeaponEditorFields() {
     `;
     formGrid.appendChild(field);
   }
+
+  // Keep action buttons anchored under dynamic weapon fields.
+  const actionsRow = formGrid.querySelector(".inventory-form-actions");
+  if (actionsRow) formGrid.appendChild(actionsRow);
 }
 
 function initWeaponDamageEditorUI() {
@@ -1617,7 +1626,7 @@ function renderInventoryItemCard(item, controlsHtml, locationTag) {
     const rangeText = getWeaponReachInFeet(item);
     details.push(`${gripLabel} | ${weaponTypeLabel}`);
     details.push(`Damage: ${damageText} + ${weaponStatLabel} Level`);
-    if (Number.isFinite(rangeText)) {
+    if (shouldDisplayWeaponRange(item) && Number.isFinite(rangeText)) {
       details.push(`Range: ${rangeText} ft`);
     }
   } else {
@@ -1695,7 +1704,7 @@ function renderEquippedSlots() {
     const weaponDamage = normalizedType === "weapon"
       ? `${formatWeaponDamageParts(item.weaponDamageParts)} + ${(WEAPON_STAT_LABELS[normalizeWeaponStat(item.weaponStat)] || "Power")} Level`
       : "";
-    const weaponRange = normalizedType === "weapon"
+    const weaponRange = normalizedType === "weapon" && shouldDisplayWeaponRange(item)
       ? getWeaponReachInFeet(item)
       : null;
     const hasDescription = Boolean(item.description);
