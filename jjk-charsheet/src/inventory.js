@@ -2051,7 +2051,9 @@ export function renderInventory() {
       const rect = menu.getBoundingClientRect();
       if (rect.top < viewportPad) menu.classList.add("confirm-below");
       if (rect.right > window.innerWidth - viewportPad) menu.classList.add("confirm-align-left");
-      if (rect.left < viewportPad) menu.classList.add("confirm-align-right");
+      // Inventory uses delete confirms (right-anchored by default), so left overflow
+      // needs a left anchor to push the popup back into the viewport.
+      if (rect.left < viewportPad) menu.classList.add("confirm-align-left");
     });
   });
   if (_refreshCharacterStats) _refreshCharacterStats();

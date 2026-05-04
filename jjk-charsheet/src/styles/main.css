@@ -1711,7 +1711,7 @@
       padding: 6px;
       min-height: 110px;
       height: 100%;
-      overflow: auto;
+      overflow: visible;
       animation: appCardIn 220ms ease both;
     }
     .techniques-app-card--editing {
@@ -3159,7 +3159,7 @@
       transform: rotate(-45deg);
     }
     .inventory-collapsible {
-      overflow: hidden;
+      overflow: visible;
       max-height: 720px;
       opacity: 1;
       transform: translateY(0);
@@ -3167,6 +3167,7 @@
       transform-origin: top center;
     }
     .inventory-collapsible.collapsed {
+      overflow: hidden;
       max-height: 0;
       opacity: 0;
       transform: translateY(-6px);
@@ -3761,7 +3762,7 @@
       opacity: 1;
       transform: translateY(0) scale(1);
       transform-origin: top center;
-      overflow: hidden;
+      overflow: visible;
       transition: opacity 180ms ease, transform 220ms ease, max-height 220ms ease, margin 220ms ease, padding 220ms ease, border-width 220ms ease;
       width: 100%;
       box-sizing: border-box;
@@ -3778,6 +3779,7 @@
       opacity: 0;
       transform: translateY(-6px) scale(0.985);
       max-height: 0;
+      overflow: hidden;
       margin: 0;
       padding-top: 0;
       padding-bottom: 0;
