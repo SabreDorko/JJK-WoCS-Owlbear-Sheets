@@ -467,6 +467,30 @@ function ensureArchetypeState(state) {
   state.archetypeProgress.unlockedAbilityIds = state.archetypeProgress.unlockedAbilityIds
     .map(value => String(value || "").trim())
     .filter(value => knownIds.has(value));
+
+  if (!state.archetypeProgress.collapsedSections || typeof state.archetypeProgress.collapsedSections !== "object") {
+    state.archetypeProgress.collapsedSections = {
+      benefits: false,
+      permanentAptitudes: false,
+    };
+  }
+  state.archetypeProgress.collapsedSections.benefits = Boolean(state.archetypeProgress.collapsedSections.benefits);
+  state.archetypeProgress.collapsedSections.permanentAptitudes = Boolean(state.archetypeProgress.collapsedSections.permanentAptitudes);
+}
+
+function syncCollapsedSectionsFromState(state) {
+  ensureArchetypeState(state);
+  const collapsed = state.archetypeProgress.collapsedSections || {};
+  _collapsedArchetypeSections.benefits = Boolean(collapsed.benefits);
+  _collapsedArchetypeSections.permanentAptitudes = Boolean(collapsed.permanentAptitudes);
+}
+
+function persistCollapsedSectionsToState(state) {
+  ensureArchetypeState(state);
+  state.archetypeProgress.collapsedSections = {
+    benefits: Boolean(_collapsedArchetypeSections.benefits),
+    permanentAptitudes: Boolean(_collapsedArchetypeSections.permanentAptitudes),
+  };
 }
 
 function abilityGlobalId(archetypeKey, abilityId) {
@@ -1150,6 +1174,7 @@ export function applyArchetypeStateToUI() {
   const state = getState();
   if (!state) return;
   ensureArchetypeState(state);
+  syncCollapsedSectionsFromState(state);
 
   const currentPrimaryArchetype = String(state.archetype || "");
   let grantedStarterItems = false;
@@ -1358,16 +1383,26 @@ export function initArchetype({ getState: getStateFn, scheduleSave: scheduleSave
   const benefitsToggle = document.getElementById("archetypeBenefitsToggleBtn");
   if (benefitsToggle) {
     benefitsToggle.addEventListener("click", () => {
+      const state = getState();
+      if (!state) return;
+      ensureArchetypeState(state);
       _collapsedArchetypeSections.benefits = !_collapsedArchetypeSections.benefits;
+      persistCollapsedSectionsToState(state);
       syncArchetypeCollapseUI();
+      scheduleSave();
     });
   }
 
   const permanentAptitudesToggle = document.getElementById("archetypePermanentAptitudesToggleBtn");
   if (permanentAptitudesToggle) {
     permanentAptitudesToggle.addEventListener("click", () => {
+      const state = getState();
+      if (!state) return;
+      ensureArchetypeState(state);
       _collapsedArchetypeSections.permanentAptitudes = !_collapsedArchetypeSections.permanentAptitudes;
+      persistCollapsedSectionsToState(state);
       syncArchetypeCollapseUI();
+      scheduleSave();
     });
   }
 

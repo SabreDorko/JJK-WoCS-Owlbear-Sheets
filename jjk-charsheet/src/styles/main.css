@@ -964,13 +964,13 @@
       border: 1.5px solid var(--ink);
       border-radius: 50%;
       flex-shrink: 0;
-      cursor: not-allowed;
+      cursor: default;
       transition: background 0.12s;
       background: transparent;
       position: relative;
     }
     body.override-mode .skill-dot {
-      cursor: pointer;
+      cursor: default;
     }
     .skill-dot.filled { background: var(--ink); }
     .skill-dot.permanent {
@@ -1540,6 +1540,7 @@
     }
     .archetype-aptitude-picks {
       display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 8px;
       margin-top: 8px;
     }
@@ -2469,7 +2470,7 @@
     }
     .aptitude-active-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
       gap: 8px;
       align-items: start;
     }
@@ -2523,6 +2524,10 @@
       margin-top: 4px;
       gap: 4px;
     }
+    .training-toggle-builder-btn {
+      min-width: 96px;
+      padding-inline: 10px;
+    }
 
     .skill-dot.trained-aptitude {
       box-shadow: inset 0 0 0 1px rgba(34, 34, 34, 0.45);
@@ -2545,6 +2550,9 @@
         grid-template-columns: 1fr;
       }
       .aptitude-active-grid {
+        grid-template-columns: 1fr;
+      }
+      .archetype-aptitude-picks {
         grid-template-columns: 1fr;
       }
     }
@@ -3137,7 +3145,7 @@
       transition: transform 260ms cubic-bezier(0.2, 0.8, 0.2, 1), border-color 150ms ease;
     }
     .inventory-desc-toggle-btn[aria-expanded="false"]::after {
-      transform: rotate(-135deg);
+      transform: rotate(-45deg);
     }
     .inventory-desc-toggle-btn:hover::after {
       border-color: var(--ink);
