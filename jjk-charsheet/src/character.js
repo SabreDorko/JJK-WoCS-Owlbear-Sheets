@@ -478,10 +478,9 @@ function buildStatBlocks(defs, container) {
         <div class="skill-dot${aptitudeState > 0 ? " filled" : ""}${aptitudeState === 2 ? " permanent" : ""}${lockedAptitudeSource ? " locked-by-archetype" : ""}"
              id="dot_${def.key}_${i}" role="checkbox" aria-label="${skill} ${aptitudeLabel}" title="${nextAptitudeAction}"></div>
         <input class="skill-bonus-input" type="text"
-               id="bonus_${def.key}_${i}" value="${formatSignedValue(subskillValue)}" ${_isOverrideMode ? "" : "readonly tabindex=\"-1\""} title="${hasOverride ? "Overridden" : "Auto-calculated"}" />
+               id="bonus_${def.key}_${i}" value="${formatSignedValue(subskillValue)}" ${_isOverrideMode ? "" : "readonly"} title="${hasOverride ? "Overridden" : "Auto-calculated"}" />
         <button type="button" class="override-marker-btn${hasOverride ? " visible" : ""}" data-subskill-override-clear="${def.key}:${i}" title="${_isOverrideMode ? "Click to clear override" : "Overridden"}" ${_isOverrideMode ? "" : "tabindex=\"-1\""}>*</button>
-        <span class="skill-name">${skill}</span>
-        <button class="skill-roll-btn" type="button" title="Roll ${skill}"></button>
+        <span class="skill-name" title="Roll ${skill}">${skill}</span>
       `;
       skillsSide.appendChild(row);
 
@@ -566,9 +565,20 @@ function buildStatBlocks(defs, container) {
         );
       };
 
-      const skillRollBtn = row.querySelector(".skill-roll-btn");
-      skillRollBtn.addEventListener("click", () => runSkillRoll("normal"));
-      skillRollBtn.addEventListener("contextmenu", event => {
+      const skillNameEl = row.querySelector(".skill-name");
+      const skillBonusEl = row.querySelector(".skill-bonus-input");
+
+      skillNameEl.addEventListener("click", () => runSkillRoll("normal"));
+      skillNameEl.addEventListener("contextmenu", event => {
+        openRollModeMenu(event, selectedMode => runSkillRoll(selectedMode));
+      });
+
+      skillBonusEl.addEventListener("click", () => {
+        if (_isOverrideMode) return;
+        runSkillRoll("normal");
+      });
+      skillBonusEl.addEventListener("contextmenu", event => {
+        if (_isOverrideMode) return;
         openRollModeMenu(event, selectedMode => runSkillRoll(selectedMode));
       });
     });

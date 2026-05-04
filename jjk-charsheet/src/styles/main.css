@@ -519,7 +519,7 @@
     /* ── MAIN BODY ── */
     .main-body {
       display: grid;
-      grid-template-columns: 148px 1fr 220px;
+      grid-template-columns: 148px minmax(0, 1fr) minmax(0, 1fr);
       gap: 10px;
       align-items: start;
     }
@@ -691,9 +691,6 @@
       background: var(--parchment);
       width: 100%;
     }
-    .intel-col .stat-block {
-      grid-template-columns: 82px 1fr;
-    }
 
     .stat-score-side {
       background: var(--parchment-dark);
@@ -742,23 +739,6 @@
       transition: background 0.12s, color 0.12s;
     }
     .roll-btn:hover { background: var(--accent); color: var(--parchment); }
-    .skill-roll-btn {
-      width: 10px;
-      height: 10px;
-      background: var(--ink-faint);
-      color: var(--parchment-faint);
-      border: 1px solid var(--ink-faint);
-      border-radius: 2px;
-      cursor: pointer;
-      padding: 0;
-      flex-shrink: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      transform: rotate(45deg);
-      transition: background 0.12s, border-color 0.12s;
-    }
-    .skill-roll-btn:hover { background: var(--accent); border-color: var(--accent); }
     .roll-toast.crit-success {
       border-color: #2a6e2a;
       background: #f0f7f0;
@@ -1033,9 +1013,13 @@
       width: 24px;
       text-align: center;
       flex-shrink: 0;
+      cursor: pointer;
     }
     .skill-bonus-input[readonly] {
-      pointer-events: none;
+      cursor: pointer;
+    }
+    .override-mode .skill-bonus-input {
+      cursor: text;
     }
     .override-marker-btn {
       border: none;
@@ -1082,6 +1066,11 @@
       min-width: 0;
       white-space: normal;
       line-height: 1.2;
+      cursor: pointer;
+      transition: color 120ms ease;
+    }
+    .skill-name:hover {
+      color: var(--accent);
     }
 
     /* ── COMING SOON PANELS ── */
@@ -1196,13 +1185,18 @@
       justify-content: space-between;
     }
     .archetype-collapse-btn::after {
-      content: "▾";
-      font-size: 14px;
+      content: "";
+      width: 7px;
+      height: 7px;
+      border-right: 1.6px solid var(--ink-faint);
+      border-bottom: 1.6px solid var(--ink-faint);
       color: var(--ink-faint);
-      transition: transform 180ms ease;
+      transform: rotate(45deg);
+      transform-origin: center;
+      transition: transform 220ms ease;
     }
     .archetype-collapse-btn[aria-expanded="false"]::after {
-      transform: rotate(-90deg);
+      transform: rotate(-45deg);
     }
     .archetype-collapse-panel {
       overflow: hidden;
@@ -2422,10 +2416,21 @@
       margin-bottom: 6px;
     }
     .inventory-collapse-btn::after {
-      content: " ▼";
-      font-size: 8px;
+      content: "";
+      width: 7px;
+      height: 7px;
+      border-right: 1.6px solid var(--ink-faint);
+      border-bottom: 1.6px solid var(--ink-faint);
+      transform: rotate(45deg);
+      transform-origin: center;
+      transition: transform 220ms ease;
+      margin-left: 6px;
+      display: inline-block;
+      vertical-align: middle;
     }
-    .inventory-collapse-btn[aria-expanded="false"]::after { content: " ►"; }
+    .inventory-collapse-btn[aria-expanded="false"]::after {
+      transform: rotate(-45deg);
+    }
     .inventory-collapsible {
       overflow: hidden;
       max-height: 720px;
@@ -2676,7 +2681,10 @@
     .inventory-icon-btn.danger:hover {
       border: none;
       background: transparent;
-      color: var(--accent);
+      color: var(--ink-faint);
+    }
+    .inventory-icon-btn.danger:hover {
+      color: var(--ink);
     }
     .inventory-icon-trash {
       width: 18px;
@@ -3092,11 +3100,11 @@
       justify-content: center;
       border: 0;
       background: transparent;
-      color: var(--ink);
+      color: var(--ink-faint);
       cursor: pointer;
     }
     .notes-delete-btn:hover {
-      color: var(--danger, #7a1f1f);
+      color: var(--ink);
     }
     .notes-delete-icon {
       width: 14px;
