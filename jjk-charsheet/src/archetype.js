@@ -2,6 +2,7 @@ import { ARCHETYPES, CENTER_STATS, RIGHT_STATS } from "./state/store.js";
 import { ARCHETYPE_RULES } from "./data/archetype-rules.js";
 import { resolveBaseItemTemplateByStartingEquipmentLine } from "./data/base-items.js";
 import { applyCharacterStateToUI } from "./character.js";
+import { renderInventory } from "./inventory.js";
 
 let _getState = null;
 let _scheduleSave = null;
@@ -121,14 +122,26 @@ function parseStartingEquipmentChoices(line) {
   return { sourceLine, detail, options };
 }
 
+function getStarterItemDisplayName(line, fallbackName = "Starter Item") {
+  const rawLabel = String(line || "").split(":")[0].trim();
+  if (!rawLabel) return fallbackName;
+
+  const withoutSuffix = rawLabel.replace(/\s*\([^)]*\)\s*$/, "").trim();
+  return withoutSuffix || rawLabel || fallbackName;
+}
+
 function buildStarterItemFromLine(line) {
   const template = resolveBaseItemTemplateByStartingEquipmentLine(line);
-  if (template) return buildInventoryItemFromBaseTemplate(template);
+  if (template) {
+    const item = buildInventoryItemFromBaseTemplate(template);
+    item.name = getStarterItemDisplayName(line, item.name);
+    return item;
+  }
 
   const [namePart, ...detailParts] = String(line || "").split(":");
   return {
     id: makeStarterItemId(),
-    name: String(namePart || "Starter Item").trim() || "Starter Item",
+    name: getStarterItemDisplayName(namePart, "Starter Item"),
     modifier: "",
     modifiers: [],
     description: detailParts.join(":").trim(),
@@ -273,6 +286,7 @@ function addStarterItemsForPrimaryArchetype() {
   });
 
   applyArchetypeStateToUI();
+  renderInventory();
   scheduleSave();
 }
 
@@ -286,6 +300,7 @@ function removeStarterItemsForPrimaryArchetype() {
   removeStarterItemsFromState(state, records.map(record => record.itemId));
   state.archetypeProgress.grantedStarterItems[state.archetype] = [];
   applyArchetypeStateToUI();
+  renderInventory();
   scheduleSave();
 }
 
@@ -1482,6 +1497,7 @@ export function applyArchetypeStateToUI() {
   renderAbilityTree(state);
   syncArchetypeCollapseUI();
   applyCharacterStateToUI();
+  if (grantedStarterItems) renderInventory();
   if (grantedStarterItems) scheduleSave();
 }
 

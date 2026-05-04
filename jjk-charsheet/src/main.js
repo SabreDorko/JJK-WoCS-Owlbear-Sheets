@@ -212,6 +212,7 @@ async function init() {
     getState: () => state,
     scheduleSave,
     refreshCharacterStats: applyCharacterStateToUI,
+    refreshArchetypeState: applyArchetypeStateToUI,
   });
 
   initNotes({

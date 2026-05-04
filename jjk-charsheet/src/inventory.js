@@ -11,6 +11,7 @@ import {
 let _getState = null;
 let _scheduleSave = null;
 let _refreshCharacterStats = null;
+let _refreshArchetypeState = null;
 let editingItemId = null;
 let isInitialized = false;
 let draggingItemId = null;
@@ -1011,6 +1012,7 @@ function deleteInventoryItem(itemId) {
   state.inventoryItems = state.inventoryItems.filter(entry => entry.id !== itemId);
   if (editingItemId === itemId) resetItemEditor();
   renderInventory();
+  if (_refreshArchetypeState) _refreshArchetypeState();
   scheduleSave();
 }
 
@@ -2370,10 +2372,11 @@ export function renderInventory() {
   if (_refreshCharacterStats) _refreshCharacterStats();
 }
 
-export function initInventory({ getState: getStateFn, scheduleSave: scheduleSaveFn, refreshCharacterStats: refreshCharacterStatsFn = null }) {
+export function initInventory({ getState: getStateFn, scheduleSave: scheduleSaveFn, refreshCharacterStats: refreshCharacterStatsFn = null, refreshArchetypeState: refreshArchetypeStateFn = null }) {
   _getState = getStateFn;
   _scheduleSave = scheduleSaveFn;
   _refreshCharacterStats = refreshCharacterStatsFn;
+  _refreshArchetypeState = refreshArchetypeStateFn;
 
   ensureWeaponEditorFields();
 
