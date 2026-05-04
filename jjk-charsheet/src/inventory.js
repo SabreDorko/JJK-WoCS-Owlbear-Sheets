@@ -48,9 +48,81 @@ function scheduleSave() {
 const HAND_SLOT_KEYS = ["rightHand", "leftHand"];
 const CLOTHING_SELECTABLE_SLOT_KEYS = ["head", "body", "legs", "feet", "accessory"];
 const ITEM_TYPES = ["clothing", "weapon", "item"];
+const WEAPON_TYPES = ["bludgeoning", "slashing", "ranged", "polearm"];
+const WEAPON_TYPE_LABELS = {
+  bludgeoning: "Bludgeoning",
+  slashing: "Slashing",
+  ranged: "Ranged",
+  polearm: "Polearm",
+};
+const WEAPON_STAT_OPTIONS = ["power", "speed", "technique"];
+const WEAPON_STAT_LABELS = {
+  power: "Power",
+  speed: "Speed",
+  technique: "Tech",
+};
+const WEAPON_DAMAGE_DICE = ["d4", "d6", "d8", "d10", "d12"];
 
 function normalizeItemType(rawType) {
   return ITEM_TYPES.includes(rawType) ? rawType : "clothing";
+}
+
+function normalizeWeaponType(rawType) {
+  return WEAPON_TYPES.includes(rawType) ? rawType : "bludgeoning";
+}
+
+function normalizeWeaponStat(rawStat) {
+  if (rawStat === "tech") return "technique";
+  return WEAPON_STAT_OPTIONS.includes(rawStat) ? rawStat : "power";
+}
+
+function parseWeaponRange(rawValue) {
+  const parsed = parseInt(rawValue, 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) return null;
+  return clamp(parsed, 1, 9999);
+}
+
+function parseWeaponPolearmReach(rawValue) {
+  return rawValue === true || rawValue === "true" || rawValue === 1;
+}
+
+function getWeaponReachInFeet(item) {
+  const weaponType = normalizeWeaponType(item?.weaponType);
+  if (weaponType === "ranged") return parseWeaponRange(item?.weaponRange);
+  if (weaponType === "slashing" || weaponType === "bludgeoning") return 5;
+  if (weaponType === "polearm") return parseWeaponPolearmReach(item?.weaponPolearmReach) ? 10 : 5;
+  return null;
+}
+
+function parseWeaponDamageCount(rawValue) {
+  const parsed = parseInt(rawValue, 10);
+  if (!Number.isFinite(parsed)) return 1;
+  return clamp(parsed, 1, 99);
+}
+
+function normalizeWeaponDamageDie(rawDie) {
+  const normalized = String(rawDie || "").toLowerCase();
+  if (WEAPON_DAMAGE_DICE.includes(normalized)) return normalized;
+  return "d6";
+}
+
+function normalizeWeaponDamageParts(rawParts) {
+  if (!Array.isArray(rawParts)) return [{ count: 1, die: "d6" }];
+
+  const parsed = rawParts
+    .map(part => ({
+      count: parseWeaponDamageCount(part?.count),
+      die: normalizeWeaponDamageDie(part?.die),
+    }))
+    .filter(part => Number.isFinite(part.count) && part.count > 0);
+
+  return parsed.length ? parsed : [{ count: 1, die: "d6" }];
+}
+
+function formatWeaponDamageParts(parts) {
+  return normalizeWeaponDamageParts(parts)
+    .map(part => `${part.count}${part.die}`)
+    .join(" + ");
 }
 
 function normalizeWeaponGrip(rawGrip, slotsNeeded) {
@@ -80,6 +152,11 @@ function applyItemTypeDefaults(item) {
     item.weaponGrip = normalizeWeaponGrip(item.weaponGrip, item.slotsNeeded);
     item.allowedSlots = ["rightHand", "leftHand"];
     item.slotsNeeded = item.weaponGrip === "twoHanded" ? 2 : 1;
+    item.weaponType = normalizeWeaponType(item.weaponType);
+    item.weaponStat = normalizeWeaponStat(item.weaponStat);
+    item.weaponDamageParts = normalizeWeaponDamageParts(item.weaponDamageParts);
+    item.weaponRange = item.weaponType === "ranged" ? parseWeaponRange(item.weaponRange) : null;
+    item.weaponPolearmReach = item.weaponType === "polearm" ? parseWeaponPolearmReach(item.weaponPolearmReach) : false;
     item.stackable = false;
     item.quantity = 1;
     return;
@@ -87,6 +164,11 @@ function applyItemTypeDefaults(item) {
 
   if (itemType === "item") {
     item.weaponGrip = null;
+    item.weaponType = null;
+    item.weaponStat = null;
+    item.weaponDamageParts = [];
+    item.weaponRange = null;
+    item.weaponPolearmReach = false;
     item.allowedSlots = ["rightHand", "leftHand"];
     item.slotsNeeded = 1;
     item.stackable = parseStackableValue(item.stackable);
@@ -95,6 +177,11 @@ function applyItemTypeDefaults(item) {
   }
 
   item.weaponGrip = null;
+  item.weaponType = null;
+  item.weaponStat = null;
+  item.weaponDamageParts = [];
+  item.weaponRange = null;
+  item.weaponPolearmReach = false;
   item.allowedSlots = normalizeAllowedSlots(item.allowedSlots).filter(slot => CLOTHING_SELECTABLE_SLOT_KEYS.includes(slot));
   item.slotsNeeded = clamp(parseInt(item.slotsNeeded, 10) || 1, 1, 3);
   item.stackable = false;
@@ -1042,11 +1129,170 @@ function collectAllowedSlotsFromForm() {
     .filter(slot => CLOTHING_SELECTABLE_SLOT_KEYS.includes(slot));
 }
 
+function renderWeaponDamageRows(parts) {
+  const list = document.getElementById("itemWeaponDamageList");
+  if (!list) return;
+
+  const normalizedParts = normalizeWeaponDamageParts(parts);
+  list.innerHTML = normalizedParts.map((part, index) => `
+    <div class="inventory-weapon-damage-row" data-damage-index="${index}">
+      <input
+        id="itemWeaponDamageCount_${index}"
+        type="number"
+        class="meta-input inventory-weapon-damage-count"
+        min="1"
+        max="99"
+        value="${part.count}"
+        aria-label="Damage dice count ${index + 1}"
+      />
+      <select
+        id="itemWeaponDamageDie_${index}"
+        class="meta-select inventory-weapon-damage-die"
+        aria-label="Damage die type ${index + 1}"
+      >
+        ${WEAPON_DAMAGE_DICE.map(die => `<option value="${die}" ${die === part.die ? "selected" : ""}>${die.toUpperCase()}</option>`).join("")}
+      </select>
+      <button
+        type="button"
+        class="inventory-mini-btn danger"
+        data-action="removeWeaponDamagePart"
+        data-index="${index}"
+        aria-label="Remove damage part"
+        title="Remove damage part"
+        ${normalizedParts.length <= 1 ? "disabled" : ""}
+      >Remove</button>
+    </div>
+  `).join("");
+}
+
+function getWeaponDamagePartsFromForm() {
+  const list = document.getElementById("itemWeaponDamageList");
+  if (!list) return [{ count: 1, die: "d6" }];
+
+  const rows = Array.from(list.querySelectorAll("[data-damage-index]"));
+  const parts = rows.map(row => {
+    const countInput = row.querySelector(".inventory-weapon-damage-count");
+    const dieSelect = row.querySelector(".inventory-weapon-damage-die");
+    return {
+      count: parseWeaponDamageCount(countInput?.value),
+      die: normalizeWeaponDamageDie(dieSelect?.value),
+    };
+  });
+
+  return normalizeWeaponDamageParts(parts);
+}
+
+function ensureWeaponEditorFields() {
+  const formGrid = document.querySelector("#itemEditorPanel .inventory-form-grid");
+  if (!formGrid) return;
+
+  if (!document.getElementById("itemWeaponTypeField")) {
+    const field = document.createElement("div");
+    field.className = "inventory-field";
+    field.id = "itemWeaponTypeField";
+    field.hidden = true;
+    field.style.display = "none";
+    field.innerHTML = `
+      <label class="field-label" for="itemWeaponTypeSelect">Weapon Type</label>
+      <select id="itemWeaponTypeSelect" class="meta-select">
+        ${WEAPON_TYPES.map(type => `<option value="${type}">${WEAPON_TYPE_LABELS[type]}</option>`).join("")}
+      </select>
+    `;
+    formGrid.appendChild(field);
+  }
+
+  if (!document.getElementById("itemWeaponStatField")) {
+    const field = document.createElement("div");
+    field.className = "inventory-field";
+    field.id = "itemWeaponStatField";
+    field.hidden = true;
+    field.style.display = "none";
+    field.innerHTML = `
+      <label class="field-label" for="itemWeaponStatSelect">Weapon Stat</label>
+      <select id="itemWeaponStatSelect" class="meta-select">
+        ${WEAPON_STAT_OPTIONS.map(stat => `<option value="${stat}">${WEAPON_STAT_LABELS[stat]}</option>`).join("")}
+      </select>
+    `;
+    formGrid.appendChild(field);
+  }
+
+  if (!document.getElementById("itemWeaponRangeField")) {
+    const field = document.createElement("div");
+    field.className = "inventory-field";
+    field.id = "itemWeaponRangeField";
+    field.hidden = true;
+    field.style.display = "none";
+    field.innerHTML = `
+      <label class="field-label" for="itemWeaponRangeInput">Range (ft)</label>
+      <input id="itemWeaponRangeInput" class="meta-input" type="number" min="1" max="9999" step="1" placeholder="e.g. 60" />
+    `;
+    formGrid.appendChild(field);
+  }
+
+  if (!document.getElementById("itemWeaponPolearmReachField")) {
+    const field = document.createElement("div");
+    field.className = "inventory-field";
+    field.id = "itemWeaponPolearmReachField";
+    field.hidden = true;
+    field.style.display = "none";
+    field.innerHTML = `
+      <label class="field-label" for="itemWeaponPolearmReachToggle">Polearm Reach</label>
+      <label><input id="itemWeaponPolearmReachToggle" class="inventory-stackable-toggle" type="checkbox" /> Add +5 ft reach</label>
+    `;
+    formGrid.appendChild(field);
+  }
+
+  if (!document.getElementById("itemWeaponDamageField")) {
+    const field = document.createElement("div");
+    field.className = "inventory-field inventory-field-full";
+    field.id = "itemWeaponDamageField";
+    field.hidden = true;
+    field.style.display = "none";
+    field.innerHTML = `
+      <label class="field-label" for="itemWeaponDamageList">Damage Dice</label>
+      <div id="itemWeaponDamageList" class="inventory-weapon-damage-list"></div>
+      <button type="button" id="itemWeaponDamageAddBtn" class="inventory-secondary-btn inventory-weapon-damage-add">Add Damage Part</button>
+    `;
+    formGrid.appendChild(field);
+  }
+}
+
+function initWeaponDamageEditorUI() {
+  const addBtn = document.getElementById("itemWeaponDamageAddBtn");
+  const list = document.getElementById("itemWeaponDamageList");
+  if (!addBtn || !list) return;
+
+  addBtn.addEventListener("click", () => {
+    const parts = getWeaponDamagePartsFromForm();
+    parts.push({ count: 1, die: "d6" });
+    renderWeaponDamageRows(parts);
+  });
+
+  list.addEventListener("click", event => {
+    const button = event.target.closest("button[data-action='removeWeaponDamagePart']");
+    if (!button) return;
+    const index = parseInt(button.dataset.index, 10);
+    if (!Number.isInteger(index)) return;
+
+    const parts = getWeaponDamagePartsFromForm();
+    if (parts.length <= 1) return;
+    parts.splice(index, 1);
+    renderWeaponDamageRows(parts);
+  });
+
+  renderWeaponDamageRows([{ count: 1, die: "d6" }]);
+}
+
 function setItemTypeFieldsVisibility(itemType) {
   const slotsNeededField = document.getElementById("itemSlotsNeededField");
   const slotsNeededLabel = document.getElementById("itemSlotsNeededLabel");
   const allowedSlotsField = document.getElementById("itemAllowedSlotsField");
   const weaponGripField = document.getElementById("itemWeaponGripField");
+  const weaponTypeField = document.getElementById("itemWeaponTypeField");
+  const weaponStatField = document.getElementById("itemWeaponStatField");
+  const weaponRangeField = document.getElementById("itemWeaponRangeField");
+  const weaponPolearmReachField = document.getElementById("itemWeaponPolearmReachField");
+  const weaponDamageField = document.getElementById("itemWeaponDamageField");
   const stackableField = document.getElementById("itemStackableField");
   const stackableToggle = document.getElementById("itemStackableToggle");
   const quantityField = document.getElementById("itemQuantityField");
@@ -1066,6 +1312,11 @@ function setItemTypeFieldsVisibility(itemType) {
   setVisible(slotsNeededField, isClothing);
   setVisible(allowedSlotsField, isClothing);
   setVisible(weaponGripField, isWeapon);
+  if (weaponTypeField) setVisible(weaponTypeField, isWeapon);
+  if (weaponStatField) setVisible(weaponStatField, isWeapon);
+  if (weaponRangeField) setVisible(weaponRangeField, false);
+  if (weaponPolearmReachField) setVisible(weaponPolearmReachField, false);
+  if (weaponDamageField) setVisible(weaponDamageField, isWeapon);
   setVisible(stackableField, isItem);
   if (!isItem) stackableToggle.checked = false;
   setVisible(quantityField, isItem && stackableToggle.checked);
@@ -1075,6 +1326,33 @@ function setItemTypeFieldsVisibility(itemType) {
     dormOption.disabled = false;
     dormOption.hidden = false;
   }
+
+  syncWeaponSubtypeFields();
+}
+
+function syncWeaponSubtypeFields() {
+  const itemType = getItemTypeFromForm();
+  const weaponTypeSelect = document.getElementById("itemWeaponTypeSelect");
+  const weaponRangeField = document.getElementById("itemWeaponRangeField");
+  const weaponRangeInput = document.getElementById("itemWeaponRangeInput");
+  const weaponPolearmReachField = document.getElementById("itemWeaponPolearmReachField");
+  const weaponPolearmReachToggle = document.getElementById("itemWeaponPolearmReachToggle");
+  if (!weaponRangeField || !weaponRangeInput || !weaponPolearmReachField || !weaponPolearmReachToggle) return;
+
+  const isWeapon = itemType === "weapon";
+  const weaponType = normalizeWeaponType(weaponTypeSelect?.value);
+  const isRanged = weaponType === "ranged";
+  const isPolearm = weaponType === "polearm";
+  const shouldShowRange = isWeapon && isRanged;
+  const shouldShowPolearmReach = isWeapon && isPolearm;
+
+  weaponRangeField.hidden = !shouldShowRange;
+  weaponRangeField.style.display = shouldShowRange ? "" : "none";
+  if (!shouldShowRange) weaponRangeInput.value = "";
+
+  weaponPolearmReachField.hidden = !shouldShowPolearmReach;
+  weaponPolearmReachField.style.display = shouldShowPolearmReach ? "" : "none";
+  if (!shouldShowPolearmReach) weaponPolearmReachToggle.checked = false;
 }
 
 function getItemTypeFromForm() {
@@ -1087,9 +1365,17 @@ function getItemConfigFromForm() {
   if (itemType === "weapon") {
     const gripSelect = document.getElementById("itemWeaponGripSelect");
     const weaponGrip = normalizeWeaponGrip(gripSelect?.value, 1);
+    const weaponTypeSelect = document.getElementById("itemWeaponTypeSelect");
+    const weaponStatSelect = document.getElementById("itemWeaponStatSelect");
+    const weaponType = normalizeWeaponType(weaponTypeSelect?.value);
     return {
       itemType,
       weaponGrip,
+      weaponType,
+      weaponStat: normalizeWeaponStat(weaponStatSelect?.value),
+      weaponDamageParts: getWeaponDamagePartsFromForm(),
+      weaponRange: weaponType === "ranged" ? parseWeaponRange(document.getElementById("itemWeaponRangeInput")?.value) : null,
+      weaponPolearmReach: weaponType === "polearm" ? Boolean(document.getElementById("itemWeaponPolearmReachToggle")?.checked) : false,
       allowedSlots: ["rightHand", "leftHand"],
       slotsNeeded: weaponGrip === "twoHanded" ? 2 : 1,
     };
@@ -1100,6 +1386,11 @@ function getItemConfigFromForm() {
     return {
       itemType,
       weaponGrip: null,
+      weaponType: null,
+      weaponStat: null,
+      weaponDamageParts: [],
+      weaponRange: null,
+      weaponPolearmReach: false,
       allowedSlots: ["rightHand", "leftHand"],
       slotsNeeded: 1,
       stackable,
@@ -1110,6 +1401,11 @@ function getItemConfigFromForm() {
   return {
     itemType,
     weaponGrip: null,
+    weaponType: null,
+    weaponStat: null,
+    weaponDamageParts: [],
+    weaponRange: null,
+    weaponPolearmReach: false,
     allowedSlots: collectAllowedSlotsFromForm(),
     slotsNeeded: clamp(parseInt(document.getElementById("itemSlotsNeededSelect")?.value, 10) || 1, 1, 3),
     stackable: false,
@@ -1129,6 +1425,11 @@ function resetItemEditor() {
   document.getElementById("itemDescriptionInput").value = "";
   setActiveItemType("clothing");
   document.getElementById("itemWeaponGripSelect").value = "oneHanded";
+  if (document.getElementById("itemWeaponTypeSelect")) document.getElementById("itemWeaponTypeSelect").value = "bludgeoning";
+  if (document.getElementById("itemWeaponStatSelect")) document.getElementById("itemWeaponStatSelect").value = "power";
+  if (document.getElementById("itemWeaponRangeInput")) document.getElementById("itemWeaponRangeInput").value = "";
+  if (document.getElementById("itemWeaponPolearmReachToggle")) document.getElementById("itemWeaponPolearmReachToggle").checked = false;
+  renderWeaponDamageRows([{ count: 1, die: "d6" }]);
   document.getElementById("itemSlotsNeededSelect").value = "1";
   document.getElementById("itemStackableToggle").checked = false;
   document.getElementById("itemQuantityInput").value = "1";
@@ -1165,6 +1466,20 @@ function startItemEdit(itemId) {
   refreshModifierSummary();
   setActiveItemType(normalizeItemType(item.itemType));
   document.getElementById("itemWeaponGripSelect").value = normalizeWeaponGrip(item.weaponGrip, item.slotsNeeded);
+  if (document.getElementById("itemWeaponTypeSelect")) {
+    document.getElementById("itemWeaponTypeSelect").value = normalizeWeaponType(item.weaponType);
+  }
+  if (document.getElementById("itemWeaponStatSelect")) {
+    document.getElementById("itemWeaponStatSelect").value = normalizeWeaponStat(item.weaponStat);
+  }
+  if (document.getElementById("itemWeaponRangeInput")) {
+    const range = parseWeaponRange(item.weaponRange);
+    document.getElementById("itemWeaponRangeInput").value = Number.isFinite(range) ? String(range) : "";
+  }
+  if (document.getElementById("itemWeaponPolearmReachToggle")) {
+    document.getElementById("itemWeaponPolearmReachToggle").checked = parseWeaponPolearmReach(item.weaponPolearmReach);
+  }
+  renderWeaponDamageRows(normalizeWeaponDamageParts(item.weaponDamageParts));
   document.getElementById("itemSlotsNeededSelect").value = String(item.slotsNeeded || 1);
   document.getElementById("itemStackableToggle").checked = parseStackableValue(item.stackable);
   document.getElementById("itemQuantityInput").value = String(parseItemQuantity(item.quantity));
@@ -1208,6 +1523,11 @@ function saveItemFromForm() {
       description,
       itemType: itemConfig.itemType,
       weaponGrip: itemConfig.weaponGrip,
+      weaponType: itemConfig.weaponType,
+      weaponStat: itemConfig.weaponStat,
+      weaponDamageParts: normalizeWeaponDamageParts(itemConfig.weaponDamageParts),
+      weaponRange: parseWeaponRange(itemConfig.weaponRange),
+      weaponPolearmReach: parseWeaponPolearmReach(itemConfig.weaponPolearmReach),
       allowedSlots,
       slotsNeeded,
       stackable: itemConfig.stackable,
@@ -1224,6 +1544,11 @@ function saveItemFromForm() {
     item.description = description;
     item.itemType = itemConfig.itemType;
     item.weaponGrip = itemConfig.weaponGrip;
+    item.weaponType = itemConfig.weaponType;
+    item.weaponStat = itemConfig.weaponStat;
+    item.weaponDamageParts = normalizeWeaponDamageParts(itemConfig.weaponDamageParts);
+    item.weaponRange = parseWeaponRange(itemConfig.weaponRange);
+    item.weaponPolearmReach = parseWeaponPolearmReach(itemConfig.weaponPolearmReach);
     item.allowedSlots = allowedSlots;
     item.slotsNeeded = slotsNeeded;
     item.stackable = itemConfig.stackable;
@@ -1285,7 +1610,16 @@ function renderInventoryItemCard(item, controlsHtml, locationTag) {
   const details = [];
 
   if (normalizedType === "weapon") {
-    details.push(normalizeWeaponGrip(item.weaponGrip, item.slotsNeeded) === "twoHanded" ? "Two-Handed" : "One-Handed");
+    const gripLabel = normalizeWeaponGrip(item.weaponGrip, item.slotsNeeded) === "twoHanded" ? "Two-Handed" : "One-Handed";
+    const weaponTypeLabel = WEAPON_TYPE_LABELS[normalizeWeaponType(item.weaponType)] || "Weapon";
+    const weaponStatLabel = WEAPON_STAT_LABELS[normalizeWeaponStat(item.weaponStat)] || "Power";
+    const damageText = formatWeaponDamageParts(item.weaponDamageParts);
+    const rangeText = getWeaponReachInFeet(item);
+    details.push(`${gripLabel} | ${weaponTypeLabel}`);
+    details.push(`Damage: ${damageText} + ${weaponStatLabel} Level`);
+    if (Number.isFinite(rangeText)) {
+      details.push(`Range: ${rangeText} ft`);
+    }
   } else {
     if (normalizedType === "clothing" && equipText) details.push(`Equip: ${equipText}`);
     if ((parseInt(item.slotsNeeded, 10) || 1) > 1) {
@@ -1355,6 +1689,15 @@ function renderEquippedSlots() {
     const weaponHandedness = normalizedType === "weapon"
       ? (normalizeWeaponGrip(item.weaponGrip, item.slotsNeeded) === "twoHanded" ? "Two-Handed" : "One-Handed")
       : "";
+    const weaponType = normalizedType === "weapon"
+      ? (WEAPON_TYPE_LABELS[normalizeWeaponType(item.weaponType)] || "Weapon")
+      : "";
+    const weaponDamage = normalizedType === "weapon"
+      ? `${formatWeaponDamageParts(item.weaponDamageParts)} + ${(WEAPON_STAT_LABELS[normalizeWeaponStat(item.weaponStat)] || "Power")} Level`
+      : "";
+    const weaponRange = normalizedType === "weapon"
+      ? getWeaponReachInFeet(item)
+      : null;
     const hasDescription = Boolean(item.description);
     const isDescriptionExpanded = expandedDescriptionIds.has(item.id);
     return `
@@ -1364,7 +1707,9 @@ function renderEquippedSlots() {
           ${hasDescription ? renderDescriptionToggleButton(isDescriptionExpanded) : ""}
         </div>
         <div class="equipped-slot-item">${escapeHtml(item.name)}</div>
-        ${weaponHandedness ? `<div class="equipped-slot-meta">${weaponHandedness}</div>` : ""}
+        ${weaponHandedness ? `<div class="equipped-slot-meta">${weaponHandedness}${weaponType ? ` | ${weaponType}` : ""}</div>` : ""}
+        ${weaponDamage ? `<div class="equipped-slot-meta">Damage: ${escapeHtml(weaponDamage)}</div>` : ""}
+        ${Number.isFinite(weaponRange) ? `<div class="equipped-slot-meta">Range: ${weaponRange} ft</div>` : ""}
         ${quantityText}
         ${hasDescription ? `<div class="equipped-slot-desc${isDescriptionExpanded ? "" : " collapsed"}">${escapeHtml(item.description)}</div>` : ""}
         ${getItemModifierSummary(item) ? `<div class="equipped-slot-mod">${escapeHtml(getItemModifierSummary(item))}</div>` : ""}
@@ -1929,6 +2274,11 @@ function ensureInventoryStateShape() {
     modifiers: normalizeModifierList(item?.modifiers),
     itemType: normalizeItemType(item?.itemType || inferLegacyItemType(item)),
     weaponGrip: item?.weaponGrip || null,
+    weaponType: normalizeWeaponType(item?.weaponType),
+    weaponStat: normalizeWeaponStat(item?.weaponStat),
+    weaponDamageParts: normalizeWeaponDamageParts(item?.weaponDamageParts),
+    weaponRange: parseWeaponRange(item?.weaponRange),
+    weaponPolearmReach: parseWeaponPolearmReach(item?.weaponPolearmReach),
     allowedSlots: normalizeAllowedSlots(item?.allowedSlots),
     slotsNeeded: clamp(parseInt(item?.slotsNeeded, 10) || 1, 1, 3),
     stackable: parseStackableValue(item?.stackable),
@@ -2016,6 +2366,8 @@ export function initInventory({ getState: getStateFn, scheduleSave: scheduleSave
   _scheduleSave = scheduleSaveFn;
   _refreshCharacterStats = refreshCharacterStatsFn;
 
+  ensureWeaponEditorFields();
+
   if (isInitialized) {
     renderInventory();
     return;
@@ -2037,6 +2389,7 @@ export function initInventory({ getState: getStateFn, scheduleSave: scheduleSave
   const dormToggleBtn = document.getElementById("dormToggleBtn");
   const itemTypeSelect = document.getElementById("itemTypeSelect");
   const itemTypeTabs = document.querySelectorAll(".inventory-type-tab");
+  const itemWeaponTypeSelect = document.getElementById("itemWeaponTypeSelect");
   const itemStackableToggle = document.getElementById("itemStackableToggle");
   const itemModifiersSummary = document.getElementById("itemModifiersSummary");
 
@@ -2065,6 +2418,9 @@ export function initInventory({ getState: getStateFn, scheduleSave: scheduleSave
   itemStackableToggle.addEventListener("change", () => {
     setItemTypeFieldsVisibility(getItemTypeFromForm());
   });
+  itemWeaponTypeSelect?.addEventListener("change", syncWeaponSubtypeFields);
+
+  initWeaponDamageEditorUI();
 
   initModifierEditorUI();
 

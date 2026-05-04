@@ -14,6 +14,9 @@
     "name": "Tonfa",
     "itemType": "weapon",
     "weaponGrip": "oneHanded",
+    "weaponType": "bludgeoning",
+    "weaponStat": "power",
+    "weaponDamageParts": [{ "count": 1, "die": "d6" }],
     "description": "Training tonfa.",
     "modifiers": [],
     "aliases": ["tonfa"]
@@ -41,6 +44,9 @@
     "name": "Hunting Knife",
     "itemType": "weapon",
     "weaponGrip": "oneHanded",
+    "weaponType": "slashing",
+    "weaponStat": "speed",
+    "weaponDamageParts": [{ "count": 1, "die": "d6" }],
     "description": "A compact knife suited for close range.",
     "modifiers": [],
     "aliases": ["hunting knife"]
@@ -58,6 +64,10 @@
     "name": "Gun",
     "itemType": "weapon",
     "weaponGrip": "oneHanded",
+    "weaponType": "ranged",
+    "weaponStat": "technique",
+    "weaponDamageParts": [{ "count": 1, "die": "d8" }],
+    "weaponRange": 60,
     "description": "Standard sidearm.",
     "modifiers": [],
     "aliases": ["gun"]
@@ -105,6 +115,9 @@
     "name": "Switchblade",
     "itemType": "weapon",
     "weaponGrip": "oneHanded",
+    "weaponType": "slashing",
+    "weaponStat": "speed",
+    "weaponDamageParts": [{ "count": 1, "die": "d6" }],
     "description": "Concealable folding blade.",
     "modifiers": [],
     "aliases": ["switchblade"]
@@ -130,6 +143,9 @@
     "name": "Katana",
     "itemType": "weapon",
     "weaponGrip": "oneHanded",
+    "weaponType": "slashing",
+    "weaponStat": "power",
+    "weaponDamageParts": [{ "count": 1, "die": "d8" }],
     "description": "Standard katana.",
     "modifiers": [],
     "aliases": ["katana"]
@@ -179,6 +195,9 @@
     "name": "Hammer",
     "itemType": "weapon",
     "weaponGrip": "twoHanded",
+    "weaponType": "bludgeoning",
+    "weaponStat": "power",
+    "weaponDamageParts": [{ "count": 2, "die": "d6" }],
     "description": "Heavy blunt weapon.",
     "modifiers": [],
     "aliases": ["hammer", "sledge hammer", "hammer/sledge hammer"]

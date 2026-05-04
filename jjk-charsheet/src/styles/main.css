@@ -3003,6 +3003,25 @@
       color: var(--ink);
     }
     .inventory-field { display: flex; flex-direction: column; gap: 2px; }
+    .inventory-weapon-damage-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-top: 2px;
+    }
+    .inventory-weapon-damage-row {
+      display: grid;
+      grid-template-columns: 78px 1fr auto;
+      gap: 6px;
+      align-items: center;
+    }
+    .inventory-weapon-damage-count {
+      width: 100%;
+    }
+    .inventory-weapon-damage-add {
+      margin-top: 6px;
+      align-self: flex-start;
+    }
     .inventory-modifiers-header-row {
       display: flex;
       align-items: center;
