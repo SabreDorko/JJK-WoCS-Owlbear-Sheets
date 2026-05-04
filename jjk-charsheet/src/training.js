@@ -163,7 +163,7 @@ function renderAptitudeSubstatOptions(state, statKey, selectedSkillIndex) {
 
 function renderAptitudeTrainingBuilder(state) {
   return `
-    <div class="aptitude-builder-card${_showAptitudeBuilder ? " open" : ""}"${_showAptitudeBuilder ? "" : ' hidden'}>
+    <div class="aptitude-builder-card">
       <div class="aptitude-builder-grid">
         <div class="skill-input-field">
           <label for="aptitudeTrainingStatSelect" class="field-label">Stat</label>
@@ -179,7 +179,8 @@ function renderAptitudeTrainingBuilder(state) {
         </div>
       </div>
       <div class="skill-input-actions">
-        <button type="button" class="training-add-skill-btn" data-action="startAptitudeTraining">Start Training</button>
+        <button type="button" class="training-add-skill-btn" data-action="startAptitudeTraining">Begin</button>
+        <button type="button" class="training-cancel-btn" data-action="cancelAptitudeBuilder">Cancel</button>
       </div>
     </div>
   `;
@@ -415,7 +416,7 @@ function renderAptitudeTraining(state) {
     <div class="training-section aptitude-training-section">
       <div class="training-section-header">
         <h3 class="training-section-title">Aptitude Training</h3>
-        <button type="button" class="training-add-skill-btn training-toggle-builder-btn" data-action="toggleAptitudeBuilder" aria-expanded="${_showAptitudeBuilder ? "true" : "false"}">${_showAptitudeBuilder ? "Hide" : "New Training"}</button>
+        <button type="button" class="training-add-skill-btn training-toggle-builder-btn" data-action="toggleAptitudeBuilder" aria-expanded="${_showAptitudeBuilder ? "true" : "false"}">Start Training</button>
       </div>
       <div class="training-muted">Set aside free time to train substats into aptitude. You can track multiple trainings at once.</div>
       ${_showAptitudeBuilder ? renderAptitudeTrainingBuilder(state) : ""}
@@ -714,7 +715,16 @@ function setupTrainingEventHandlers() {
     const toggleAptitudeBuilderBtn = e.target?.closest?.("[data-action='toggleAptitudeBuilder']");
     if (toggleAptitudeBuilderBtn) {
       runTrainingAction(() => {
-        _showAptitudeBuilder = !_showAptitudeBuilder;
+        _showAptitudeBuilder = true;
+        refreshUI();
+      });
+      return;
+    }
+
+    const cancelAptitudeBuilderBtn = e.target?.closest?.("[data-action='cancelAptitudeBuilder']");
+    if (cancelAptitudeBuilderBtn) {
+      runTrainingAction(() => {
+        _showAptitudeBuilder = false;
         refreshUI();
       });
       return;
