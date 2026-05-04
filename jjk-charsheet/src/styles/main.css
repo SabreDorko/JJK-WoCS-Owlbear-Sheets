@@ -168,6 +168,48 @@
     .meta-select { cursor: pointer; }
     .meta-select option { background: #f0ebe0; }
     .meta-input:focus, .meta-select:focus { border-bottom-color: var(--ink); }
+
+    .header-mini-vitals {
+      grid-column: 1 / -1;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-top: 2px;
+    }
+    .header-mini-vital {
+      padding: 6px 8px 7px;
+      min-height: 56px;
+    }
+    .header-mini-vital .vital-label {
+      margin-bottom: 4px;
+      letter-spacing: 1.3px;
+      font-size: 8px;
+    }
+    .header-mini-value {
+      display: flex;
+      align-items: baseline;
+      justify-content: center;
+      min-height: 24px;
+    }
+    .header-mini-input {
+      font-family: 'Cinzel', serif;
+      font-size: 17px;
+      font-weight: 600;
+      background: transparent;
+      border: none;
+      border-bottom: 1.5px solid var(--border-strong);
+      color: var(--ink);
+      outline: none;
+      width: 64px;
+      text-align: center;
+      padding: 1px 0;
+    }
+    .header-mini-input::placeholder {
+      color: var(--ink-faint);
+      font-size: 13px;
+      font-weight: 400;
+    }
+
     .rest-control-wrap {
       position: relative;
       display: inline-flex;
