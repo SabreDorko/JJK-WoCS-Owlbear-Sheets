@@ -940,8 +940,11 @@ function renderEditButton() {
   return '<button type="button" class="inventory-mini-btn inventory-icon-btn inventory-icon-btn-edit" data-action="editItem" aria-label="Edit item" title="Edit item">&#9998;</button>';
 }
 
-function renderDeleteButton(itemId) {
+function renderDeleteButton(itemId, forceAlignLeft = false) {
   const showConfirm = openDeleteConfirmItemId === itemId;
+  const confirmClasses = forceAlignLeft
+    ? "skills-delete-confirm confirm-align-left confirm-force-left"
+    : "skills-delete-confirm";
   return `
     <span class="skills-delete-wrap">
       <button type="button" class="inventory-mini-btn inventory-icon-btn danger" data-action="deleteItem" aria-label="Delete item" title="Delete item">
@@ -950,7 +953,7 @@ function renderDeleteButton(itemId) {
           <path fill="none" stroke="currentColor" stroke-width="1.5" d="M6 7.5h12"/>
         </svg>
       </button>
-      ${showConfirm ? `<div class="skills-delete-confirm" role="menu">
+      ${showConfirm ? `<div class="${confirmClasses}" role="menu">
         <span class="skills-delete-confirm-text">Delete item?</span>
         <button type="button" class="inventory-mini-btn danger" data-action="confirmDeleteItem">Delete</button>
         <button type="button" class="inventory-mini-btn" data-action="cancelDeleteItem">Cancel</button>
@@ -1443,7 +1446,7 @@ function renderInventorySlots() {
       ${renderMoveButton()}
       ${renderMovePickerMenu(item)}
       ${renderEditButton()}
-      ${renderDeleteButton(item.id)}
+      ${renderDeleteButton(item.id, true)}
     `;
 
     return `
@@ -1475,7 +1478,7 @@ function renderDormInventory() {
       ${renderMoveButton()}
       ${renderMovePickerMenu(item)}
       ${renderEditButton()}
-      ${renderDeleteButton(item.id)}
+      ${renderDeleteButton(item.id, true)}
     `;
 
     return renderInventoryItemCard(item, controls, "Storage");
@@ -2047,27 +2050,31 @@ export function renderInventory() {
     const menus = document.querySelectorAll(".skills-delete-confirm");
     const viewportPad = 8;
     menus.forEach(menu => {
+      const forceAlignLeft = menu.classList.contains("confirm-force-left");
       const tabContent = menu.closest(".tab-content");
       const tabRect = tabContent ? tabContent.getBoundingClientRect() : null;
       const leftBoundary = Math.max(viewportPad, (tabRect?.left ?? viewportPad) + 2);
       const rightBoundary = Math.min(window.innerWidth - viewportPad, (tabRect?.right ?? window.innerWidth - viewportPad) - 2);
 
-      menu.classList.remove("confirm-below", "confirm-align-left", "confirm-align-right");
+      menu.classList.remove("confirm-below", "confirm-align-right");
+      if (!forceAlignLeft) menu.classList.remove("confirm-align-left");
       const rect = menu.getBoundingClientRect();
       if (rect.top < viewportPad) menu.classList.add("confirm-below");
-      if (rect.right > rightBoundary) menu.classList.add("confirm-align-left");
-      // Inventory uses delete confirms (right-anchored by default), so left overflow
-      // needs a left anchor to push the popup back into the viewport.
-      if (rect.left < leftBoundary) menu.classList.add("confirm-align-left");
+      if (!forceAlignLeft) {
+        if (rect.right > rightBoundary) menu.classList.add("confirm-align-left");
+        // Inventory uses delete confirms (right-anchored by default), so left overflow
+        // needs a left anchor to push the popup back into the viewport.
+        if (rect.left < leftBoundary) menu.classList.add("confirm-align-left");
+      }
 
       // Second pass: if still clipped on either side, try the opposite anchor.
       let adjusted = menu.getBoundingClientRect();
-      if (adjusted.left < leftBoundary) {
+      if (!forceAlignLeft && adjusted.left < leftBoundary) {
         menu.classList.remove("confirm-align-left");
         menu.classList.add("confirm-align-right");
         adjusted = menu.getBoundingClientRect();
       }
-      if (adjusted.right > rightBoundary) {
+      if (!forceAlignLeft && adjusted.right > rightBoundary) {
         menu.classList.remove("confirm-align-right");
         menu.classList.add("confirm-align-left");
       }
