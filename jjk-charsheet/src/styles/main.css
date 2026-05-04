@@ -2394,12 +2394,56 @@
       text-transform: uppercase;
       color: var(--ink-faint);
     }
+    .aptitude-builder-card {
+      border: 1px solid var(--border-light);
+      background: var(--parchment);
+      padding: 8px;
+      display: grid;
+      gap: 8px;
+    }
+    .aptitude-builder-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+    }
+    .aptitude-active-card {
+      border-color: rgba(193, 157, 98, 0.45);
+      background: rgba(193, 157, 98, 0.08);
+    }
+    .aptitude-progress-pips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .aptitude-pip {
+      width: 12px;
+      height: 12px;
+      padding: 0;
+      border: 1.5px solid var(--border-light);
+      border-radius: 2px;
+      background: transparent;
+      cursor: pointer;
+      transition: background 120ms ease, border-color 120ms ease;
+    }
+    .aptitude-pip:hover {
+      border-color: var(--accent);
+    }
+    .aptitude-pip.filled {
+      background: var(--accent);
+      border-color: var(--accent);
+    }
+    .skill-input option:disabled {
+      color: var(--ink-faint);
+    }
 
     @media (max-width: 760px) {
       .techniques-app-edit-grid {
         grid-template-columns: 1fr;
       }
       .training-skills-container {
+        grid-template-columns: 1fr;
+      }
+      .aptitude-builder-grid {
         grid-template-columns: 1fr;
       }
     }

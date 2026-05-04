@@ -1,3 +1,5 @@
+import { CENTER_STATS, RIGHT_STATS } from "./state/store.js";
+
 let _getState = null;
 let _scheduleSave = null;
 let _showRollToast = null;
@@ -23,11 +25,138 @@ function ensureTrainingState(state) {
   if (!state.training) {
     state.training = {
       jujutsuSkills: [],
-      aptitudeTraining: [],
+      aptitudeTraining: {
+        active: null,
+      },
     };
   }
   if (!state.training.jujutsuSkills) state.training.jujutsuSkills = [];
-  if (!state.training.aptitudeTraining) state.training.aptitudeTraining = [];
+  if (!state.training.aptitudeTraining || typeof state.training.aptitudeTraining !== "object") {
+    state.training.aptitudeTraining = { active: null };
+  }
+  if (!("active" in state.training.aptitudeTraining)) state.training.aptitudeTraining.active = null;
+}
+
+function parseNonNegativeInt(rawValue) {
+  const parsed = parseInt(rawValue, 10);
+  if (!Number.isFinite(parsed)) return 0;
+  return Math.max(0, parsed);
+}
+
+function getStatDefinitions() {
+  return [...CENTER_STATS, ...RIGHT_STATS];
+}
+
+function getStatDefinition(statKey) {
+  return getStatDefinitions().find(stat => stat.key === statKey) || null;
+}
+
+function normalizeSkillAptitude(raw) {
+  const parsed = parseInt(raw, 10);
+  if (!Number.isFinite(parsed)) return 0;
+  return Math.max(0, Math.min(2, parsed));
+}
+
+function isSkillAlreadyTrained(state, statKey, skillIndex) {
+  const skillState = state?.stats?.[statKey]?.skills?.[skillIndex];
+  return normalizeSkillAptitude(skillState?.aptitude) > 0;
+}
+
+function getSkillOptions(statKey) {
+  const statDef = getStatDefinition(statKey);
+  if (!statDef) return [];
+  return statDef.skills.map((label, index) => ({ label, index }));
+}
+
+function getTrainingPipTarget(state, statKey) {
+  const rawScore = state?.stats?.[statKey]?.score;
+  return parseNonNegativeInt(rawScore);
+}
+
+function renderAptitudeStatOptions(selectedStatKey) {
+  const statOptions = getStatDefinitions();
+  const selected = selectedStatKey || "";
+  let html = '<option value="">- Select Stat -</option>';
+  for (const stat of statOptions) {
+    const isSelected = stat.key === selected;
+    html += `<option value="${stat.key}"${isSelected ? " selected" : ""}>${stat.label}</option>`;
+  }
+  return html;
+}
+
+function renderAptitudeSubstatOptions(state, statKey, selectedSkillIndex) {
+  if (!statKey) return '<option value="">- Select Substat -</option>';
+  const options = getSkillOptions(statKey);
+  const selectedIdx = parseInt(selectedSkillIndex, 10);
+  let html = '<option value="">- Select Substat -</option>';
+  for (const option of options) {
+    const disabled = isSkillAlreadyTrained(state, statKey, option.index);
+    const selected = Number.isFinite(selectedIdx) && option.index === selectedIdx;
+    const titleAttr = disabled ? ' title="Already Trained"' : "";
+    html += `<option value="${option.index}"${selected ? " selected" : ""}${disabled ? " disabled" : ""}${titleAttr}>${option.label}${disabled ? " (Already Trained)" : ""}</option>`;
+  }
+  return html;
+}
+
+function renderAptitudeTrainingBuilder(state) {
+  return `
+    <div class="aptitude-builder-card">
+      <div class="aptitude-builder-grid">
+        <div class="skill-input-field">
+          <label for="aptitudeTrainingStatSelect" class="field-label">Stat</label>
+          <select id="aptitudeTrainingStatSelect" class="skill-input" data-action="aptitudeStatSelect">
+            ${renderAptitudeStatOptions("")}
+          </select>
+        </div>
+        <div class="skill-input-field">
+          <label for="aptitudeTrainingSkillSelect" class="field-label">Substat</label>
+          <select id="aptitudeTrainingSkillSelect" class="skill-input" data-action="aptitudeSkillSelect" disabled>
+            <option value="">- Select Substat -</option>
+          </select>
+        </div>
+      </div>
+      <div class="skill-input-actions">
+        <button type="button" class="training-add-skill-btn" data-action="startAptitudeTraining">Start Training</button>
+      </div>
+    </div>
+  `;
+}
+
+function renderAptitudeTrainingPips(progress, required) {
+  let html = "";
+  for (let i = 0; i < required; i += 1) {
+    const filled = i < progress;
+    html += `<button type="button" class="progress-pip aptitude-pip${filled ? " filled" : ""}" data-action="setAptitudeProgress" data-progress="${i + 1}" aria-label="Set progress ${i + 1} of ${required}" title="${i + 1}/${required}"></button>`;
+  }
+  return html;
+}
+
+function renderActiveAptitudeTraining(state, activeTraining) {
+  const statDef = getStatDefinition(activeTraining.statKey);
+  const skillOptions = getSkillOptions(activeTraining.statKey);
+  const substat = skillOptions.find(option => option.index === activeTraining.skillIndex);
+  const required = Math.max(1, parseNonNegativeInt(activeTraining.requiredPips));
+  const progress = Math.max(0, Math.min(required, parseNonNegativeInt(activeTraining.progress)));
+  const complete = progress >= required;
+
+  return `
+    <div class="training-skill-card aptitude-active-card">
+      <div class="skill-card-header">
+        <div class="skill-card-title">${substat?.label || "Substat"} Training</div>
+      </div>
+      <div class="skill-card-meta">
+        <span class="skill-requirement">Stat: ${statDef?.label || "-"}</span>
+        <span class="skill-requirement">Pips: ${progress}/${required}</span>
+      </div>
+      <div class="skill-card-progress">
+        <div class="progress-pips aptitude-progress-pips">${renderAptitudeTrainingPips(progress, required)}</div>
+      </div>
+      <div class="skill-card-actions">
+        ${complete ? '<button type="button" class="training-complete-btn" data-action="completeAptitudeTraining">Complete Training</button>' : ""}
+        <button type="button" class="training-cancel-btn" data-action="cancelAptitudeTraining">Cancel</button>
+      </div>
+    </div>
+  `;
 }
 
 function generateUniqueId() {
@@ -199,12 +328,16 @@ function renderJujutsuSkills(state) {
 }
 
 function renderAptitudeTraining(state) {
+  ensureTrainingState(state);
+  const activeTraining = state.training.aptitudeTraining.active;
+
   return `
     <div class="training-section aptitude-training-section">
       <div class="training-section-header">
         <h3 class="training-section-title">Aptitude Training</h3>
       </div>
-      <div class="training-muted">Aptitude training progress tracking will be implemented here.</div>
+      <div class="training-muted">Set aside free time to train one substat into aptitude.</div>
+      ${activeTraining ? renderActiveAptitudeTraining(state, activeTraining) : renderAptitudeTrainingBuilder(state)}
     </div>
   `;
 }
@@ -212,10 +345,122 @@ function renderAptitudeTraining(state) {
 function renderTrainingPanel(state) {
   return `
     <div class="training-shell">
-      ${renderJujutsuSkills(state)}
       ${renderAptitudeTraining(state)}
+      ${renderJujutsuSkills(state)}
     </div>
   `;
+}
+
+function refreshAptitudeSubstatSelect(statKey, selectedSkillIndex = "") {
+  const state = getState();
+  if (!state) return;
+  const skillSelect = document.getElementById("aptitudeTrainingSkillSelect");
+  if (!skillSelect) return;
+
+  const hasStat = Boolean(statKey);
+  skillSelect.disabled = !hasStat;
+  skillSelect.innerHTML = renderAptitudeSubstatOptions(state, statKey, selectedSkillIndex);
+}
+
+function handleStartAptitudeTraining() {
+  const state = getState();
+  if (!state) return;
+  ensureTrainingState(state);
+
+  if (state.training.aptitudeTraining.active) {
+    alert("Finish or cancel the current aptitude training first.");
+    return;
+  }
+
+  const statSelect = document.getElementById("aptitudeTrainingStatSelect");
+  const substatSelect = document.getElementById("aptitudeTrainingSkillSelect");
+  const statKey = String(statSelect?.value || "");
+  const skillIndex = parseInt(substatSelect?.value, 10);
+
+  if (!statKey) {
+    alert("Please select a stat.");
+    return;
+  }
+  if (!Number.isFinite(skillIndex)) {
+    alert("Please select a substat.");
+    return;
+  }
+  if (isSkillAlreadyTrained(state, statKey, skillIndex)) {
+    alert("That substat is already trained.");
+    return;
+  }
+
+  const requiredPips = getTrainingPipTarget(state, statKey);
+  if (requiredPips <= 0) {
+    alert("This stat must be at least 1 to start aptitude training.");
+    return;
+  }
+
+  state.training.aptitudeTraining.active = {
+    statKey,
+    skillIndex,
+    requiredPips,
+    progress: 0,
+  };
+  scheduleSave();
+  refreshUI();
+}
+
+function handleSetAptitudeProgress(nextProgressRaw) {
+  const state = getState();
+  if (!state) return;
+  ensureTrainingState(state);
+  const active = state.training.aptitudeTraining.active;
+  if (!active) return;
+
+  const required = Math.max(1, parseNonNegativeInt(active.requiredPips));
+  const nextProgress = Math.max(0, Math.min(required, parseNonNegativeInt(nextProgressRaw)));
+  active.progress = nextProgress;
+  scheduleSave();
+  refreshUI();
+}
+
+function handleCancelAptitudeTraining() {
+  const state = getState();
+  if (!state) return;
+  ensureTrainingState(state);
+  state.training.aptitudeTraining.active = null;
+  scheduleSave();
+  refreshUI();
+}
+
+function handleCompleteAptitudeTraining() {
+  const state = getState();
+  if (!state) return;
+  ensureTrainingState(state);
+  const active = state.training.aptitudeTraining.active;
+  if (!active) return;
+
+  const required = Math.max(1, parseNonNegativeInt(active.requiredPips));
+  const progress = parseNonNegativeInt(active.progress);
+  if (progress < required) {
+    alert("Fill all pips before completing training.");
+    return;
+  }
+
+  const skillState = state?.stats?.[active.statKey]?.skills?.[active.skillIndex];
+  if (!skillState) {
+    alert("Unable to apply training to that substat.");
+    return;
+  }
+
+  if (normalizeSkillAptitude(skillState.aptitude) > 0) {
+    alert("That substat already has aptitude.");
+    state.training.aptitudeTraining.active = null;
+    scheduleSave();
+    refreshUI();
+    return;
+  }
+
+  skillState.aptitude = 1;
+  state.training.aptitudeTraining.active = null;
+  scheduleSave();
+  refreshUI();
 }
 
 function handleAddSkill() {
@@ -339,6 +584,14 @@ function handleCompleteSkill(skillId) {
 function setupTrainingEventHandlers() {
   const trainingPanel = document.getElementById("jujutsuSubpanelTraining");
   if (!trainingPanel) return;
+
+  trainingPanel.addEventListener("change", e => {
+    const statSelect = e.target?.closest?.("[data-action='aptitudeStatSelect']");
+    if (statSelect) {
+      refreshAptitudeSubstatSelect(String(statSelect.value || ""));
+      return;
+    }
+  });
   
   trainingPanel.addEventListener("click", (e) => {
     const addBtn = e.target?.closest?.("[data-action='showAddSkillForm']");
@@ -362,6 +615,30 @@ function setupTrainingEventHandlers() {
     const addSkillBtn = e.target?.closest?.("[data-action='addSkill']");
     if (addSkillBtn) {
       handleAddSkill();
+      return;
+    }
+
+    const startAptitudeBtn = e.target?.closest?.("[data-action='startAptitudeTraining']");
+    if (startAptitudeBtn) {
+      handleStartAptitudeTraining();
+      return;
+    }
+
+    const setProgressBtn = e.target?.closest?.("[data-action='setAptitudeProgress']");
+    if (setProgressBtn) {
+      handleSetAptitudeProgress(setProgressBtn.dataset.progress);
+      return;
+    }
+
+    const completeAptitudeBtn = e.target?.closest?.("[data-action='completeAptitudeTraining']");
+    if (completeAptitudeBtn) {
+      handleCompleteAptitudeTraining();
+      return;
+    }
+
+    const cancelAptitudeBtn = e.target?.closest?.("[data-action='cancelAptitudeTraining']");
+    if (cancelAptitudeBtn) {
+      handleCancelAptitudeTraining();
       return;
     }
     
