@@ -221,7 +221,8 @@ async function init() {
     getState: () => state,
     scheduleSave,
     showRollToast,
-    refreshUI: applyStateToUI,
+    refreshUI: () => renderTraining(state),
+    refreshAll: applyStateToUI,
   });
 
   // Re-render training slots whenever grade changes (slot unlock is grade-gated)

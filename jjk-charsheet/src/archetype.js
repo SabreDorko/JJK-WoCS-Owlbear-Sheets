@@ -1212,7 +1212,12 @@ export function initArchetype({ getState: getStateFn, scheduleSave: scheduleSave
       if (!key) return;
       if (_expandedAbilityDescriptions.has(key)) _expandedAbilityDescriptions.delete(key);
       else _expandedAbilityDescriptions.add(key);
-      renderAbilityTree(getState());
+      const isExpanded = _expandedAbilityDescriptions.has(key);
+      descTrigger.setAttribute("aria-expanded", isExpanded ? "true" : "false");
+      const notesEl = descTrigger.nextElementSibling;
+      if (notesEl?.classList.contains("archetype-ability-notes")) {
+        notesEl.classList.toggle("open", isExpanded);
+      }
     });
   }
 
@@ -1243,7 +1248,12 @@ export function initArchetype({ getState: getStateFn, scheduleSave: scheduleSave
       if (!key) return;
       if (_expandedAbilityDescriptions.has(key)) _expandedAbilityDescriptions.delete(key);
       else _expandedAbilityDescriptions.add(key);
-      renderAbilitySlots(getState());
+      const isExpanded = _expandedAbilityDescriptions.has(key);
+      descTrigger.setAttribute("aria-expanded", isExpanded ? "true" : "false");
+      const notesEl = descTrigger.nextElementSibling;
+      if (notesEl?.classList.contains("archetype-ability-notes")) {
+        notesEl.classList.toggle("open", isExpanded);
+      }
     });
   }
 

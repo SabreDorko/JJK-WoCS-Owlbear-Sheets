@@ -1505,7 +1505,13 @@ function handleInventoryActions(event) {
     openOverflowChoice = null;
     if (expandedDescriptionIds.has(item.id)) expandedDescriptionIds.delete(item.id);
     else expandedDescriptionIds.add(item.id);
-    renderInventory();
+    const isExpanded = expandedDescriptionIds.has(item.id);
+    // In-place DOM update so the CSS transition can animate
+    const itemCard = button.closest("[data-item-id]");
+    const descEl = itemCard?.querySelector(".inventory-item-desc, .equipped-slot-desc");
+    const toggleBtn = itemCard?.querySelector(".inventory-desc-toggle-btn");
+    if (descEl) descEl.classList.toggle("collapsed", !isExpanded);
+    if (toggleBtn) toggleBtn.setAttribute("aria-expanded", isExpanded ? "true" : "false");
     return;
   }
 

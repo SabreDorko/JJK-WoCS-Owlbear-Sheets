@@ -5,6 +5,7 @@ let _getState = null;
 let _scheduleSave = null;
 let _showRollToast = null;
 let _refreshUI = null;
+let _refreshAll = null;
 let _initialized = false;
 let _trainingActionInFlight = false;
 let _activeSkillFormSlot = null;
@@ -36,21 +37,48 @@ function refreshUI() {
   if (_refreshUI) _refreshUI();
 }
 
+function refreshAll() {
+  if (_refreshAll) _refreshAll();
+}
+
 function ensureTrainingState(state) {
   if (!state) return;
   if (!state.training) {
     state.training = {
       jujutsuSkills: [],
       aptitudeTraining: {
-        active: null,
+        activeTrainings: [],
       },
     };
   }
   if (!state.training.jujutsuSkills) state.training.jujutsuSkills = [];
   if (!state.training.aptitudeTraining || typeof state.training.aptitudeTraining !== "object") {
-    state.training.aptitudeTraining = { active: null };
+    state.training.aptitudeTraining = { activeTrainings: [] };
   }
-  if (!("active" in state.training.aptitudeTraining)) state.training.aptitudeTraining.active = null;
+  if (Array.isArray(state.training.aptitudeTraining)) {
+    state.training.aptitudeTraining = { activeTrainings: state.training.aptitudeTraining };
+  }
+
+  const trainingState = state.training.aptitudeTraining;
+  if (!Array.isArray(trainingState.activeTrainings)) {
+    trainingState.activeTrainings = [];
+  }
+  // Backward-compat: migrate old single-active shape into the new list.
+  if (trainingState.active && typeof trainingState.active === "object") {
+    const hasDuplicate = trainingState.activeTrainings.some(item =>
+      item?.statKey === trainingState.active.statKey && item?.skillIndex === trainingState.active.skillIndex,
+    );
+    if (!hasDuplicate) {
+      trainingState.activeTrainings.push({
+        id: trainingState.active.id || `apt-${Date.now()}`,
+        statKey: trainingState.active.statKey,
+        skillIndex: trainingState.active.skillIndex,
+        requiredPips: parseNonNegativeInt(trainingState.active.requiredPips),
+        progress: parseNonNegativeInt(trainingState.active.progress),
+      });
+    }
+    delete trainingState.active;
+  }
 }
 
 function parseNonNegativeInt(rawValue) {
@@ -76,6 +104,19 @@ function normalizeSkillAptitude(raw) {
 function isSkillAlreadyTrained(state, statKey, skillIndex) {
   const skillState = state?.stats?.[statKey]?.skills?.[skillIndex];
   return normalizeSkillAptitude(skillState?.aptitude) > 0;
+}
+
+function getActiveAptitudeTrainings(state) {
+  ensureTrainingState(state);
+  return state.training.aptitudeTraining.activeTrainings;
+}
+
+function isSkillInActiveTraining(state, statKey, skillIndex, excludeTrainingId = "") {
+  const activeTrainings = getActiveAptitudeTrainings(state);
+  return activeTrainings.some(training => {
+    if (!training || training.id === excludeTrainingId) return false;
+    return training.statKey === statKey && parseNonNegativeInt(training.skillIndex) === parseNonNegativeInt(skillIndex);
+  });
 }
 
 function getSkillOptions(statKey) {
@@ -106,10 +147,15 @@ function renderAptitudeSubstatOptions(state, statKey, selectedSkillIndex) {
   const selectedIdx = parseInt(selectedSkillIndex, 10);
   let html = '<option value="">- Select Substat -</option>';
   for (const option of options) {
-    const disabled = isSkillAlreadyTrained(state, statKey, option.index);
+    const alreadyTrained = isSkillAlreadyTrained(state, statKey, option.index);
+    const alreadyInTraining = isSkillInActiveTraining(state, statKey, option.index);
+    const disabled = alreadyTrained || alreadyInTraining;
     const selected = Number.isFinite(selectedIdx) && option.index === selectedIdx;
-    const titleAttr = disabled ? ' title="Already Trained"' : "";
-    html += `<option value="${option.index}"${selected ? " selected" : ""}${disabled ? " disabled" : ""}${titleAttr}>${option.label}${disabled ? " (Already Trained)" : ""}</option>`;
+    let disabledReason = "";
+    if (alreadyTrained) disabledReason = "Already Trained";
+    else if (alreadyInTraining) disabledReason = "Already In Training";
+    const titleAttr = disabledReason ? ` title="${disabledReason}"` : "";
+    html += `<option value="${option.index}"${selected ? " selected" : ""}${disabled ? " disabled" : ""}${titleAttr}>${option.label}${disabledReason ? ` (${disabledReason})` : ""}</option>`;
   }
   return html;
 }
@@ -138,11 +184,11 @@ function renderAptitudeTrainingBuilder(state) {
   `;
 }
 
-function renderAptitudeTrainingPips(progress, required) {
+function renderAptitudeTrainingPips(trainingId, progress, required) {
   let html = "";
   for (let i = 0; i < required; i += 1) {
     const filled = i < progress;
-    html += `<button type="button" class="progress-pip aptitude-pip${filled ? " filled" : ""}" data-action="setAptitudeProgress" data-progress="${i + 1}" aria-label="Set progress ${i + 1} of ${required}" title="${i + 1}/${required}"></button>`;
+    html += `<button type="button" class="progress-pip aptitude-pip${filled ? " filled" : ""}" data-action="setAptitudeProgress" data-training-id="${trainingId}" data-progress="${i + 1}" aria-label="Set progress ${i + 1} of ${required}" title="${i + 1}/${required}"></button>`;
   }
   return html;
 }
@@ -154,9 +200,10 @@ function renderActiveAptitudeTraining(state, activeTraining) {
   const required = Math.max(1, parseNonNegativeInt(activeTraining.requiredPips));
   const progress = Math.max(0, Math.min(required, parseNonNegativeInt(activeTraining.progress)));
   const complete = progress >= required;
+  const trainingId = String(activeTraining.id || "");
 
   return `
-    <div class="training-skill-card aptitude-active-card">
+    <div class="training-skill-card aptitude-active-card" data-training-id="${trainingId}">
       <div class="skill-card-header">
         <div class="skill-card-title">${substat?.label || "Substat"} Training</div>
       </div>
@@ -165,11 +212,12 @@ function renderActiveAptitudeTraining(state, activeTraining) {
       </div>
       <div class="skill-card-progress aptitude-progress-row">
         <span class="skill-requirement aptitude-progress-label">Progress:</span>
-        <div class="progress-pips aptitude-progress-pips" aria-label="Progress ${progress} of ${required}">${renderAptitudeTrainingPips(progress, required)}</div>
+        <div class="progress-pips aptitude-progress-pips" aria-label="Progress ${progress} of ${required}">${renderAptitudeTrainingPips(trainingId, progress, required)}</div>
+        <div class="progress-text">${progress}/${required}</div>
       </div>
       <div class="skill-card-actions">
-        ${complete ? '<button type="button" class="training-complete-btn training-complete-btn-small" data-action="completeAptitudeTraining">Complete Training</button>' : ""}
-        <button type="button" class="training-cancel-btn" data-action="cancelAptitudeTraining">Cancel</button>
+        ${complete ? `<button type="button" class="training-complete-btn training-complete-btn-small" data-action="completeAptitudeTraining" data-training-id="${trainingId}">Complete Training</button>` : ""}
+        <button type="button" class="training-cancel-btn" data-action="cancelAptitudeTraining" data-training-id="${trainingId}">Cancel</button>
       </div>
     </div>
   `;
@@ -360,15 +408,18 @@ function renderJujutsuSkills(state) {
 
 function renderAptitudeTraining(state) {
   ensureTrainingState(state);
-  const activeTraining = state.training.aptitudeTraining.active;
+  const activeTrainings = getActiveAptitudeTrainings(state);
 
   return `
     <div class="training-section aptitude-training-section">
       <div class="training-section-header">
         <h3 class="training-section-title">Aptitude Training</h3>
       </div>
-      <div class="training-muted">Set aside free time to train one substat into aptitude.</div>
-      ${activeTraining ? renderActiveAptitudeTraining(state, activeTraining) : renderAptitudeTrainingBuilder(state)}
+      <div class="training-muted">Set aside free time to train substats into aptitude. You can track multiple trainings at once.</div>
+      ${renderAptitudeTrainingBuilder(state)}
+      <div class="aptitude-active-grid">
+        ${activeTrainings.length ? activeTrainings.map(training => renderActiveAptitudeTraining(state, training)).join("") : '<div class="training-muted">No active aptitude training yet.</div>'}
+      </div>
     </div>
   `;
 }
@@ -397,11 +448,7 @@ function handleStartAptitudeTraining() {
   const state = getState();
   if (!state) return;
   ensureTrainingState(state);
-
-  if (state.training.aptitudeTraining.active) {
-    alert("Finish or cancel the current aptitude training first.");
-    return;
-  }
+  const activeTrainings = getActiveAptitudeTrainings(state);
 
   const statSelect = document.getElementById("aptitudeTrainingStatSelect");
   const substatSelect = document.getElementById("aptitudeTrainingSkillSelect");
@@ -420,6 +467,10 @@ function handleStartAptitudeTraining() {
     alert("That substat is already trained.");
     return;
   }
+  if (isSkillInActiveTraining(state, statKey, skillIndex)) {
+    alert("That substat is already being trained.");
+    return;
+  }
 
   const requiredPips = getTrainingPipTarget(state, statKey);
   if (requiredPips <= 0) {
@@ -427,21 +478,23 @@ function handleStartAptitudeTraining() {
     return;
   }
 
-  state.training.aptitudeTraining.active = {
+  activeTrainings.push({
+    id: `apt-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
     statKey,
     skillIndex,
     requiredPips,
     progress: 0,
-  };
+  });
   scheduleSave();
   refreshUI();
 }
 
-function handleSetAptitudeProgress(nextProgressRaw) {
+function handleSetAptitudeProgress(trainingId, nextProgressRaw) {
   const state = getState();
   if (!state) return;
   ensureTrainingState(state);
-  const active = state.training.aptitudeTraining.active;
+  const activeTrainings = getActiveAptitudeTrainings(state);
+  const active = activeTrainings.find(training => training?.id === trainingId);
   if (!active) return;
 
   const required = Math.max(1, parseNonNegativeInt(active.requiredPips));
@@ -451,21 +504,26 @@ function handleSetAptitudeProgress(nextProgressRaw) {
   refreshUI();
 }
 
-function handleCancelAptitudeTraining() {
+function handleCancelAptitudeTraining(trainingId) {
   const state = getState();
   if (!state) return;
   ensureTrainingState(state);
-  state.training.aptitudeTraining.active = null;
+  const activeTrainings = getActiveAptitudeTrainings(state);
+  const index = activeTrainings.findIndex(training => training?.id === trainingId);
+  if (index < 0) return;
+  activeTrainings.splice(index, 1);
   scheduleSave();
   refreshUI();
 }
 
-function handleCompleteAptitudeTraining() {
+function handleCompleteAptitudeTraining(trainingId) {
   const state = getState();
   if (!state) return;
   ensureTrainingState(state);
-  const active = state.training.aptitudeTraining.active;
-  if (!active) return;
+  const activeTrainings = getActiveAptitudeTrainings(state);
+  const index = activeTrainings.findIndex(training => training?.id === trainingId);
+  if (index < 0) return;
+  const active = activeTrainings[index];
 
   const required = Math.max(1, parseNonNegativeInt(active.requiredPips));
   const progress = parseNonNegativeInt(active.progress);
@@ -482,7 +540,7 @@ function handleCompleteAptitudeTraining() {
 
   if (normalizeSkillAptitude(skillState.aptitude) > 0) {
     alert("That substat already has aptitude.");
-    state.training.aptitudeTraining.active = null;
+    activeTrainings.splice(index, 1);
     scheduleSave();
     refreshUI();
     return;
@@ -490,13 +548,14 @@ function handleCompleteAptitudeTraining() {
 
   skillState.aptitude = 1;
   skillState.trainedAptitude = true;
-  state.training.aptitudeTraining.active = null;
+  skillState.overriddenAptitude = false;
+  activeTrainings.splice(index, 1);
 
   // Attempt stat promotion if all substats now have aptitude
   promoteStatFromFullAptitudes(state, active.statKey);
 
   scheduleSave();
-  refreshUI();
+  refreshAll(); // Full UI update so stat changes show on character sheet
 }
 
 function handleAddSkill() {
@@ -651,8 +710,9 @@ function setupTrainingEventHandlers() {
 
     const setProgressBtn = e.target?.closest?.("[data-action='setAptitudeProgress']");
     if (setProgressBtn) {
+      const trainingId = String(setProgressBtn.dataset.trainingId || setProgressBtn.closest("[data-training-id]")?.dataset?.trainingId || "");
       runTrainingAction(() => {
-        handleSetAptitudeProgress(setProgressBtn.dataset.progress);
+        handleSetAptitudeProgress(trainingId, setProgressBtn.dataset.progress);
       });
       return;
     }
@@ -668,16 +728,18 @@ function setupTrainingEventHandlers() {
 
     const completeAptitudeBtn = e.target?.closest?.("[data-action='completeAptitudeTraining']");
     if (completeAptitudeBtn) {
+      const trainingId = String(completeAptitudeBtn.dataset.trainingId || completeAptitudeBtn.closest("[data-training-id]")?.dataset?.trainingId || "");
       runTrainingAction(() => {
-        handleCompleteAptitudeTraining();
+        handleCompleteAptitudeTraining(trainingId);
       });
       return;
     }
 
     const cancelAptitudeBtn = e.target?.closest?.("[data-action='cancelAptitudeTraining']");
     if (cancelAptitudeBtn) {
+      const trainingId = String(cancelAptitudeBtn.dataset.trainingId || cancelAptitudeBtn.closest("[data-training-id]")?.dataset?.trainingId || "");
       runTrainingAction(() => {
-        handleCancelAptitudeTraining();
+        handleCancelAptitudeTraining(trainingId);
       });
       return;
     }
@@ -708,6 +770,7 @@ export function initTraining(deps = {}) {
   _scheduleSave = deps.scheduleSave || null;
   _showRollToast = deps.showRollToast || null;
   _refreshUI = deps.refreshUI || null;
+  _refreshAll = deps.refreshAll || deps.refreshUI || null;
   _initialized = true;
 }
 
