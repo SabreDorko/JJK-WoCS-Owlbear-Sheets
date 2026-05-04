@@ -5,8 +5,22 @@ let _scheduleSave = null;
 let _showRollToast = null;
 let _refreshUI = null;
 let _initialized = false;
+let _trainingActionInFlight = false;
 
 const GRADE_RANK = { "4": 0, "Semi-3": 0.5, "3": 1, "Semi-2": 1.5, "2": 2, "Semi-1": 2.5, "1": 3, "Special Grade": 4 };
+
+function normalizeGradeKey(rawGrade) {
+  const value = String(rawGrade || "").trim();
+  if (!value) return "";
+  const compact = value.replace(/\s+/g, " ");
+  const lowered = compact.toLowerCase();
+  if (lowered === "special" || lowered === "special grade") return "Special Grade";
+  if (lowered === "semi-1" || lowered === "semi 1") return "Semi-1";
+  if (lowered === "semi-2" || lowered === "semi 2") return "Semi-2";
+  if (lowered === "semi-3" || lowered === "semi 3") return "Semi-3";
+  if (["1", "2", "3", "4"].includes(compact)) return compact;
+  return compact;
+}
 
 function getState() {
   return _getState ? _getState() : null;
@@ -146,13 +160,13 @@ function renderActiveAptitudeTraining(state, activeTraining) {
       </div>
       <div class="skill-card-meta">
         <span class="skill-requirement">Stat: ${statDef?.label || "-"}</span>
-        <span class="skill-requirement">Pips: ${progress}/${required}</span>
       </div>
-      <div class="skill-card-progress">
-        <div class="progress-pips aptitude-progress-pips">${renderAptitudeTrainingPips(progress, required)}</div>
+      <div class="skill-card-progress aptitude-progress-row">
+        <span class="skill-requirement aptitude-progress-label">Progress:</span>
+        <div class="progress-pips aptitude-progress-pips" aria-label="Progress ${progress} of ${required}">${renderAptitudeTrainingPips(progress, required)}</div>
       </div>
       <div class="skill-card-actions">
-        ${complete ? '<button type="button" class="training-complete-btn" data-action="completeAptitudeTraining">Complete Training</button>' : ""}
+        ${complete ? '<button type="button" class="training-complete-btn training-complete-btn-small" data-action="completeAptitudeTraining">Complete Training</button>' : ""}
         <button type="button" class="training-cancel-btn" data-action="cancelAptitudeTraining">Cancel</button>
       </div>
     </div>
@@ -164,7 +178,7 @@ function generateUniqueId() {
 }
 
 function getCharacterGradeRank(state) {
-  const grade = state?.grade || "";
+  const grade = normalizeGradeKey(state?.grade || "");
   return GRADE_RANK[grade] ?? -1;
 }
 
@@ -184,8 +198,9 @@ function getSlotLockMessage(slotNumber) {
 
 function formatProgressPips(progress, required) {
   let html = "";
-  for (let i = 0; i < required; i++) {
-    html += `<span class="progress-pip${i < progress ? " filled" : ""}"></span>`;
+  for (let i = 0; i < required; i += 1) {
+    const filled = i < progress;
+    html += `<button type="button" class="progress-pip${filled ? " filled" : ""}" data-action="setSkillProgress" data-progress="${i + 1}" aria-label="Set mission progress ${i + 1} of ${required}" title="${i + 1}/${required}"></button>`;
   }
   return html;
 }
@@ -211,16 +226,27 @@ function renderJujutsuSkillCard(skill) {
       </div>
       ${skill.description ? `<div class="skill-card-description">${skill.description}</div>` : ''}
       <div class="skill-card-progress">
-        <div class="progress-pips">${progressHtml}</div>
-        <div class="progress-text">${skill.progress}/${skill.requiredMissions} missions</div>
+        <span class="skill-requirement aptitude-progress-label">Progress:</span>
+        <div class="progress-pips" data-skill-id="${skill.id}">${progressHtml}</div>
+        <div class="progress-text">${skill.progress}/${skill.requiredMissions}</div>
       </div>
       <div class="skill-card-actions">
-        <button type="button" class="training-progress-btn" data-action="progressSkill" data-skill-id="${skill.id}" aria-label="Add mission progress">+</button>
-        ${skill.progress > 0 ? `<button type="button" class="training-progress-btn minus" data-action="regressSkill" data-skill-id="${skill.id}" aria-label="Remove mission progress">−</button>` : ''}
         ${isComplete ? `<button type="button" class="training-complete-btn" data-action="completeSkill" data-skill-id="${skill.id}" aria-label="Move to Skills tab">Complete</button>` : ''}
       </div>
     </div>
   `;
+}
+
+function runTrainingAction(action) {
+  if (_trainingActionInFlight) return;
+  _trainingActionInFlight = true;
+  try {
+    action();
+  } finally {
+    queueMicrotask(() => {
+      _trainingActionInFlight = false;
+    });
+  }
 }
 
 function renderJujutsuSkillInput() {
@@ -458,6 +484,7 @@ function handleCompleteAptitudeTraining() {
   }
 
   skillState.aptitude = 1;
+  skillState.trainedAptitude = true;
   state.training.aptitudeTraining.active = null;
   scheduleSave();
   refreshUI();
@@ -471,8 +498,7 @@ function handleAddSkill() {
   
   // Debug: verify inputs exist
   if (!titleInput || !requirementsInput) {
-    console.error("Form inputs not found in DOM");
-    alert("Error: Form elements not found. Please try again.");
+    // If stale listeners fired after a rerender, silently ignore this duplicate action.
     return;
   }
   
@@ -534,32 +560,20 @@ function handleDeleteSkill(skillId) {
   }
 }
 
-function handleProgressSkill(skillId) {
+function handleSetSkillProgress(skillId, nextProgressRaw) {
   const state = getState();
   if (!state) return;
   
   ensureTrainingState(state);
   
   const skill = state.training.jujutsuSkills.find(s => s.id === skillId);
-  if (skill && skill.progress < skill.requiredMissions) {
-    skill.progress++;
-    scheduleSave();
-    refreshUI();
-  }
-}
+  if (!skill) return;
 
-function handleReggressSkill(skillId) {
-  const state = getState();
-  if (!state) return;
-  
-  ensureTrainingState(state);
-  
-  const skill = state.training.jujutsuSkills.find(s => s.id === skillId);
-  if (skill && skill.progress > 0) {
-    skill.progress--;
-    scheduleSave();
-    refreshUI();
-  }
+  const required = Math.max(1, parseNonNegativeInt(skill.requiredMissions));
+  const nextProgress = Math.max(0, Math.min(required, parseNonNegativeInt(nextProgressRaw)));
+  skill.progress = nextProgress;
+  scheduleSave();
+  refreshUI();
 }
 
 function handleCompleteSkill(skillId) {
@@ -585,6 +599,9 @@ function setupTrainingEventHandlers() {
   const trainingPanel = document.getElementById("jujutsuSubpanelTraining");
   if (!trainingPanel) return;
 
+  if (trainingPanel.dataset.trainingHandlersBound === "true") return;
+  trainingPanel.dataset.trainingHandlersBound = "true";
+
   trainingPanel.addEventListener("change", e => {
     const statSelect = e.target?.closest?.("[data-action='aptitudeStatSelect']");
     if (statSelect) {
@@ -596,76 +613,91 @@ function setupTrainingEventHandlers() {
   trainingPanel.addEventListener("click", (e) => {
     const addBtn = e.target?.closest?.("[data-action='showAddSkillForm']");
     if (addBtn) {
-      const container = document.getElementById("skillInputContainer");
-      if (container) {
-        container.innerHTML = renderJujutsuSkillInput();
-      }
+      runTrainingAction(() => {
+        const container = document.getElementById("skillInputContainer");
+        if (container) {
+          container.innerHTML = renderJujutsuSkillInput();
+        }
+      });
       return;
     }
     
     const cancelBtn = e.target?.closest?.("[data-action='cancelAddSkill']");
     if (cancelBtn) {
-      const container = document.getElementById("skillInputContainer");
-      if (container) {
-        container.innerHTML = "";
-      }
+      runTrainingAction(() => {
+        const container = document.getElementById("skillInputContainer");
+        if (container) {
+          container.innerHTML = "";
+        }
+      });
       return;
     }
     
     const addSkillBtn = e.target?.closest?.("[data-action='addSkill']");
     if (addSkillBtn) {
-      handleAddSkill();
+      runTrainingAction(() => {
+        handleAddSkill();
+      });
       return;
     }
 
     const startAptitudeBtn = e.target?.closest?.("[data-action='startAptitudeTraining']");
     if (startAptitudeBtn) {
-      handleStartAptitudeTraining();
+      runTrainingAction(() => {
+        handleStartAptitudeTraining();
+      });
       return;
     }
 
     const setProgressBtn = e.target?.closest?.("[data-action='setAptitudeProgress']");
     if (setProgressBtn) {
-      handleSetAptitudeProgress(setProgressBtn.dataset.progress);
+      runTrainingAction(() => {
+        handleSetAptitudeProgress(setProgressBtn.dataset.progress);
+      });
+      return;
+    }
+
+    const setSkillProgressBtn = e.target?.closest?.("[data-action='setSkillProgress']");
+    if (setSkillProgressBtn) {
+      const skillId = setSkillProgressBtn.closest("[data-skill-id]")?.dataset?.skillId || "";
+      runTrainingAction(() => {
+        handleSetSkillProgress(skillId, setSkillProgressBtn.dataset.progress);
+      });
       return;
     }
 
     const completeAptitudeBtn = e.target?.closest?.("[data-action='completeAptitudeTraining']");
     if (completeAptitudeBtn) {
-      handleCompleteAptitudeTraining();
+      runTrainingAction(() => {
+        handleCompleteAptitudeTraining();
+      });
       return;
     }
 
     const cancelAptitudeBtn = e.target?.closest?.("[data-action='cancelAptitudeTraining']");
     if (cancelAptitudeBtn) {
-      handleCancelAptitudeTraining();
+      runTrainingAction(() => {
+        handleCancelAptitudeTraining();
+      });
       return;
     }
     
     const deleteBtn = e.target?.closest?.("[data-action='deleteSkill']");
     if (deleteBtn) {
       const skillId = deleteBtn.dataset.skillId;
-      if (confirm("Delete this skill?")) {
-        handleDeleteSkill(skillId);
-      }
-      return;
-    }
-    
-    const progressBtn = e.target?.closest?.("[data-action='progressSkill']");
-    if (progressBtn) {
-      handleProgressSkill(progressBtn.dataset.skillId);
-      return;
-    }
-    
-    const reggressBtn = e.target?.closest?.("[data-action='regressSkill']");
-    if (reggressBtn) {
-      handleReggressSkill(reggressBtn.dataset.skillId);
+      runTrainingAction(() => {
+        if (confirm("Delete this skill?")) {
+          handleDeleteSkill(skillId);
+        }
+      });
       return;
     }
     
     const completeBtn = e.target?.closest?.("[data-action='completeSkill']");
     if (completeBtn) {
-      handleCompleteSkill(completeBtn.dataset.skillId);
+      runTrainingAction(() => {
+        handleCompleteSkill(completeBtn.dataset.skillId);
+      });
       return;
     }
   });

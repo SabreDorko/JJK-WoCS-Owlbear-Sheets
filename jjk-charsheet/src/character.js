@@ -66,9 +66,13 @@ function setDerivedOverride(state, fieldKey, value) {
   else state.overrides.derived[fieldKey] = parsed;
 }
 
-function getNextAptitudeActionLabel(currentAptitude) {
+function getNextAptitudeActionLabel(currentAptitude, isOverrideMode = false) {
+  if (isOverrideMode) {
+    if (currentAptitude <= 0) return "Set as Aptitude";
+    if (currentAptitude === 1) return "Set as Permanent Aptitude";
+    return "Clear Aptitude";
+  }
   if (currentAptitude <= 0) return "Set as Aptitude";
-  if (currentAptitude === 1) return "Set as Permanent Aptitude";
   return "Clear Aptitude";
 }
 
@@ -231,7 +235,7 @@ function promoteStatFromFullAptitudes(state, statKey) {
   state.xp = String(parseXpValue(state.xp) + newStatValue);
   temporaryAptitudeIndices.forEach(index => {
     const currentSkill = statState.skills[index] || { aptitude: 0 };
-    statState.skills[index] = { ...currentSkill, aptitude: 0 };
+    statState.skills[index] = { ...currentSkill, aptitude: 0, trainedAptitude: false };
   });
   return true;
 }
@@ -463,19 +467,22 @@ function buildStatBlocks(defs, container) {
       const sk = sd.skills[i];
       const lockedAptitudeSource = getArchetypePermanentAptitudeSource(state, def.key, i);
       const aptitudeState = lockedAptitudeSource ? 2 : getAptitudeState(sk);
+      const trainedAptitude = Boolean(sk?.trainedAptitude) && aptitudeState > 0 && !lockedAptitudeSource;
       const subskillValue = getSubskillValue(state, effects, def.key, i);
       const aptitudeLabel = aptitudeState === 2 ? "Permanent Aptitude" : aptitudeState === 1 ? "Aptitude" : "No Aptitude";
       const sourceLabel = lockedAptitudeSource?.sourceLabel || (lockedAptitudeSource?.sourceArchetype
         ? lockedAptitudeSource.sourceArchetype.charAt(0).toUpperCase() + lockedAptitudeSource.sourceArchetype.slice(1)
         : "");
-      const nextAptitudeAction = lockedAptitudeSource
+      const nextAptitudeAction = trainedAptitude
+        ? "Trained Attribute"
+        : lockedAptitudeSource
         ? (_isOverrideMode ? "Override lock: cycle aptitude" : `Permanent Aptitude (${sourceLabel || "Archetype"})`)
-        : getNextAptitudeActionLabel(aptitudeState);
+        : getNextAptitudeActionLabel(aptitudeState, _isOverrideMode);
       const hasOverride = Number.isFinite(getSubskillOverride(state, def.key, i));
       const row = document.createElement("div");
       row.className = "skill-row";
       row.innerHTML = `
-        <div class="skill-dot${aptitudeState > 0 ? " filled" : ""}${aptitudeState === 2 ? " permanent" : ""}${lockedAptitudeSource ? " locked-by-archetype" : ""}"
+        <div class="skill-dot${aptitudeState > 0 ? " filled" : ""}${aptitudeState === 2 ? " permanent" : ""}${lockedAptitudeSource ? " locked-by-archetype" : ""}${trainedAptitude ? " trained-aptitude" : ""}"
              id="dot_${def.key}_${i}" role="checkbox" aria-label="${skill} ${aptitudeLabel}" title="${nextAptitudeAction}"></div>
         <input class="skill-bonus-input" type="text"
                id="bonus_${def.key}_${i}" value="${formatSignedValue(subskillValue)}" ${_isOverrideMode ? "" : "readonly"} title="${hasOverride ? "Overridden" : "Auto-calculated"}" />
@@ -485,13 +492,19 @@ function buildStatBlocks(defs, container) {
       skillsSide.appendChild(row);
 
       row.querySelector(".skill-dot").addEventListener("click", () => {
+        if (trainedAptitude) return;
         if (lockedAptitudeSource && !_isOverrideMode) return;
         const skillState = state.stats[def.key].skills[i] || { aptitude: 0 };
+        if (skillState.trainedAptitude && !_isOverrideMode) return;
         const currentAptitude = getAptitudeState(skillState);
         const nextAptitude = _isOverrideMode
           ? (currentAptitude + 1) % 3
           : (currentAptitude > 0 ? 0 : 1);
-        state.stats[def.key].skills[i] = { aptitude: nextAptitude };
+        state.stats[def.key].skills[i] = {
+          ...skillState,
+          aptitude: nextAptitude,
+          trainedAptitude: skillState.trainedAptitude && nextAptitude > 0,
+        };
 
         if (promoteStatFromFullAptitudes(state, def.key)) {
           applyCharacterStateToUI();
@@ -503,10 +516,13 @@ function buildStatBlocks(defs, container) {
         dot.classList.toggle("filled", nextAptitude > 0);
         dot.classList.toggle("permanent", nextAptitude === 2);
         dot.classList.toggle("locked-by-archetype", Boolean(lockedAptitudeSource));
+        dot.classList.toggle("trained-aptitude", Boolean(skillState.trainedAptitude && nextAptitude > 0));
         const nextLabel = nextAptitude === 2 ? "Permanent Aptitude" : nextAptitude === 1 ? "Aptitude" : "No Aptitude";
-        dot.setAttribute("title", lockedAptitudeSource
+        dot.setAttribute("title", skillState.trainedAptitude && nextAptitude > 0
+          ? "Trained Attribute"
+          : lockedAptitudeSource
           ? (_isOverrideMode ? "Override lock: cycle aptitude" : `Permanent Aptitude (${sourceLabel || "Archetype"})`)
-          : getNextAptitudeActionLabel(nextAptitude));
+          : getNextAptitudeActionLabel(nextAptitude, _isOverrideMode));
         dot.setAttribute("aria-label", `${skill} ${nextLabel}`);
         const valueEl = row.querySelector(".skill-bonus-input");
         const nextValue = getSubskillValue(state, computeActiveModifierEffects(state), def.key, i);
