@@ -62,6 +62,11 @@ const WEAPON_STAT_LABELS = {
   speed: "Speed",
   technique: "Tech",
 };
+const WEAPON_STAT_LEVEL_ABBREVIATIONS = {
+  power: "PL",
+  speed: "SL",
+  technique: "TL",
+};
 const WEAPON_DAMAGE_DICE = ["d4", "d6", "d8", "d10", "d12"];
 
 function normalizeItemType(rawType) {
@@ -129,6 +134,23 @@ function formatWeaponDamageParts(parts) {
   return normalizeWeaponDamageParts(parts)
     .map(part => `${part.count}${part.die}`)
     .join(" + ");
+}
+
+function getWeaponDamageBonusAbbreviation(rawStat) {
+  const weaponStat = normalizeWeaponStat(rawStat);
+  return WEAPON_STAT_LEVEL_ABBREVIATIONS[weaponStat] || "PL";
+}
+
+function getWeaponDamageBonusTooltip(rawStat) {
+  const weaponStat = normalizeWeaponStat(rawStat);
+  const weaponStatLabel = weaponStat === "technique"
+    ? "Technique"
+    : (WEAPON_STAT_LABELS[weaponStat] || "Power");
+  return `${weaponStatLabel} Level`;
+}
+
+function getWeaponDamageText(item) {
+  return `${formatWeaponDamageParts(item?.weaponDamageParts)} + ${getWeaponDamageBonusAbbreviation(item?.weaponStat)}`;
 }
 
 function normalizeWeaponGrip(rawGrip, slotsNeeded) {
@@ -1623,11 +1645,10 @@ function renderInventoryItemCard(item, controlsHtml, locationTag) {
   if (normalizedType === "weapon") {
     const gripLabel = normalizeWeaponGrip(item.weaponGrip, item.slotsNeeded) === "twoHanded" ? "Two-Handed" : "One-Handed";
     const weaponTypeLabel = WEAPON_TYPE_LABELS[normalizeWeaponType(item.weaponType)] || "Weapon";
-    const weaponStatLabel = WEAPON_STAT_LABELS[normalizeWeaponStat(item.weaponStat)] || "Power";
-    const damageText = formatWeaponDamageParts(item.weaponDamageParts);
+    const damageText = getWeaponDamageText(item);
     const rangeText = getWeaponReachInFeet(item);
     details.push(`${gripLabel} | ${weaponTypeLabel}`);
-    details.push(`Damage: ${damageText} + ${weaponStatLabel} Level`);
+    details.push(`<span title="${escapeHtml(getWeaponDamageBonusTooltip(item.weaponStat))}">Damage: ${escapeHtml(damageText)}</span>`);
     if (shouldDisplayWeaponRange(item) && Number.isFinite(rangeText)) {
       details.push(`Range: ${rangeText} ft`);
     }
@@ -1704,7 +1725,7 @@ function renderEquippedSlots() {
       ? (WEAPON_TYPE_LABELS[normalizeWeaponType(item.weaponType)] || "Weapon")
       : "";
     const weaponDamage = normalizedType === "weapon"
-      ? `${formatWeaponDamageParts(item.weaponDamageParts)} + ${(WEAPON_STAT_LABELS[normalizeWeaponStat(item.weaponStat)] || "Power")} Level`
+      ? getWeaponDamageText(item)
       : "";
     const weaponRange = normalizedType === "weapon" && shouldDisplayWeaponRange(item)
       ? getWeaponReachInFeet(item)
@@ -1719,7 +1740,7 @@ function renderEquippedSlots() {
         </div>
         <div class="equipped-slot-item">${escapeHtml(item.name)}</div>
         ${weaponHandedness ? `<div class="equipped-slot-meta">${weaponHandedness}${weaponType ? ` | ${weaponType}` : ""}</div>` : ""}
-        ${weaponDamage ? `<div class="equipped-slot-meta">Damage: ${escapeHtml(weaponDamage)}</div>` : ""}
+        ${weaponDamage ? `<div class="equipped-slot-meta" title="${escapeHtml(getWeaponDamageBonusTooltip(item.weaponStat))}">Damage: ${escapeHtml(weaponDamage)}</div>` : ""}
         ${Number.isFinite(weaponRange) ? `<div class="equipped-slot-meta">Range: ${weaponRange} ft</div>` : ""}
         ${quantityText}
         ${hasDescription ? `<div class="equipped-slot-desc${isDescriptionExpanded ? "" : " collapsed"}">${escapeHtml(item.description)}</div>` : ""}

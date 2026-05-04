@@ -943,8 +943,14 @@ function renderBenefits(state) {
   });
   state.archetypeProgress.permanentAptitudeSelections = nextSelections;
 
+  const aptitudeInstructionLines = [...new Set(slots.map(slot => String(slot?.ruleText || "").trim()).filter(Boolean))];
+  const aptitudeInstructionMarkup = aptitudeInstructionLines.length
+    ? `<div class="techniques-muted">${aptitudeInstructionLines.map(line => escapeHtml(line)).join("<br>")}</div>`
+    : "";
+
   const aptitudeMarkup = slots.length
     ? `<div class="archetype-aptitude-picks">
+        <div class="meta-grid archetype-picker-grid">
         ${slots.map((slot, index) => {
           const entry = nextSelections[index];
           const isDuplicate = (seen.get(aptitudeSelectionSignature(entry)) || 0) > 1;
@@ -961,16 +967,16 @@ function renderBenefits(state) {
             : "";
 
           return `
-            <div class="archetype-aptitude-row${isDuplicate ? " archetype-aptitude-row--warning" : ""}">
+            <div class="meta-field${isDuplicate ? " archetype-aptitude-row--warning" : ""}">
               <div class="archetype-aptitude-row-label">${escapeHtml(statTitle)}</div>
               ${statControl}
               <select class="meta-select" data-perm-apt-skill="${index}">${skillOptions}</select>
               <div class="archetype-aptitude-preview">Selected: ${escapeHtml(selectedSkillLabel)}</div>
-              <div class="techniques-muted">${escapeHtml(slot.ruleText)}</div>
               ${isDuplicate ? '<div class="archetype-aptitude-warning">Duplicate pick detected. Choose a different skill.</div>' : ""}
             </div>
           `;
         }).join("")}
+        </div>
       </div>`
     : '<div class="techniques-app-empty">This archetype has no permanent aptitude requirements.</div>';
 
@@ -987,6 +993,7 @@ function renderBenefits(state) {
   const equipmentMarkup = equipmentLines.length
     ? `
       <div class="archetype-aptitude-picks">
+        <div class="meta-grid archetype-picker-grid">
         ${equipmentLines.map((line, index) => {
           const parsed = parseStartingEquipmentChoices(line);
           const selectedIndex = selections[index] || 0;
@@ -998,13 +1005,14 @@ function renderBenefits(state) {
             : `<div class="archetype-aptitude-preview">${escapeHtml(selected?.label || line)}</div>`;
 
           return `
-            <div class="archetype-aptitude-row">
+            <div class="meta-field">
               <div class="archetype-aptitude-row-label">Equipment ${index + 1}</div>
               ${selectMarkup}
               ${parsed.detail ? `<div class="techniques-muted">${escapeHtml(parsed.detail)}</div>` : ""}
             </div>
           `;
         }).join("")}
+        </div>
         <div class="inventory-form-actions">
           <button type="button" class="meta-toggle-btn" data-add-starting-equipment="true"${starterStatus.pendingSlots.length ? "" : " disabled"}>${equipmentButtonLabel}</button>
           <button type="button" class="inventory-secondary-btn" data-remove-starting-equipment="true"${starterStatus.hasAnyPresent ? "" : " disabled"}>Remove Granted Equipment</button>
@@ -1020,10 +1028,12 @@ function renderBenefits(state) {
       <div class="archetype-benefit-grid">
         <div>
           <div class="field-label">Permanent Aptitudes</div>
+          ${aptitudeInstructionMarkup}
           ${aptitudeMarkup}
         </div>
         <div>
           <div class="field-label">Starting Equipment</div>
+          <div class="techniques-muted">Choose your starting equipment options, then add or replace the granted gear below.</div>
           ${equipmentMarkup}
         </div>
       </div>
