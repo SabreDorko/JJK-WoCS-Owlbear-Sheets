@@ -198,6 +198,18 @@ function getAptitudeState(skillState) {
   return Math.max(0, Math.min(2, parsed));
 }
 
+function parseXpValue(rawValue) {
+  const parsed = parseInt(rawValue, 10);
+  if (!Number.isFinite(parsed)) return 0;
+  return Math.max(0, parsed);
+}
+
+function getAptitudeBonusValue(state) {
+  const overridden = getDerivedOverride(state, "aptitudeBonus");
+  if (Number.isFinite(overridden)) return overridden;
+  return 2;
+}
+
 function promoteStatFromFullAptitudes(state, statKey) {
   const statState = state?.stats?.[statKey];
   if (!statState || !Array.isArray(statState.skills) || !statState.skills.length) return false;
@@ -214,7 +226,9 @@ function promoteStatFromFullAptitudes(state, statKey) {
   // Only consume temporary aptitudes; permanent aptitudes are preserved.
   if (!temporaryAptitudeIndices.length) return false;
 
-  statState.score = String(parseStatScore(statState.score) + 1);
+  const newStatValue = parseStatScore(statState.score) + 1;
+  statState.score = String(newStatValue);
+  state.xp = String(parseXpValue(state.xp) + newStatValue);
   temporaryAptitudeIndices.forEach(index => {
     const currentSkill = statState.skills[index] || { aptitude: 0 };
     statState.skills[index] = { ...currentSkill, aptitude: 0 };
@@ -319,7 +333,9 @@ function getSubskillValue(state, effects, statKey, skillIndex) {
   if (Number.isFinite(overridden)) return overridden;
   const skillState = state?.stats?.[statKey]?.skills?.[skillIndex] || {};
   const lockedFromArchetype = getArchetypePermanentAptitudeSource(state, statKey, skillIndex);
-  const aptitudeBonus = (lockedFromArchetype || getAptitudeState(skillState) > 0) ? 2 : 0;
+  const aptitudeBonus = (lockedFromArchetype || getAptitudeState(skillState) > 0)
+    ? getAptitudeBonusValue(state)
+    : 0;
   const statSkillBonus = effects?.skillBonuses?.[statKey] || 0;
   const specificSkillBonus = effects?.specificSkillBonuses?.[`${statKey}:${skillIndex}`] || 0;
   return aptitudeBonus + statSkillBonus + specificSkillBonus;
@@ -711,7 +727,7 @@ function wireDerivedOverrideInput(inputId, fieldKey) {
 
 function applyOverrideFieldReadOnlyState() {
   document.body.classList.toggle("override-mode", _isOverrideMode);
-  const editableWhenOverride = ["acInput", "hpMax", "ceMax", "moveInput"];
+  const editableWhenOverride = ["acInput", "hpMax", "ceMax", "moveInput", "aptitudeBonusInput"];
   editableWhenOverride.forEach(id => {
     const el = document.getElementById(id);
     if (!el) return;
@@ -736,6 +752,13 @@ export function applyCharacterStateToUI() {
     ctInput.readOnly = true;
     ctInput.title = "Managed from the Jujutsu tab";
   }
+  const aptitudeBonusInput = document.getElementById("aptitudeBonusInput");
+  if (aptitudeBonusInput) {
+    setInputValueWithPulse(aptitudeBonusInput, formatSignedValue(getAptitudeBonusValue(state)));
+  }
+  state.xp = String(parseXpValue(state.xp));
+  const xpInput = document.getElementById("xpInput");
+  if (xpInput) xpInput.value = state.xp;
   document.getElementById("playerName").value = state.playerName || "";
   setInputValueWithPulse(document.getElementById("acInput"), state.ac || "");
   setInputValueWithPulse(document.getElementById("hpCurrent"), state.hpCurrent || "");
@@ -768,6 +791,7 @@ export function applyCharacterStateToUI() {
   ensureDerivedOverrideMarker("hpMax", "hpMax");
   ensureDerivedOverrideMarker("ceMax", "ceMax");
   ensureDerivedOverrideMarker("moveInput", "movement");
+  ensureDerivedOverrideMarker("aptitudeBonusInput", "aptitudeBonus");
   syncRestControlsUI(state);
 }
 
@@ -797,6 +821,7 @@ export function initCharacter({ getState: getStateFn, scheduleSave: scheduleSave
   bindField("ageInput", "age");
   bindField("gradeSelect", "grade");
   bindField("playerName", "playerName");
+  bindField("xpInput", "xp");
   bindField("hpCurrent", "hpCurrent");
   bindField("ceCurrent", "ceCurrent");
   bindField("ceNote", "ceNote");
@@ -813,6 +838,7 @@ export function initCharacter({ getState: getStateFn, scheduleSave: scheduleSave
   wireDerivedOverrideInput("hpMax", "hpMax");
   wireDerivedOverrideInput("ceMax", "ceMax");
   wireDerivedOverrideInput("moveInput", "movement");
+  wireDerivedOverrideInput("aptitudeBonusInput", "aptitudeBonus");
 
   const overrideBtn = document.getElementById("overrideModeBtn");
   if (overrideBtn) {

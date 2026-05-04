@@ -66,7 +66,7 @@ export function defaultState() {
   });
   return {
     charName: "", archetype: "", subArchetype: "", age: "",
-    grade: "", ct: "", playerName: "", sorcererXp: "",
+    grade: "", ct: "", playerName: "", sorcererXp: "", xp: "0",
     techniques: {
       mode: "none",
       activeSubtab: "technique",
