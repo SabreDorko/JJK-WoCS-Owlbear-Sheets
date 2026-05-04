@@ -2056,6 +2056,9 @@ export function renderInventory() {
       const leftBoundary = Math.max(viewportPad, (tabRect?.left ?? viewportPad) + 2);
       const rightBoundary = Math.min(window.innerWidth - viewportPad, (tabRect?.right ?? window.innerWidth - viewportPad) - 2);
 
+      // Reset any previous horizontal clamp offset before recalculating.
+      menu.style.marginLeft = "";
+
       menu.classList.remove("confirm-below", "confirm-align-right");
       if (!forceAlignLeft) menu.classList.remove("confirm-align-left");
       const rect = menu.getBoundingClientRect();
@@ -2077,6 +2080,16 @@ export function renderInventory() {
       if (!forceAlignLeft && adjusted.right > rightBoundary) {
         menu.classList.remove("confirm-align-right");
         menu.classList.add("confirm-align-left");
+        adjusted = menu.getBoundingClientRect();
+      }
+
+      // Final hard clamp: preserve chosen anchor, then nudge the popup back inside bounds.
+      const overflowLeft = leftBoundary - adjusted.left;
+      const overflowRight = adjusted.right - rightBoundary;
+      if (overflowLeft > 0) {
+        menu.style.marginLeft = `${Math.ceil(overflowLeft)}px`;
+      } else if (overflowRight > 0) {
+        menu.style.marginLeft = `${-Math.ceil(overflowRight)}px`;
       }
     });
   });
