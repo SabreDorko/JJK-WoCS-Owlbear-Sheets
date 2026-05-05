@@ -444,12 +444,15 @@ function initDirectModifierUI() {
 
   if (!menu || !menuBtn || !panel || !closeBtn || !addBtn || !saveBtn || !cancelBtn || !listEl) return;
 
-  menuBtn.addEventListener("click", () => {
+  menuBtn.addEventListener("click", e => {
+    e.preventDefault();
+    e.stopPropagation();
     const targetType = menu.dataset.targetType;
     const targetKey = menu.dataset.targetKey;
     closeModifierContextMenu();
     if (!targetType || !targetKey) return;
-    openDirectModifierPanel(targetType, targetKey);
+    // Defer panel open so document-level click handlers from this same click cannot close it.
+    setTimeout(() => openDirectModifierPanel(targetType, targetKey), 0);
   });
 
   closeBtn.addEventListener("click", closeDirectModifierPanel);
@@ -471,9 +474,6 @@ function initDirectModifierUI() {
 
   document.addEventListener("click", e => {
     if (!menu.hidden && !menu.contains(e.target)) closeModifierContextMenu();
-    if (!panel.hidden && !panel.contains(e.target) && !(e.target instanceof Element && e.target.closest(".stat-block, .vital-box, .header-mini-vital"))) {
-      closeDirectModifierPanel();
-    }
   });
 
   document.addEventListener("scroll", () => closeModifierContextMenu(), true);
