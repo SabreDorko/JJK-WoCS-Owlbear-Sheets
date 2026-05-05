@@ -888,7 +888,8 @@ function getEffectiveStatLevel(state, effects, statKey) {
 function getSubskillValue(state, effects, statKey, skillIndex) {
   const skillState = state?.stats?.[statKey]?.skills?.[skillIndex] || {};
   const aptitude = parseInt(skillState.aptitude, 10) || 0;
-  const aptitudeBonus = aptitude > 0 ? getAptitudeBonusValue(state, effects) : 0;
+  const hasPermanentAptitude = !!getArchetypePermanentAptitudeSource?.(state, statKey, skillIndex);
+  const aptitudeBonus = (aptitude > 0 || hasPermanentAptitude) ? getAptitudeBonusValue(state, effects) : 0;
   const statSkillBonus = effects?.skillBonuses?.[statKey] || 0;
   const specificBonus = effects?.specificSkillBonuses?.[`${statKey}:${skillIndex}`] || 0;
   const baseValue = aptitudeBonus + statSkillBonus + specificBonus;

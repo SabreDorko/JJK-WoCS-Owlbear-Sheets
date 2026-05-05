@@ -159,7 +159,7 @@ function renderMartialArt(art) {
     <div class="combat-art-item">
       <strong>${escapeHtml(art.title)}</strong>
       <span>${escapeHtml(art.description)}</span>
-      <em>Uses: ${art.usesPerEncounter} &nbsp;·&nbsp; Req: ${art.statRequirement.stat} ${art.statRequirement.value}</em>
+      <em>Cooldown: ${art.cooldown} turn${art.cooldown === 1 ? '' : 's'} &nbsp;·&nbsp; Req: ${art.statRequirement.stat} ${art.statRequirement.value}</em>
     </div>`;
 }
 
