@@ -189,20 +189,20 @@ export function initNotes({ getState: getStateFn, scheduleSave: scheduleSaveFn }
     }
 
     list.addEventListener("click", e => {
-            // Pin button
-            const pinBtn = e.target?.closest?.("[data-note-pin]");
-            if (pinBtn) {
-              const noteId = String(pinBtn.dataset.notePin || "");
-              const idx = findNoteIndexById(state, noteId);
-              if (idx >= 0) {
-                state.notes[idx].pinned = !state.notes[idx].pinned;
-                scheduleSave();
-                renderNotes(state);
-              }
-              return;
-            }
       const state = getState();
       if (!state) return;
+      // Pin button
+      const pinBtn = e.target?.closest?.("[data-note-pin]");
+      if (pinBtn) {
+        const noteId = String(pinBtn.dataset.notePin || "");
+        const idx = findNoteIndexById(state, noteId);
+        if (idx >= 0) {
+          state.notes[idx].pinned = !state.notes[idx].pinned;
+          scheduleSave();
+          renderNotes(state);
+        }
+        return;
+      }
 
       const toggleBtn = e.target?.closest?.("[data-note-toggle]");
       if (toggleBtn) {
@@ -216,14 +216,14 @@ export function initNotes({ getState: getStateFn, scheduleSave: scheduleSaveFn }
           if (wrap) wrap.classList.toggle("notes-content-wrap--collapsed", nextCollapsed);
           scheduleSave();
         }
-        return;
-      }
-
-      const deleteBtn = e.target?.closest?.("[data-note-delete]");
-      if (deleteBtn) {
-        const noteId = String(deleteBtn.dataset.noteDelete || "");
-        _pendingDeleteNoteId = _pendingDeleteNoteId === noteId ? null : noteId;
-        renderNotes(state);
+        return `
+          <article class="notes-item${isNew}" data-note-id="${escapeHtml(note.id)}">
+            <div class="notes-item-head">
+              <button type="button" class="notes-pin-btn${pinClass}" data-note-pin="${escapeHtml(note.id)}" aria-label="Pin note" title="Pin">
+                <svg class="notes-pin-icon" viewBox="0 0 20 20" width="16" height="16" aria-hidden="true" focusable="false">
+                  <path d="M7.5 2.5c-.3.1-.4.5-.2.7l2.1 3.2-5.1 5.1c-.2.2-.2.5 0 .7l2.5 2.5c.2.2.5.2.7 0l5.1-5.1 3.2 2.1c.2.1.6 0 .7-.2.1-.2.1-.5-.1-.7l-2.7-2.7.7-2.1c.1-.3-.2-.6-.5-.5l-2.1.7-2.7-2.7c-.2-.2-.5-.2-.7-.1z" fill="${note.pinned ? 'var(--accent)' : 'var(--ink-faint)'}"/>
+                </svg>
+              </button>
         return;
       }
 
