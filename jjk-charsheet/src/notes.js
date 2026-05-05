@@ -24,7 +24,7 @@ function ensureNotesState(state) {
       title: String(raw.title || "Untitled Note"),
       content: String(raw.content || ""),
       collapsed: Boolean(raw.collapsed),
-      pinned: Boolean(raw.pinned),
+      pinned: typeof raw.pinned === "boolean" ? raw.pinned : false,
     };
   });
 }
@@ -67,8 +67,11 @@ function renderNotes(state) {
       note.content.toLowerCase().includes(searchValue)
     );
   }
-  // Sort: pinned first, then by most recent (original order)
-  notes = notes.slice().sort((a, b) => (b.pinned - a.pinned));
+  // Sort: pinned first, then by original order (id fallback)
+  notes = notes.slice().sort((a, b) => {
+    if (b.pinned !== a.pinned) return b.pinned - a.pinned;
+    return (a.id > b.id ? -1 : 1);
+  });
 
   if (!notes.length) {
     list.innerHTML = '<div class="notes-empty">No notes yet. Click New Note to start writing.</div>';
@@ -85,7 +88,7 @@ function renderNotes(state) {
         <div class="notes-item-head">
           <button type="button" class="notes-pin-btn${pinClass}" data-note-pin="${escapeHtml(note.id)}" aria-label="Pin note" title="Pin">
             <svg class="notes-pin-icon" viewBox="0 0 20 20" width="16" height="16" aria-hidden="true" focusable="false">
-              <path d="M10.5 2.5a1 1 0 0 0-1 0l-2.5 1.5a1 1 0 0 0-.5.87v2.13a1 1 0 0 1-.5.87l-2.5 1.5a1 1 0 0 0 0 1.74l2.5 1.5a1 1 0 0 1 .5.87v2.13a1 1 0 0 0 .5.87l2.5 1.5a1 1 0 0 0 1 0l2.5-1.5a1 1 0 0 0 .5-.87v-2.13a1 1 0 0 1 .5-.87l2.5-1.5a1 1 0 0 0 0-1.74l-2.5-1.5a1 1 0 0 1-.5-.87V4.87a1 1 0 0 0-.5-.87z" fill="${note.pinned ? 'var(--accent)' : 'var(--ink-faint)'}"/>
+              <path d="M10.5 2.5c-.28 0-.5.22-.5.5v3.09l-3.16 1.05a.5.5 0 0 0-.13.92l2.79 1.61-.7 6.08a.5.5 0 0 0 .77.48l2.43-1.62 2.43 1.62a.5.5 0 0 0 .77-.48l-.7-6.08 2.79-1.61a.5.5 0 0 0-.13-.92L11 6.09V3a.5.5 0 0 0-.5-.5z" fill="${note.pinned ? 'var(--accent)' : 'var(--ink-faint)'}"/>
             </svg>
           </button>
           <button type="button" class="notes-toggle-btn${toggleCollapsedClass}" data-note-toggle="${escapeHtml(note.id)}" aria-label="Toggle note">
@@ -143,6 +146,7 @@ function createNewNote() {
     title: "Untitled Note",
     content: "",
     collapsed: false,
+    pinned: false,
   });
   _newlyAddedNoteId = newId;
 
