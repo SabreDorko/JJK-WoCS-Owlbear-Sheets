@@ -508,9 +508,9 @@ function initModifierEditorUI() {
   const list = document.getElementById("itemModifiersList");
   const kindSelect = document.getElementById("itemModifierKindSelect");
   const statSelect = document.getElementById("itemModifierStatSelect");
-  const saveBtn = document.getElementById("itemModifierSaveBtn");
+  const modSaveBtn = document.getElementById("itemModifierSaveBtn");
   const cancelBtn = document.getElementById("itemModifierCancelBtn");
-  if (!editBtn || !addBtn || !list || !kindSelect || !statSelect || !saveBtn || !cancelBtn) return;
+  if (!editBtn || !addBtn || !list || !kindSelect || !statSelect || !modSaveBtn || !cancelBtn) return;
 
   const editor = document.getElementById("itemModifiersEditor");
   const statDefinitions = getStatDefinitions();
@@ -537,7 +537,7 @@ function initModifierEditorUI() {
   kindSelect.addEventListener("change", syncModifierFieldVisibility);
   statSelect.addEventListener("change", syncModifierSkillOptions);
 
-  saveBtn.addEventListener("click", () => {
+  modSaveBtn.addEventListener("click", () => {
     const nextModifier = getModifierDraftFromForm();
     if (!nextModifier) {
       setItemFormError("Modifier value must be non-zero.");
@@ -1285,9 +1285,13 @@ function ensureWeaponEditorFields() {
     formGrid.appendChild(field);
   }
 
-  // Keep action buttons anchored under dynamic weapon fields.
-  const actionsRow = formGrid.querySelector(".inventory-form-actions");
-  if (actionsRow) formGrid.appendChild(actionsRow);
+  // Move Buttons to end of form
+  const cancelBtn = document.getElementById("cancelEditItemBtn");
+  const saveItemsBtn=document.getElementById("saveItemBtn");
+  const el = document.getElementById("itemFormError");
+  formGrid.appendChild(cancelBtn);
+  formGrid.appendChild(saveItemsBtn);
+  formGrid.appendChild(el);
 }
 
 function initWeaponDamageEditorUI() {
