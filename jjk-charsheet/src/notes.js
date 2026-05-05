@@ -88,7 +88,10 @@ function renderNotes(state) {
         <div class="notes-item-head">
           <button type="button" class="notes-pin-btn${pinClass}" data-note-pin="${escapeHtml(note.id)}" aria-label="Pin note" title="Pin">
             <svg class="notes-pin-icon" viewBox="0 0 20 20" width="16" height="16" aria-hidden="true" focusable="false">
-              <path d="M7.5 2.5c-.2.1-.3.4-.2.6l2.2 4.2-4.2 4.2c-.2.2-.2.5 0 .7l2.1 2.1c.2.2.5.2.7 0l4.2-4.2 4.2 2.2c.2.1.5 0 .6-.2.1-.2.1-.5-.1-.7l-2.7-2.7.7-2.1c.1-.3-.2-.6-.5-.5l-2.1.7-2.7-2.7c-.2-.2-.5-.2-.7-.1z" fill="${note.pinned ? 'var(--accent)' : 'var(--ink-faint)'}"/>
+                <g transform="scale(-1,1) translate(-20,0)">
+                  <path d="M10 2c-1.1 0-2 .9-2 2 0 .6.3 1.2.7 1.6l-2.6 6.1c-.2.5.1 1 .6 1.1l3.3.7v3.5c0 .3.2.5.5.5s.5-.2.5-.5v-3.5l3.3-.7c.5-.1.8-.6.6-1.1l-2.6-6.1c.4-.4.7-1 .7-1.6 0-1.1-.9-2-2-2zm0 1c.6 0 1 .4 1 1s-.4 1-1 1-1-.4-1-1 .4-1 1-1zm-2.1 9.2l2.1-5 2.1 5-4.2 0z" fill="${note.pinned ? 'var(--accent)' : 'var(--ink-faint)'}"/>
+                  <rect x="9.25" y="15" width="1.5" height="3" rx="0.75" fill="${note.pinned ? 'var(--accent)' : 'var(--ink-faint)'}"/>
+                </g>
             </svg>
           </button>
           <button type="button" class="notes-toggle-btn${toggleCollapsedClass}" data-note-toggle="${escapeHtml(note.id)}" aria-label="Toggle note">
@@ -191,6 +194,14 @@ export function initNotes({ getState: getStateFn, scheduleSave: scheduleSaveFn }
     list.addEventListener("click", e => {
       const state = getState();
       if (!state) return;
+      // Delete button (show confirmation)
+      const deleteBtn = e.target?.closest?.("[data-note-delete]");
+      if (deleteBtn) {
+        const noteId = String(deleteBtn.dataset.noteDelete || "");
+        _pendingDeleteNoteId = noteId;
+        renderNotes(state);
+        return;
+      }
       // Pin button
       const pinBtn = e.target?.closest?.("[data-note-pin]");
       if (pinBtn) {
@@ -216,14 +227,6 @@ export function initNotes({ getState: getStateFn, scheduleSave: scheduleSaveFn }
           if (wrap) wrap.classList.toggle("notes-content-wrap--collapsed", nextCollapsed);
           scheduleSave();
         }
-        return `
-          <article class="notes-item${isNew}" data-note-id="${escapeHtml(note.id)}">
-            <div class="notes-item-head">
-              <button type="button" class="notes-pin-btn${pinClass}" data-note-pin="${escapeHtml(note.id)}" aria-label="Pin note" title="Pin">
-                <svg class="notes-pin-icon" viewBox="0 0 20 20" width="16" height="16" aria-hidden="true" focusable="false">
-                  <path d="M7.5 2.5c-.3.1-.4.5-.2.7l2.1 3.2-5.1 5.1c-.2.2-.2.5 0 .7l2.5 2.5c.2.2.5.2.7 0l5.1-5.1 3.2 2.1c.2.1.6 0 .7-.2.1-.2.1-.5-.1-.7l-2.7-2.7.7-2.1c.1-.3-.2-.6-.5-.5l-2.1.7-2.7-2.7c-.2-.2-.5-.2-.7-.1z" fill="${note.pinned ? 'var(--accent)' : 'var(--ink-faint)'}"/>
-                </svg>
-              </button>
         return;
       }
 
