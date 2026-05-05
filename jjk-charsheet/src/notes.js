@@ -24,6 +24,7 @@ function ensureNotesState(state) {
       title: String(raw.title || "Untitled Note"),
       content: String(raw.content || ""),
       collapsed: Boolean(raw.collapsed),
+      pinned: Boolean(raw.pinned),
     };
   });
 }
@@ -49,13 +50,25 @@ function repositionNotesFloatingMenus() {
   });
 }
 
+let _notesSearchValue = "";
 function renderNotes(state) {
   const list = document.getElementById("notesList");
   if (!list) return;
 
   ensureNotesState(state);
-  const notes = state.notes;
+  let notes = state.notes;
   if (_pendingDeleteNoteId && !notes.some(note => note.id === _pendingDeleteNoteId)) _pendingDeleteNoteId = null;
+
+  // Filter by search
+  const searchValue = (_notesSearchValue || "").toLowerCase();
+  if (searchValue) {
+    notes = notes.filter(note =>
+      note.title.toLowerCase().includes(searchValue) ||
+      note.content.toLowerCase().includes(searchValue)
+    );
+  }
+  // Sort: pinned first, then by most recent (original order)
+  notes = notes.slice().sort((a, b) => (b.pinned - a.pinned));
 
   if (!notes.length) {
     list.innerHTML = '<div class="notes-empty">No notes yet. Click New Note to start writing.</div>';
@@ -66,9 +79,15 @@ function renderNotes(state) {
     const isNew = note.id === _newlyAddedNoteId ? " notes-item--new" : "";
     const collapsedClass = note.collapsed ? " notes-content-wrap--collapsed" : "";
     const toggleCollapsedClass = note.collapsed ? " is-collapsed" : "";
+    const pinClass = note.pinned ? " notes-pin-btn--pinned" : "";
     return `
       <article class="notes-item${isNew}" data-note-id="${escapeHtml(note.id)}">
         <div class="notes-item-head">
+          <button type="button" class="notes-pin-btn${pinClass}" data-note-pin="${escapeHtml(note.id)}" aria-label="Pin note" title="Pin">
+            <svg class="notes-pin-icon" viewBox="0 0 20 20" width="16" height="16" aria-hidden="true" focusable="false">
+              <path d="M10.5 2.5a1 1 0 0 0-1 0l-2.5 1.5a1 1 0 0 0-.5.87v2.13a1 1 0 0 1-.5.87l-2.5 1.5a1 1 0 0 0 0 1.74l2.5 1.5a1 1 0 0 1 .5.87v2.13a1 1 0 0 0 .5.87l2.5 1.5a1 1 0 0 0 1 0l2.5-1.5a1 1 0 0 0 .5-.87v-2.13a1 1 0 0 1 .5-.87l2.5-1.5a1 1 0 0 0 0-1.74l-2.5-1.5a1 1 0 0 1-.5-.87V4.87a1 1 0 0 0-.5-.87z" fill="${note.pinned ? 'var(--accent)' : 'var(--ink-faint)'}"/>
+            </svg>
+          </button>
           <button type="button" class="notes-toggle-btn${toggleCollapsedClass}" data-note-toggle="${escapeHtml(note.id)}" aria-label="Toggle note">
             <svg class="notes-toggle-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
               <path fill="currentColor" d="M7 10.5 12 15.5 17 10.5l-1.4-1.4-3.6 3.6-3.6-3.6z"/>
@@ -156,7 +175,28 @@ export function initNotes({ getState: getStateFn, scheduleSave: scheduleSaveFn }
   }
 
   if (list) {
+    // Search input event
+    const searchInput = document.getElementById("notesSearchInput");
+    if (searchInput) {
+      searchInput.addEventListener("input", e => {
+        _notesSearchValue = e.target.value;
+        renderNotes(getState());
+      });
+    }
+
     list.addEventListener("click", e => {
+            // Pin button
+            const pinBtn = e.target?.closest?.("[data-note-pin]");
+            if (pinBtn) {
+              const noteId = String(pinBtn.dataset.notePin || "");
+              const idx = findNoteIndexById(state, noteId);
+              if (idx >= 0) {
+                state.notes[idx].pinned = !state.notes[idx].pinned;
+                scheduleSave();
+                renderNotes(state);
+              }
+              return;
+            }
       const state = getState();
       if (!state) return;
 

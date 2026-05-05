@@ -1,3 +1,38 @@
+/* ── NOTES SEARCH & PIN ── */
+.notes-search-row {
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.notes-search-input {
+  width: 100%;
+  font-size: 13px;
+  padding: 3px 0;
+}
+.notes-pin-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  margin-right: 6px;
+  opacity: 0.55;
+  transition: opacity 0.15s;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+}
+.notes-pin-btn:hover,
+.notes-pin-btn:focus-visible {
+  opacity: 1;
+}
+.notes-pin-btn--pinned {
+  opacity: 1;
+}
+.notes-pin-icon {
+  display: block;
+  width: 16px;
+  height: 16px;
+}
 :root {
       --ink: #1a1410;
       --ink-light: #3d342a;
