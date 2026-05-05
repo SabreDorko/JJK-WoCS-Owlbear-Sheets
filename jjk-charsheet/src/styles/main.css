@@ -315,6 +315,16 @@
       outline: none;
     }
 
+    .roll-mode-divider {
+      height: 1px;
+      background: var(--border);
+      margin: 3px 2px;
+    }
+
+    .roll-mode-divider[hidden] {
+      display: none !important;
+    }
+
     .sheet-modifier-context-menu {
       position: fixed;
       z-index: 42;
@@ -351,7 +361,7 @@
       position: fixed;
       top: 0;
       right: 0;
-      width: min(340px, 88vw);
+      width: min(290px, 52vw);
       height: 100vh;
       z-index: 41;
       border-left: 1.5px solid var(--ink);
@@ -362,9 +372,16 @@
       flex-direction: column;
       gap: 8px;
       overflow: hidden;
+      transform: translateX(14px);
+      opacity: 0;
+      transition: transform 220ms ease, opacity 220ms ease;
     }
     .sheet-modifier-panel[hidden] {
       display: none !important;
+    }
+    .sheet-modifier-panel.is-open {
+      transform: translateX(0);
+      opacity: 1;
     }
     .sheet-modifier-panel-header {
       display: flex;
@@ -431,6 +448,25 @@
       display: grid;
       gap: 6px;
     }
+    .sheet-modifier-add-row {
+      border: 1px dashed var(--border-strong);
+      background: rgba(240, 235, 224, 0.75);
+      color: var(--ink-light);
+      font-family: 'Cinzel', serif;
+      font-size: 9px;
+      letter-spacing: 0.9px;
+      text-transform: uppercase;
+      text-align: center;
+      padding: 6px;
+      cursor: pointer;
+      transition: border-color 120ms ease, background 120ms ease;
+    }
+    .sheet-modifier-add-row:hover,
+    .sheet-modifier-add-row:focus-visible {
+      border-color: var(--ink);
+      background: rgba(240, 235, 224, 0.95);
+      outline: none;
+    }
     .sheet-modifier-empty {
       font-family: 'Crimson Text', serif;
       font-size: 13px;
@@ -445,6 +481,11 @@
       grid-template-columns: 1fr auto;
       gap: 6px;
       align-items: center;
+      animation: modifierRowIn 180ms ease;
+    }
+    .sheet-modifier-row.is-removing {
+      animation: modifierRowOut 170ms ease forwards;
+      pointer-events: none;
     }
     .sheet-modifier-row-main {
       display: flex;
@@ -466,20 +507,41 @@
       overflow: hidden;
       text-overflow: ellipsis;
     }
-    .sheet-modifier-actions {
+    .sheet-modifier-row-actions {
       display: flex;
-      justify-content: flex-start;
+      align-items: center;
+      gap: 4px;
     }
     .sheet-modifier-form {
       border-top: 1px solid var(--border);
       padding-top: 6px;
       display: grid;
       gap: 6px;
+      max-height: 0;
+      opacity: 0;
+      transform: translateY(-6px);
+      overflow: hidden;
+      transition: max-height 180ms ease, opacity 180ms ease, transform 180ms ease;
+    }
+    .sheet-modifier-form.is-open {
+      max-height: 260px;
+      opacity: 1;
+      transform: translateY(0);
     }
 
-    @media (max-width: 860px) {
+    @keyframes modifierRowIn {
+      from { opacity: 0; transform: translateX(7px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+
+    @keyframes modifierRowOut {
+      from { opacity: 1; transform: translateX(0); }
+      to { opacity: 0; transform: translateX(9px); }
+    }
+
+    @media (max-width: 640px) {
       .sheet-modifier-panel {
-        width: 100vw;
+        width: min(290px, 90vw);
       }
     }
 
@@ -1243,6 +1305,44 @@
     }
     .skill-name:hover {
       color: var(--accent);
+    }
+
+    .direct-modified-badge {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      border: 1px solid var(--accent);
+      background: rgba(139, 26, 26, 0.2);
+      box-shadow: 0 0 0 1px rgba(240, 235, 224, 0.65);
+      display: inline-block;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 120ms ease;
+      pointer-events: auto;
+    }
+    .direct-modified-badge.visible {
+      opacity: 1;
+      visibility: visible;
+      background: var(--accent);
+      cursor: pointer;
+    }
+    .stat-score-side {
+      position: relative;
+    }
+    .stat-mod-badge {
+      position: absolute;
+      top: 5px;
+      right: 5px;
+    }
+    .skill-mod-badge {
+      flex: 0 0 auto;
+      margin-right: 2px;
+    }
+    .vital-mod-badge {
+      position: absolute;
+      top: 6px;
+      right: 6px;
+      z-index: 2;
     }
 
     /* ── COMING SOON PANELS ── */

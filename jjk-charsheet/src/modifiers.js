@@ -5,11 +5,36 @@ const STAT_KEYS = new Set(STAT_DEFS.map(def => def.key));
 const STAT_LABELS = Object.fromEntries(STAT_DEFS.map(def => [def.key, def.label.charAt(0) + def.label.slice(1).toLowerCase()]));
 const SKILLS_BY_STAT = Object.fromEntries(STAT_DEFS.map(def => [def.key, [...def.skills]]));
 const DIRECT_DERIVED_KEYS = new Set(["hpMax", "ceMax", "ac", "movement", "aptitudeBonus"]);
+const DIRECT_OPERATIONS = new Set(["add", "multiply", "divide"]);
 
 function parseModifierValue(rawValue) {
   const parsed = parseInt(rawValue, 10);
   if (!Number.isFinite(parsed)) return 0;
   return Math.max(-999, Math.min(999, parsed));
+}
+
+function parseDirectModifierValue(rawValue, operation) {
+  const parsed = parseFloat(rawValue);
+  if (!Number.isFinite(parsed)) return null;
+
+  if (operation === "add") {
+    const limited = Math.max(-999, Math.min(999, parsed));
+    if (limited === 0) return null;
+    return Math.round(limited * 1000) / 1000;
+  }
+
+  if (operation === "multiply") {
+    const limited = Math.max(-50, Math.min(50, parsed));
+    return Math.round(limited * 1000) / 1000;
+  }
+
+  if (operation === "divide") {
+    const limited = Math.max(-50, Math.min(50, parsed));
+    if (limited === 0) return null;
+    return Math.round(limited * 1000) / 1000;
+  }
+
+  return null;
 }
 
 function isValidSubskillKey(subskillKey) {
@@ -26,7 +51,10 @@ export function normalizeDirectModifierList(rawList) {
     .map((entry, idx) => {
       const targetType = String(entry?.targetType || "").trim();
       const targetKey = String(entry?.targetKey || "").trim();
-      const value = parseModifierValue(entry?.value);
+      const operation = DIRECT_OPERATIONS.has(String(entry?.operation || "").trim())
+        ? String(entry.operation).trim()
+        : "add";
+      const value = parseDirectModifierValue(entry?.value, operation);
       const source = String(entry?.source || "").trim().slice(0, 120);
 
       if (!["stat", "subskill", "derived"].includes(targetType)) return null;
@@ -34,17 +62,29 @@ export function normalizeDirectModifierList(rawList) {
       if (targetType === "stat" && !STAT_KEYS.has(targetKey)) return null;
       if (targetType === "subskill" && !isValidSubskillKey(targetKey)) return null;
       if (targetType === "derived" && !DIRECT_DERIVED_KEYS.has(targetKey)) return null;
-      if (value === 0) return null;
+      if (!Number.isFinite(value)) return null;
 
       return {
         id: String(entry?.id || `direct_mod_${Date.now()}_${idx}`),
         targetType,
         targetKey,
+        operation,
         value,
         source,
       };
     })
     .filter(Boolean);
+}
+
+export function applyDirectModifiers(baseValue, modifiers) {
+  return normalizeDirectModifierList(modifiers).reduce((current, modifier) => {
+    const value = Number(modifier.value);
+    if (!Number.isFinite(value)) return current;
+
+    if (modifier.operation === "multiply") return current * value;
+    if (modifier.operation === "divide") return value === 0 ? current : current / value;
+    return current + value;
+  }, Number.isFinite(baseValue) ? baseValue : 0);
 }
 
 export function normalizeModifierList(rawList) {
@@ -126,11 +166,6 @@ export function buildEmptyModifierEffects() {
     skillBonuses,
     rollBonuses,
     specificSkillBonuses: {},
-    derivedBonuses: {
-      hpMax: 0,
-      ceMax: 0,
-      aptitudeBonus: 0,
-    },
     acBonus: 0,
     movementBonus: 0,
     extraInventorySlots: 0,
@@ -163,33 +198,7 @@ export function computeActiveModifierEffects(state) {
     });
   }
 
-  normalizeDirectModifierList(state.directModifiers).forEach(modifier => {
-    const value = parseModifierValue(modifier.value);
-    if (modifier.targetType === "stat" && STAT_KEYS.has(modifier.targetKey)) {
-      effects.statBonuses[modifier.targetKey] += value;
-      return;
-    }
-
-    if (modifier.targetType === "subskill" && isValidSubskillKey(modifier.targetKey)) {
-      effects.specificSkillBonuses[modifier.targetKey] = (effects.specificSkillBonuses[modifier.targetKey] || 0) + value;
-      return;
-    }
-
-    if (modifier.targetType === "derived") {
-      if (modifier.targetKey === "ac") effects.acBonus += value;
-      else if (modifier.targetKey === "movement") effects.movementBonus += value;
-      else if (modifier.targetKey === "hpMax") effects.derivedBonuses.hpMax += value;
-      else if (modifier.targetKey === "ceMax") effects.derivedBonuses.ceMax += value;
-      else if (modifier.targetKey === "aptitudeBonus") effects.derivedBonuses.aptitudeBonus += value;
-    }
-  });
-
   return effects;
-}
-
-export function getDirectModifiersForTarget(state, targetType, targetKey) {
-  return normalizeDirectModifierList(state?.directModifiers)
-    .filter(entry => entry.targetType === targetType && entry.targetKey === targetKey);
 }
 
 export function getSkillOptions(statKey) {

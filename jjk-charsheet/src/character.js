@@ -1,5 +1,5 @@
 import { ARCHETYPES, CENTER_STATS, RIGHT_STATS } from "./state/store.js";
-import { computeActiveModifierEffects, getRollModifierSources, normalizeDirectModifierList } from "./modifiers.js";
+import { applyDirectModifiers, computeActiveModifierEffects, getRollModifierSources, normalizeDirectModifierList } from "./modifiers.js";
 import { updateTechniquesDerivedUI } from "./techniques.js";
 
 let _getState = null;
@@ -9,7 +9,9 @@ let _initialized = false;
 let _isOverrideMode = false;
 let _rollModeMenu = null;
 let _pendingRollModeAction = null;
+let _pendingRollModeModifierAction = null;
 let _activeDirectModifierTarget = null;
+let _editingDirectModifierId = null;
 
 const DIRECT_DERIVED_LABELS = {
   hpMax: "Max HP",
@@ -44,10 +46,19 @@ function ensureDirectModifierState(state) {
   if (!Array.isArray(state.directModifiers)) state.directModifiers = [];
 }
 
-function parseDirectModifierValue(rawValue) {
-  const parsed = parseInt(rawValue, 10);
-  if (!Number.isFinite(parsed)) return 0;
-  return Math.max(-999, Math.min(999, parsed));
+function parseDirectModifierValue(rawValue, operation = "add") {
+  const parsed = parseFloat(rawValue);
+  if (!Number.isFinite(parsed)) return null;
+  if (operation === "add") {
+    if (parsed === 0) return null;
+    return Math.max(-999, Math.min(999, parsed));
+  }
+  if (operation === "multiply") return Math.max(-50, Math.min(50, parsed));
+  if (operation === "divide") {
+    if (parsed === 0) return null;
+    return Math.max(-50, Math.min(50, parsed));
+  }
+  return null;
 }
 
 function escapeHtml(value) {
@@ -91,13 +102,86 @@ function getTargetDirectModifiers(state, targetType, targetKey) {
     .filter(entry => entry.targetType === targetType && entry.targetKey === targetKey);
 }
 
-function getDirectModifierTotal(state, targetType, targetKey) {
-  return getTargetDirectModifiers(state, targetType, targetKey)
-    .reduce((sum, entry) => sum + parseDirectModifierValue(entry.value), 0);
+function hasDirectModifiers(state, targetType, targetKey) {
+  return getTargetDirectModifiers(state, targetType, targetKey).length > 0;
+}
+
+function setModifiedBadgeState(badgeEl, isVisible) {
+  if (!badgeEl) return;
+  badgeEl.classList.toggle("visible", Boolean(isVisible));
+  badgeEl.title = isVisible ? "Modified" : "";
+  badgeEl.setAttribute("aria-label", isVisible ? "Modified" : "");
+  badgeEl.tabIndex = isVisible ? 0 : -1;
+  badgeEl.setAttribute("role", "button");
+}
+
+function ensureVitalModifierBadge(containerId) {
+  const container = document.getElementById(containerId);
+  if (!container) return null;
+
+  let badge = container.querySelector(".direct-modified-badge.vital-mod-badge");
+  if (!badge) {
+    badge = document.createElement("span");
+    badge.className = "direct-modified-badge vital-mod-badge";
+    container.appendChild(badge);
+  }
+
+  return badge;
+}
+
+function updateDerivedModifierBadges(state) {
+  const configs = [
+    ["hpVitalBox", "derived", "hpMax"],
+    ["ceVitalBox", "derived", "ceMax"],
+    ["acVitalBox", "derived", "ac"],
+    ["movementVitalBox", "derived", "movement"],
+    ["aptitudeBonusVitalBox", "derived", "aptitudeBonus"],
+  ];
+
+  configs.forEach(([containerId, targetType, targetKey]) => {
+    const badge = ensureVitalModifierBadge(containerId);
+    if (badge && !badge.dataset.boundClick) {
+      badge.dataset.boundClick = "true";
+      badge.addEventListener("click", e => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (!badge.classList.contains("visible")) return;
+        openDirectModifierPanel(targetType, targetKey);
+      });
+      badge.addEventListener("keydown", e => {
+        if (e.key !== "Enter" && e.key !== " ") return;
+        e.preventDefault();
+        e.stopPropagation();
+        if (!badge.classList.contains("visible")) return;
+        openDirectModifierPanel(targetType, targetKey);
+      });
+    }
+    setModifiedBadgeState(badge, hasDirectModifiers(state, targetType, targetKey));
+  });
+}
+
+function getDirectModifierOperationLabel(operation, value) {
+  if (operation === "multiply") return `x${value}`;
+  if (operation === "divide") return `/${value}`;
+  return formatSignedValue(value);
 }
 
 function formatSignedValue(value) {
   return value >= 0 ? `+${value}` : `${value}`;
+}
+
+function applyDirectModifiersForTarget(state, targetType, targetKey, baseValue) {
+  const entries = getTargetDirectModifiers(state, targetType, targetKey);
+  return applyDirectModifiers(baseValue, entries);
+}
+
+function getDirectModifierSummaryDelta(state, targetType, targetKey, baseValue) {
+  const totalValue = applyDirectModifiersForTarget(state, targetType, targetKey, baseValue);
+  return {
+    baseValue,
+    totalValue,
+    deltaValue: totalValue - baseValue,
+  };
 }
 
 function parseOptionalInt(rawValue) {
@@ -203,6 +287,7 @@ function closeRollModeMenu() {
   if (!_rollModeMenu) return;
   _rollModeMenu.hidden = true;
   _pendingRollModeAction = null;
+  _pendingRollModeModifierAction = null;
 }
 
 function ensureRollModeMenu() {
@@ -215,9 +300,19 @@ function ensureRollModeMenu() {
     <button type="button" class="roll-mode-item" data-roll-mode="advantage">Roll with Advantage</button>
     <button type="button" class="roll-mode-item" data-roll-mode="disadvantage">Roll with Disadvantage</button>
     <button type="button" class="roll-mode-item" data-roll-mode="normal">Normal Roll</button>
+    <div class="roll-mode-divider" data-roll-mode-divider hidden></div>
+    <button type="button" class="roll-mode-item" data-roll-mode-action="addModifier" hidden>Add Modifier</button>
   `;
 
   menu.addEventListener("click", e => {
+    const modifierButton = e.target.closest("[data-roll-mode-action]");
+    if (modifierButton) {
+      const modifierAction = _pendingRollModeModifierAction;
+      closeRollModeMenu();
+      if (modifierAction) modifierAction();
+      return;
+    }
+
     const button = e.target.closest("[data-roll-mode]");
     if (!button) return;
     const selectedMode = button.dataset.rollMode;
@@ -237,12 +332,21 @@ function ensureRollModeMenu() {
   return menu;
 }
 
-function openRollModeMenu(event, onSelectMode) {
+function openRollModeMenu(event, onSelectMode, options = {}) {
   event.preventDefault();
   event.stopPropagation();
 
   const menu = ensureRollModeMenu();
   _pendingRollModeAction = onSelectMode;
+  _pendingRollModeModifierAction = typeof options?.onAddModifier === "function"
+    ? options.onAddModifier
+    : null;
+
+  const modifierButton = menu.querySelector("[data-roll-mode-action='addModifier']");
+  const divider = menu.querySelector("[data-roll-mode-divider]");
+  const showModifierAction = Boolean(_pendingRollModeModifierAction);
+  if (modifierButton) modifierButton.hidden = !showModifierAction;
+  if (divider) divider.hidden = !showModifierAction;
 
   menu.hidden = false;
   const viewportWidth = window.innerWidth;
@@ -288,45 +392,73 @@ function openModifierContextMenu(event, targetType, targetKey) {
 }
 
 function getDirectModifierTargetValues(state, targetType, targetKey, effects) {
-  const directTotal = getDirectModifierTotal(state, targetType, targetKey);
-
   if (targetType === "stat") {
-    const totalValue = getEffectiveStatLevel(state, effects, targetKey);
-    return { baseValue: totalValue - directTotal, totalValue, directTotal };
+    const baseValue = getEffectiveStatLevel(state, effects, targetKey, { includeDirect: false });
+    return getDirectModifierSummaryDelta(state, targetType, targetKey, baseValue);
   }
 
   if (targetType === "subskill") {
     const parsed = parseSubskillTargetKey(targetKey);
-    if (!parsed) return { baseValue: 0, totalValue: 0, directTotal };
-    const totalValue = getSubskillValue(state, effects, parsed.statKey, parsed.skillIndex);
-    return { baseValue: totalValue - directTotal, totalValue, directTotal };
+    if (!parsed) return { baseValue: 0, totalValue: 0, deltaValue: 0 };
+    const baseValue = getSubskillValue(state, effects, parsed.statKey, parsed.skillIndex, { includeDirect: false });
+    return getDirectModifierSummaryDelta(state, targetType, targetKey, baseValue);
   }
 
   if (targetType === "derived") {
     if (targetKey === "aptitudeBonus") {
-      const totalValue = getAptitudeBonusValue(state, effects);
-      return { baseValue: totalValue - directTotal, totalValue, directTotal };
+      const baseValue = getAptitudeBonusValue(state, effects, { includeDirect: false });
+      return getDirectModifierSummaryDelta(state, targetType, targetKey, baseValue);
     }
 
-    const numericValue = parseInt(state?.[targetKey], 10);
-    const totalValue = Number.isFinite(numericValue) ? numericValue : 0;
-    return { baseValue: totalValue - directTotal, totalValue, directTotal };
+    let baseValue = 0;
+    if (targetKey === "hpMax") {
+      const powerLevel = getEffectiveStatLevel(state, effects, "power");
+      baseValue = Math.max(1, 10 + (powerLevel * 5));
+      baseValue = Math.max(1, getDerivedOverride(state, "hpMax") ?? baseValue);
+    } else if (targetKey === "ceMax") {
+      const techniqueLevel = getEffectiveStatLevel(state, effects, "technique");
+      const domainCtBonus = state?.techniques?.mode === "domain" ? 10 : 0;
+      baseValue = Math.max(1, 15 + (techniqueLevel * 5) + domainCtBonus);
+      baseValue = Math.max(1, getDerivedOverride(state, "ceMax") ?? baseValue);
+    } else if (targetKey === "ac") {
+      const techniqueLevel = getEffectiveStatLevel(state, effects, "technique");
+      const speedLevel = getEffectiveStatLevel(state, effects, "speed");
+      baseValue = Math.max(0, techniqueLevel + speedLevel + (effects?.acBonus || 0));
+      baseValue = Math.max(0, getDerivedOverride(state, "ac") ?? baseValue);
+    } else if (targetKey === "movement") {
+      const speedLevel = getEffectiveStatLevel(state, effects, "speed");
+      baseValue = Math.max(0, 30 + (speedLevel * 5) + (effects?.movementBonus || 0));
+      baseValue = Math.max(0, getDerivedOverride(state, "movement") ?? baseValue);
+    }
+    return getDirectModifierSummaryDelta(state, targetType, targetKey, baseValue);
   }
 
-  return { baseValue: 0, totalValue: 0, directTotal };
+  return { baseValue: 0, totalValue: 0, deltaValue: 0 };
 }
 
 function setDirectModifierFormOpen(isOpen) {
   const form = document.getElementById("sheetModifierForm");
   if (!form) return;
-  form.hidden = !isOpen;
+  if (!isOpen) {
+    form.classList.remove("is-open");
+    setTimeout(() => {
+      if (!form.classList.contains("is-open")) form.hidden = true;
+    }, 160);
+    return;
+  }
+  form.hidden = false;
+  requestAnimationFrame(() => form.classList.add("is-open"));
 }
 
 function closeDirectModifierPanel() {
   const panel = document.getElementById("sheetModifierPanel");
   if (!panel) return;
-  panel.hidden = true;
+  panel.classList.remove("is-open");
+  setTimeout(() => {
+    if (!panel.classList.contains("is-open")) panel.hidden = true;
+  }, 220);
   _activeDirectModifierTarget = null;
+  _editingDirectModifierId = null;
   setDirectModifierFormOpen(false);
 }
 
@@ -348,25 +480,35 @@ function renderDirectModifierPanel() {
   const listEl = document.getElementById("sheetModifierList");
 
   if (headingEl) headingEl.textContent = label || getDirectModifierTargetLabel(targetType, targetKey);
-  if (baseEl) baseEl.textContent = `${totals.baseValue}`;
-  if (deltaEl) deltaEl.textContent = formatSignedValue(totals.directTotal);
-  if (totalEl) totalEl.textContent = `${totals.totalValue}`;
+  if (baseEl) baseEl.textContent = `${Math.round(totals.baseValue * 1000) / 1000}`;
+  if (deltaEl) deltaEl.textContent = formatSignedValue(Math.round(totals.deltaValue * 1000) / 1000);
+  if (totalEl) totalEl.textContent = `${Math.round(totals.totalValue * 1000) / 1000}`;
 
   if (!listEl) return;
+  const addRow = `
+    <button type="button" id="sheetModifierAddBtn" class="sheet-modifier-add-row">
+      + Add Modifier
+    </button>
+  `;
+
   if (!entries.length) {
-    listEl.innerHTML = '<div class="sheet-modifier-empty">No direct modifiers yet.</div>';
+    listEl.innerHTML = `${addRow}<div class="sheet-modifier-empty">No direct modifiers yet.</div>`;
     return;
   }
 
-  listEl.innerHTML = entries.map(entry => {
+  listEl.innerHTML = addRow + entries.map(entry => {
     const sourceText = entry.source ? escapeHtml(entry.source) : "No source";
+    const modifierLabel = getDirectModifierOperationLabel(entry.operation, entry.value);
     return `
       <div class="sheet-modifier-row" data-direct-modifier-id="${escapeHtml(entry.id)}">
         <div class="sheet-modifier-row-main">
-          <span class="sheet-modifier-row-value">${formatSignedValue(parseDirectModifierValue(entry.value))}</span>
+          <span class="sheet-modifier-row-value">${modifierLabel}</span>
           <span class="sheet-modifier-row-source">${sourceText}</span>
         </div>
-        <button type="button" class="inventory-mini-btn danger" data-action="removeDirectModifier" data-modifier-id="${escapeHtml(entry.id)}">Remove</button>
+        <div class="sheet-modifier-row-actions">
+          <button type="button" class="inventory-mini-btn" data-action="editDirectModifier" data-modifier-id="${escapeHtml(entry.id)}">Edit</button>
+          <button type="button" class="inventory-mini-btn danger" data-action="removeDirectModifier" data-modifier-id="${escapeHtml(entry.id)}">Remove</button>
+        </div>
       </div>
     `;
   }).join("");
@@ -380,7 +522,9 @@ function openDirectModifierPanel(targetType, targetKey) {
     targetKey,
     label: getDirectModifierTargetLabel(targetType, targetKey),
   };
+  _editingDirectModifierId = null;
   panel.hidden = false;
+  requestAnimationFrame(() => panel.classList.add("is-open"));
   setDirectModifierFormOpen(false);
   renderDirectModifierPanel();
 }
@@ -391,37 +535,51 @@ function addDirectModifierFromForm() {
 
   const valueInput = document.getElementById("sheetModifierValueInput");
   const sourceInput = document.getElementById("sheetModifierSourceInput");
-  if (!valueInput || !sourceInput) return;
+  const operationInput = document.getElementById("sheetModifierOperationInput");
+  if (!valueInput || !sourceInput || !operationInput) return;
 
-  const value = parseDirectModifierValue(valueInput.value);
-  if (value === 0) {
+  const operation = operationInput.value || "add";
+  const value = parseDirectModifierValue(valueInput.value, operation);
+  if (!Number.isFinite(value)) {
     valueInput.focus();
     return;
   }
 
   ensureDirectModifierState(state);
-  state.directModifiers = normalizeDirectModifierList([
-    ...state.directModifiers,
-    {
-      id: `direct_mod_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-      targetType: _activeDirectModifierTarget.targetType,
-      targetKey: _activeDirectModifierTarget.targetKey,
-      value,
-      source: sourceInput.value,
-    },
-  ]);
+  const normalized = normalizeDirectModifierList(state.directModifiers);
+  const editingIndex = normalized.findIndex(entry => entry.id === _editingDirectModifierId);
+  const nextEntry = {
+    id: _editingDirectModifierId || `direct_mod_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+    targetType: _activeDirectModifierTarget.targetType,
+    targetKey: _activeDirectModifierTarget.targetKey,
+    operation,
+    value,
+    source: sourceInput.value,
+  };
+
+  if (editingIndex >= 0) normalized[editingIndex] = nextEntry;
+  else normalized.push(nextEntry);
+  state.directModifiers = normalizeDirectModifierList(normalized);
 
   valueInput.value = "";
   sourceInput.value = "";
+  operationInput.value = "add";
+  _editingDirectModifierId = null;
   setDirectModifierFormOpen(false);
   applyCharacterStateToUI();
   scheduleSave();
 }
 
-function removeDirectModifier(modifierId) {
+function removeDirectModifier(modifierId, rowEl = null) {
   const state = getState();
   if (!state || !modifierId) return;
   ensureDirectModifierState(state);
+
+  if (rowEl) {
+    rowEl.classList.add("is-removing");
+    setTimeout(() => removeDirectModifier(modifierId, null), 170);
+    return;
+  }
 
   const beforeCount = state.directModifiers.length;
   state.directModifiers = normalizeDirectModifierList(state.directModifiers)
@@ -432,17 +590,43 @@ function removeDirectModifier(modifierId) {
   scheduleSave();
 }
 
+function beginEditDirectModifier(modifierId) {
+  const state = getState();
+  if (!state || !_activeDirectModifierTarget || !modifierId) return;
+
+  const targetModifiers = getTargetDirectModifiers(
+    state,
+    _activeDirectModifierTarget.targetType,
+    _activeDirectModifierTarget.targetKey,
+  );
+  const current = targetModifiers.find(entry => entry.id === modifierId);
+  if (!current) return;
+
+  const valueInput = document.getElementById("sheetModifierValueInput");
+  const sourceInput = document.getElementById("sheetModifierSourceInput");
+  const operationInput = document.getElementById("sheetModifierOperationInput");
+  if (!valueInput || !sourceInput || !operationInput) return;
+
+  _editingDirectModifierId = modifierId;
+  operationInput.value = current.operation || "add";
+  valueInput.value = String(current.value);
+  valueInput.step = operationInput.value === "add" ? "1" : "0.1";
+  sourceInput.value = current.source || "";
+  setDirectModifierFormOpen(true);
+  valueInput.focus();
+}
+
 function initDirectModifierUI() {
   const menu = getModifierContextMenu();
   const menuBtn = document.getElementById("sheetModifierContextAdjustBtn");
   const panel = document.getElementById("sheetModifierPanel");
   const closeBtn = document.getElementById("sheetModifierCloseBtn");
-  const addBtn = document.getElementById("sheetModifierAddBtn");
   const saveBtn = document.getElementById("sheetModifierSaveBtn");
   const cancelBtn = document.getElementById("sheetModifierCancelBtn");
   const listEl = document.getElementById("sheetModifierList");
+  const operationInput = document.getElementById("sheetModifierOperationInput");
 
-  if (!menu || !menuBtn || !panel || !closeBtn || !addBtn || !saveBtn || !cancelBtn || !listEl) return;
+  if (!menu || !menuBtn || !panel || !closeBtn || !saveBtn || !cancelBtn || !listEl || !operationInput) return;
 
   menuBtn.addEventListener("click", e => {
     e.preventDefault();
@@ -457,19 +641,45 @@ function initDirectModifierUI() {
 
   closeBtn.addEventListener("click", closeDirectModifierPanel);
 
-  addBtn.addEventListener("click", () => {
-    setDirectModifierFormOpen(true);
-    const valueInput = document.getElementById("sheetModifierValueInput");
-    if (valueInput) valueInput.focus();
+  saveBtn.addEventListener("click", addDirectModifierFromForm);
+  cancelBtn.addEventListener("click", () => {
+    _editingDirectModifierId = null;
+    setDirectModifierFormOpen(false);
   });
 
-  saveBtn.addEventListener("click", addDirectModifierFromForm);
-  cancelBtn.addEventListener("click", () => setDirectModifierFormOpen(false));
+  operationInput.addEventListener("change", () => {
+    const valueInput = document.getElementById("sheetModifierValueInput");
+    if (!valueInput) return;
+    valueInput.step = operationInput.value === "add" ? "1" : "0.1";
+  });
 
   listEl.addEventListener("click", e => {
-    const button = e.target.closest("button[data-action='removeDirectModifier']");
-    if (!button) return;
-    removeDirectModifier(button.dataset.modifierId || "");
+    const addBtn = e.target.closest("#sheetModifierAddBtn");
+    if (addBtn) {
+      _editingDirectModifierId = null;
+      const valueInput = document.getElementById("sheetModifierValueInput");
+      const sourceInput = document.getElementById("sheetModifierSourceInput");
+      const operationInputInner = document.getElementById("sheetModifierOperationInput");
+      if (valueInput) valueInput.value = "";
+      if (sourceInput) sourceInput.value = "";
+      if (operationInputInner) operationInputInner.value = "add";
+      if (valueInput) valueInput.step = "1";
+      setDirectModifierFormOpen(true);
+      if (valueInput) valueInput.focus();
+      return;
+    }
+
+    const editBtn = e.target.closest("button[data-action='editDirectModifier']");
+    if (editBtn) {
+      beginEditDirectModifier(editBtn.dataset.modifierId || "");
+      return;
+    }
+
+    const removeBtn = e.target.closest("button[data-action='removeDirectModifier']");
+    if (removeBtn) {
+      const row = removeBtn.closest(".sheet-modifier-row");
+      removeDirectModifier(removeBtn.dataset.modifierId || "", row);
+    }
   });
 
   document.addEventListener("click", e => {
@@ -509,11 +719,11 @@ function parseXpValue(rawValue) {
   return Math.max(0, parsed);
 }
 
-function getAptitudeBonusValue(state, effects = null) {
+function getAptitudeBonusValue(state, effects = null, options = {}) {
   const overridden = getDerivedOverride(state, "aptitudeBonus");
-  if (Number.isFinite(overridden)) return overridden;
-  const activeEffects = effects || computeActiveModifierEffects(state);
-  return 2 + (activeEffects?.derivedBonuses?.aptitudeBonus || 0);
+  const baseValue = Number.isFinite(overridden) ? overridden : 2;
+  if (options?.includeDirect === false) return baseValue;
+  return Math.round(applyDirectModifiersForTarget(state, "derived", "aptitudeBonus", baseValue));
 }
 
 export function promoteStatFromFullAptitudes(state, statKey) {
@@ -626,13 +836,18 @@ function setInputValueWithPulse(inputEl, nextValue) {
   }, { once: true });
 }
 
-function getEffectiveStatLevel(state, effects, statKey) {
-  return parseStatScore(state?.stats?.[statKey]?.score) + (effects?.statBonuses?.[statKey] || 0);
+function getEffectiveStatLevel(state, effects, statKey, options = {}) {
+  const baseValue = parseStatScore(state?.stats?.[statKey]?.score) + (effects?.statBonuses?.[statKey] || 0);
+  if (options?.includeDirect === false) return baseValue;
+  return Math.max(0, Math.round(applyDirectModifiersForTarget(state, "stat", statKey, baseValue)));
 }
 
-function getSubskillValue(state, effects, statKey, skillIndex) {
+function getSubskillValue(state, effects, statKey, skillIndex, options = {}) {
   const overridden = getSubskillOverride(state, statKey, skillIndex);
-  if (Number.isFinite(overridden)) return overridden;
+  if (Number.isFinite(overridden)) {
+    if (options?.includeDirect === false) return overridden;
+    return applyDirectModifiersForTarget(state, "subskill", `${statKey}:${skillIndex}`, overridden);
+  }
   const skillState = state?.stats?.[statKey]?.skills?.[skillIndex] || {};
   const lockedFromArchetype = getArchetypePermanentAptitudeSource(state, statKey, skillIndex);
   const aptitudeBonus = (lockedFromArchetype || getAptitudeState(skillState) > 0)
@@ -640,7 +855,9 @@ function getSubskillValue(state, effects, statKey, skillIndex) {
     : 0;
   const statSkillBonus = effects?.skillBonuses?.[statKey] || 0;
   const specificSkillBonus = effects?.specificSkillBonuses?.[`${statKey}:${skillIndex}`] || 0;
-  return aptitudeBonus + statSkillBonus + specificSkillBonus;
+  const baseValue = aptitudeBonus + statSkillBonus + specificSkillBonus;
+  if (options?.includeDirect === false) return baseValue;
+  return Math.round(applyDirectModifiersForTarget(state, "subskill", `${statKey}:${skillIndex}`, baseValue));
 }
 
 function applyDerivedCharacterFields({ preserveCurrent = true } = {}) {
@@ -653,15 +870,20 @@ function applyDerivedCharacterFields({ preserveCurrent = true } = {}) {
   const speedLevel = getEffectiveStatLevel(state, effects, "speed");
   const domainCtBonus = state?.techniques?.mode === "domain" ? 10 : 0;
 
-  const nextHpMax = Math.max(1, 10 + (powerLevel * 5) + (effects?.derivedBonuses?.hpMax || 0));
-  const nextCeMax = Math.max(1, 15 + (techniqueLevel * 5) + domainCtBonus + (effects?.derivedBonuses?.ceMax || 0));
-  const nextAc = Math.max(0, techniqueLevel + speedLevel + (effects.acBonus || 0));
-  const nextMovement = Math.max(0, 30 + (speedLevel * 5) + (effects.movementBonus || 0));
+  const baseHpMax = Math.max(1, 10 + (powerLevel * 5));
+  const baseCeMax = Math.max(1, 15 + (techniqueLevel * 5) + domainCtBonus);
+  const baseAc = Math.max(0, techniqueLevel + speedLevel + (effects.acBonus || 0));
+  const baseMovement = Math.max(0, 30 + (speedLevel * 5) + (effects.movementBonus || 0));
 
-  const finalHpMax = Math.max(1, getDerivedOverride(state, "hpMax") ?? nextHpMax);
-  const finalCeMax = Math.max(1, getDerivedOverride(state, "ceMax") ?? nextCeMax);
-  const finalAc = Math.max(0, getDerivedOverride(state, "ac") ?? nextAc);
-  const finalMovement = Math.max(0, getDerivedOverride(state, "movement") ?? nextMovement);
+  const hpBaseFromOverride = Math.max(1, getDerivedOverride(state, "hpMax") ?? baseHpMax);
+  const ceBaseFromOverride = Math.max(1, getDerivedOverride(state, "ceMax") ?? baseCeMax);
+  const acBaseFromOverride = Math.max(0, getDerivedOverride(state, "ac") ?? baseAc);
+  const movementBaseFromOverride = Math.max(0, getDerivedOverride(state, "movement") ?? baseMovement);
+
+  const finalHpMax = Math.max(0, Math.round(applyDirectModifiersForTarget(state, "derived", "hpMax", hpBaseFromOverride)));
+  const finalCeMax = Math.max(0, Math.round(applyDirectModifiersForTarget(state, "derived", "ceMax", ceBaseFromOverride)));
+  const finalAc = Math.max(0, Math.round(applyDirectModifiersForTarget(state, "derived", "ac", acBaseFromOverride)));
+  const finalMovement = Math.max(0, Math.round(applyDirectModifiersForTarget(state, "derived", "movement", movementBaseFromOverride)));
 
   const previousHpMax = parseInt(state.hpMax, 10);
   const previousCeMax = parseInt(state.ceMax, 10);
@@ -694,7 +916,7 @@ export function updateBlackFlashRangeDisplay() {
 
   const techRaw = state?.stats?.technique?.score;
   const effects = computeActiveModifierEffects(state);
-  const tech = (parseInt(techRaw, 10) || 0) + (effects.statBonuses.technique || 0);
+  const tech = getEffectiveStatLevel(state, effects, "technique");
   const range = getBlackFlashRange(tech);
 
   if (range === null) {
@@ -726,8 +948,10 @@ function buildStatBlocks(defs, container) {
 
     const scoreSide = document.createElement("div");
     scoreSide.className = "stat-score-side";
+    const statHasDirectModifiers = hasDirectModifiers(state, "stat", def.key);
     scoreSide.innerHTML = `
       <div class="stat-label">${def.label}</div>
+      <span class="direct-modified-badge stat-mod-badge${statHasDirectModifiers ? " visible" : ""}" title="${statHasDirectModifiers ? "Modified" : ""}" aria-label="${statHasDirectModifiers ? "Modified" : ""}"></span>
       <input class="stat-score-input" type="number" placeholder="—"
              id="score_${def.key}" value="${sd.score}" min="0" />
       <button class="roll-btn" type="button" title="Roll ${def.label.charAt(0).toUpperCase() + def.label.slice(1).toLowerCase()}">Roll</button>
@@ -766,6 +990,22 @@ function buildStatBlocks(defs, container) {
         openModifierContextMenu(event, "stat", def.key);
       });
     }
+    const statBadgeEl = scoreSide.querySelector(".direct-modified-badge.stat-mod-badge");
+    if (statBadgeEl) {
+      statBadgeEl.addEventListener("click", e => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (!statBadgeEl.classList.contains("visible")) return;
+        openDirectModifierPanel("stat", def.key);
+      });
+      statBadgeEl.addEventListener("keydown", e => {
+        if (e.key !== "Enter" && e.key !== " ") return;
+        e.preventDefault();
+        e.stopPropagation();
+        if (!statBadgeEl.classList.contains("visible")) return;
+        openDirectModifierPanel("stat", def.key);
+      });
+    }
     statRollBtn.addEventListener("click", () => runStatRoll("normal"));
     statRollBtn.addEventListener("contextmenu", event => {
       openRollModeMenu(event, selectedMode => runStatRoll(selectedMode));
@@ -794,6 +1034,7 @@ function buildStatBlocks(defs, container) {
         ? getNextAptitudeActionLabel(aptitudeState, true)
         : (aptitudeState > 0 ? "Aptitude" : "Locked");
       const hasOverride = Number.isFinite(getSubskillOverride(state, def.key, i));
+      const subskillHasDirectModifiers = hasDirectModifiers(state, "subskill", `${def.key}:${i}`);
       const row = document.createElement("div");
       row.className = "skill-row";
       row.innerHTML = `
@@ -802,6 +1043,7 @@ function buildStatBlocks(defs, container) {
         <input class="skill-bonus-input" type="text"
                id="bonus_${def.key}_${i}" value="${formatSignedValue(subskillValue)}" ${_isOverrideMode ? "" : "readonly"} title="${hasOverride ? "Overridden" : "Auto-calculated"}" />
         <button type="button" class="override-marker-btn${hasOverride ? " visible" : ""}" data-subskill-override-clear="${def.key}:${i}" title="${_isOverrideMode ? "Click to clear override" : "Overridden"}" ${_isOverrideMode ? "" : "tabindex=\"-1\""}>*</button>
+        <span class="direct-modified-badge skill-mod-badge${subskillHasDirectModifiers ? " visible" : ""}" title="${subskillHasDirectModifiers ? "Modified" : ""}" aria-label="${subskillHasDirectModifiers ? "Modified" : ""}"></span>
         <span class="skill-name" title="Roll ${skill}">${skill}</span>
       `;
       skillsSide.appendChild(row);
@@ -812,6 +1054,23 @@ function buildStatBlocks(defs, container) {
         if (target instanceof Element && target.closest(".skill-name, .skill-bonus-input")) return;
         openModifierContextMenu(event, "subskill", `${def.key}:${i}`);
       });
+
+      const subskillBadgeEl = row.querySelector(".direct-modified-badge.skill-mod-badge");
+      if (subskillBadgeEl) {
+        subskillBadgeEl.addEventListener("click", e => {
+          e.preventDefault();
+          e.stopPropagation();
+          if (!subskillBadgeEl.classList.contains("visible")) return;
+          openDirectModifierPanel("subskill", `${def.key}:${i}`);
+        });
+        subskillBadgeEl.addEventListener("keydown", e => {
+          if (e.key !== "Enter" && e.key !== " ") return;
+          e.preventDefault();
+          e.stopPropagation();
+          if (!subskillBadgeEl.classList.contains("visible")) return;
+          openDirectModifierPanel("subskill", `${def.key}:${i}`);
+        });
+      }
 
       row.querySelector(".skill-dot").addEventListener("click", () => {
         // In normal mode, dots are fully locked
@@ -912,7 +1171,9 @@ function buildStatBlocks(defs, container) {
 
       skillNameEl.addEventListener("click", () => runSkillRoll("normal"));
       skillNameEl.addEventListener("contextmenu", event => {
-        openRollModeMenu(event, selectedMode => runSkillRoll(selectedMode));
+        openRollModeMenu(event, selectedMode => runSkillRoll(selectedMode), {
+          onAddModifier: () => openDirectModifierPanel("subskill", `${def.key}:${i}`),
+        });
       });
 
       skillBonusEl.addEventListener("click", () => {
@@ -921,7 +1182,9 @@ function buildStatBlocks(defs, container) {
       });
       skillBonusEl.addEventListener("contextmenu", event => {
         if (_isOverrideMode) return;
-        openRollModeMenu(event, selectedMode => runSkillRoll(selectedMode));
+        openRollModeMenu(event, selectedMode => runSkillRoll(selectedMode), {
+          onAddModifier: () => openDirectModifierPanel("subskill", `${def.key}:${i}`),
+        });
       });
     });
 
@@ -1145,6 +1408,7 @@ export function applyCharacterStateToUI() {
   ensureDerivedOverrideMarker("ceMax", "ceMax");
   ensureDerivedOverrideMarker("moveInput", "movement");
   ensureDerivedOverrideMarker("aptitudeBonusInput", "aptitudeBonus");
+  updateDerivedModifierBadges(state);
   syncRestControlsUI(state);
   if (_activeDirectModifierTarget) renderDirectModifierPanel();
 }
@@ -1205,6 +1469,21 @@ export function initCharacter({ getState: getStateFn, scheduleSave: scheduleSave
     if (!input) return;
     input.title = `${input.title ? `${input.title} ` : ""}(Right-click to adjust modifiers)`;
     input.addEventListener("contextmenu", event => {
+      openModifierContextMenu(event, targetType, targetKey);
+    });
+  });
+
+  [
+    ["hpVitalBox", "derived", "hpMax"],
+    ["ceVitalBox", "derived", "ceMax"],
+    ["acVitalBox", "derived", "ac"],
+    ["movementVitalBox", "derived", "movement"],
+    ["aptitudeBonusVitalBox", "derived", "aptitudeBonus"],
+  ].forEach(([id, targetType, targetKey]) => {
+    const box = document.getElementById(id);
+    if (!box) return;
+    box.title = "Right-click to adjust modifiers";
+    box.addEventListener("contextmenu", event => {
       openModifierContextMenu(event, targetType, targetKey);
     });
   });

@@ -78,7 +78,7 @@
             <input class="meta-input" id="ctInput" placeholder="—" />
           </div>
           <div class="header-mini-vitals">
-            <div class="vital-box header-mini-vital">
+            <div class="vital-box header-mini-vital" id="aptitudeBonusVitalBox">
               <span class="vital-label">Aptitude Bonus</span>
               <div class="header-mini-value">
                 <input class="header-mini-input" id="aptitudeBonusInput" type="text" inputmode="numeric" placeholder="+2" />
@@ -103,7 +103,7 @@
         <div class="vitals-col">
 
           <!-- Health -->
-          <div class="vital-box">
+          <div class="vital-box" id="hpVitalBox">
             <span class="vital-label">Health</span>
             <div class="hp-row">
               <input class="hp-input" id="hpCurrent" placeholder="0" type="number" min="0" />
@@ -113,7 +113,7 @@
           </div>
 
           <!-- Cursed Energy -->
-          <div class="vital-box">
+          <div class="vital-box" id="ceVitalBox">
             <span class="vital-label">Cursed Energy</span>
             <div class="hp-row">
               <input class="hp-input" id="ceCurrent" placeholder="0" type="number" min="0" />
@@ -123,7 +123,7 @@
           </div>
 
           <!-- Armor Class -->
-          <div class="vital-box">
+          <div class="vital-box" id="acVitalBox">
             <div class="shield-wrap">
               <svg viewBox="0 0 60 68" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path d="M30 4L5 13V36C5 50 17 62 30 66C43 62 55 50 55 36V13L30 4Z"
@@ -142,7 +142,7 @@
           </div>
 
           <!-- Movement -->
-          <div class="vital-box">
+          <div class="vital-box" id="movementVitalBox">
             <span class="vital-label">Movement</span>
             <div class="move-row">
               <input class="move-input" id="moveInput" placeholder="—" />
@@ -668,11 +668,15 @@
     <div id="sheetModifierList" class="sheet-modifier-list"></div>
   </div>
 
-  <div class="sheet-modifier-actions">
-    <button id="sheetModifierAddBtn" type="button" class="inventory-mini-btn">+ Add Modifier</button>
-  </div>
-
   <div id="sheetModifierForm" class="sheet-modifier-form" hidden>
+    <label class="inventory-field">
+      <span class="field-label">Operation</span>
+      <select id="sheetModifierOperationInput" class="meta-select">
+        <option value="add">Add / Subtract</option>
+        <option value="multiply">Multiply</option>
+        <option value="divide">Divide</option>
+      </select>
+    </label>
     <label class="inventory-field">
       <span class="field-label">Value</span>
       <input id="sheetModifierValueInput" class="meta-input" type="number" step="1" placeholder="5" />
