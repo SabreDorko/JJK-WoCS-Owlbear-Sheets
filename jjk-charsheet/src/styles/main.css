@@ -315,6 +315,174 @@
       outline: none;
     }
 
+    .sheet-modifier-context-menu {
+      position: fixed;
+      z-index: 42;
+      min-width: 170px;
+      border: 1px solid var(--border-strong);
+      background: var(--parchment);
+      box-shadow: 1px 2px 0 rgba(26, 20, 16, 0.22);
+      padding: 4px;
+    }
+    .sheet-modifier-context-menu[hidden] {
+      display: none !important;
+    }
+    .sheet-modifier-context-item {
+      border: 1px solid transparent;
+      background: transparent;
+      color: var(--ink);
+      font-family: 'Cinzel', serif;
+      font-size: 10px;
+      letter-spacing: 0.7px;
+      text-transform: uppercase;
+      text-align: left;
+      width: 100%;
+      padding: 6px 7px;
+      cursor: pointer;
+    }
+    .sheet-modifier-context-item:hover,
+    .sheet-modifier-context-item:focus-visible {
+      border-color: var(--border);
+      background: var(--parchment-dark);
+      outline: none;
+    }
+
+    .sheet-modifier-panel {
+      position: fixed;
+      top: 0;
+      right: 0;
+      width: min(340px, 88vw);
+      height: 100vh;
+      z-index: 41;
+      border-left: 1.5px solid var(--ink);
+      background: linear-gradient(180deg, #f1ebde 0%, #e8dec9 100%);
+      box-shadow: -5px 0 18px rgba(26, 20, 16, 0.2);
+      padding: 10px 11px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      overflow: hidden;
+    }
+    .sheet-modifier-panel[hidden] {
+      display: none !important;
+    }
+    .sheet-modifier-panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 8px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 6px;
+    }
+    .sheet-modifier-panel-title {
+      font-family: 'Cinzel', serif;
+      font-size: 10px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--ink-light);
+    }
+    .sheet-modifier-panel-target {
+      margin-top: 2px;
+      font-family: 'Crimson Text', serif;
+      font-size: 17px;
+      line-height: 1.2;
+      color: var(--ink);
+    }
+    .sheet-modifier-totals {
+      border: 1px solid var(--border);
+      background: rgba(240, 235, 224, 0.6);
+      padding: 6px;
+      display: grid;
+      gap: 4px;
+    }
+    .sheet-modifier-total-row {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .sheet-modifier-total-row.emphasized {
+      border-top: 1px dashed var(--border);
+      padding-top: 4px;
+    }
+    .sheet-modifier-total-label {
+      font-family: 'Cinzel', serif;
+      font-size: 8px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--ink-faint);
+    }
+    .sheet-modifier-total-value {
+      font-family: 'Cinzel', serif;
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--ink);
+      text-align: right;
+    }
+    .sheet-modifier-list-wrap {
+      flex: 1;
+      border: 1px solid var(--border);
+      background: rgba(240, 235, 224, 0.58);
+      overflow: auto;
+      padding: 6px;
+      min-height: 84px;
+    }
+    .sheet-modifier-list {
+      display: grid;
+      gap: 6px;
+    }
+    .sheet-modifier-empty {
+      font-family: 'Crimson Text', serif;
+      font-size: 13px;
+      color: var(--ink-faint);
+      font-style: italic;
+    }
+    .sheet-modifier-row {
+      border: 1px solid var(--border);
+      background: rgba(240, 235, 224, 0.9);
+      padding: 5px 6px;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 6px;
+      align-items: center;
+    }
+    .sheet-modifier-row-main {
+      display: flex;
+      align-items: baseline;
+      gap: 6px;
+      min-width: 0;
+    }
+    .sheet-modifier-row-value {
+      font-family: 'Cinzel', serif;
+      font-size: 15px;
+      color: var(--accent);
+      font-weight: 600;
+    }
+    .sheet-modifier-row-source {
+      font-family: 'Crimson Text', serif;
+      font-size: 12px;
+      color: var(--ink-light);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .sheet-modifier-actions {
+      display: flex;
+      justify-content: flex-start;
+    }
+    .sheet-modifier-form {
+      border-top: 1px solid var(--border);
+      padding-top: 6px;
+      display: grid;
+      gap: 6px;
+    }
+
+    @media (max-width: 860px) {
+      .sheet-modifier-panel {
+        width: 100vw;
+      }
+    }
+
     .stat-derived-pulse {
       animation: statDerivedPulse 260ms ease;
     }

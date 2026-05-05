@@ -4,11 +4,47 @@ const STAT_DEFS = [...CENTER_STATS, ...RIGHT_STATS];
 const STAT_KEYS = new Set(STAT_DEFS.map(def => def.key));
 const STAT_LABELS = Object.fromEntries(STAT_DEFS.map(def => [def.key, def.label.charAt(0) + def.label.slice(1).toLowerCase()]));
 const SKILLS_BY_STAT = Object.fromEntries(STAT_DEFS.map(def => [def.key, [...def.skills]]));
+const DIRECT_DERIVED_KEYS = new Set(["hpMax", "ceMax", "ac", "movement", "aptitudeBonus"]);
 
 function parseModifierValue(rawValue) {
   const parsed = parseInt(rawValue, 10);
   if (!Number.isFinite(parsed)) return 0;
   return Math.max(-999, Math.min(999, parsed));
+}
+
+function isValidSubskillKey(subskillKey) {
+  const [statKey, rawIndex] = String(subskillKey || "").split(":");
+  const skillIndex = parseInt(rawIndex, 10);
+  const skills = SKILLS_BY_STAT[statKey] || [];
+  return STAT_KEYS.has(statKey) && Number.isInteger(skillIndex) && skillIndex >= 0 && skillIndex < skills.length;
+}
+
+export function normalizeDirectModifierList(rawList) {
+  if (!Array.isArray(rawList)) return [];
+
+  return rawList
+    .map((entry, idx) => {
+      const targetType = String(entry?.targetType || "").trim();
+      const targetKey = String(entry?.targetKey || "").trim();
+      const value = parseModifierValue(entry?.value);
+      const source = String(entry?.source || "").trim().slice(0, 120);
+
+      if (!["stat", "subskill", "derived"].includes(targetType)) return null;
+      if (!targetKey) return null;
+      if (targetType === "stat" && !STAT_KEYS.has(targetKey)) return null;
+      if (targetType === "subskill" && !isValidSubskillKey(targetKey)) return null;
+      if (targetType === "derived" && !DIRECT_DERIVED_KEYS.has(targetKey)) return null;
+      if (value === 0) return null;
+
+      return {
+        id: String(entry?.id || `direct_mod_${Date.now()}_${idx}`),
+        targetType,
+        targetKey,
+        value,
+        source,
+      };
+    })
+    .filter(Boolean);
 }
 
 export function normalizeModifierList(rawList) {
@@ -90,6 +126,11 @@ export function buildEmptyModifierEffects() {
     skillBonuses,
     rollBonuses,
     specificSkillBonuses: {},
+    derivedBonuses: {
+      hpMax: 0,
+      ceMax: 0,
+      aptitudeBonus: 0,
+    },
     acBonus: 0,
     movementBonus: 0,
     extraInventorySlots: 0,
@@ -98,30 +139,57 @@ export function buildEmptyModifierEffects() {
 
 export function computeActiveModifierEffects(state) {
   const effects = buildEmptyModifierEffects();
-  if (!state?.inventoryItems || !state?.equippedSlots) return effects;
+  if (!state) return effects;
 
-  const equippedIds = [...new Set(Object.values(state.equippedSlots).filter(Boolean))];
-  equippedIds.forEach(itemId => {
-    const item = state.inventoryItems.find(entry => entry.id === itemId);
-    if (!item) return;
-    const modifiers = normalizeModifierList(item.modifiers);
+  if (state.inventoryItems && state.equippedSlots) {
+    const equippedIds = [...new Set(Object.values(state.equippedSlots).filter(Boolean))];
+    equippedIds.forEach(itemId => {
+      const item = state.inventoryItems.find(entry => entry.id === itemId);
+      if (!item) return;
+      const modifiers = normalizeModifierList(item.modifiers);
 
-    modifiers.forEach(modifier => {
-      const value = parseModifierValue(modifier.value);
-      if (modifier.kind === "ac") effects.acBonus += value;
-      else if (modifier.kind === "movement") effects.movementBonus += value;
-      else if (modifier.kind === "storage") effects.extraInventorySlots += value;
-      else if (modifier.kind === "stat" && STAT_KEYS.has(modifier.statKey)) effects.statBonuses[modifier.statKey] += value;
-      else if (modifier.kind === "skills" && STAT_KEYS.has(modifier.statKey)) effects.skillBonuses[modifier.statKey] += value;
-      else if (modifier.kind === "rolls" && STAT_KEYS.has(modifier.statKey)) effects.rollBonuses[modifier.statKey] += value;
-      else if (modifier.kind === "skill" && STAT_KEYS.has(modifier.statKey)) {
-        const key = `${modifier.statKey}:${modifier.skillIndex}`;
-        effects.specificSkillBonuses[key] = (effects.specificSkillBonuses[key] || 0) + value;
-      }
+      modifiers.forEach(modifier => {
+        const value = parseModifierValue(modifier.value);
+        if (modifier.kind === "ac") effects.acBonus += value;
+        else if (modifier.kind === "movement") effects.movementBonus += value;
+        else if (modifier.kind === "storage") effects.extraInventorySlots += value;
+        else if (modifier.kind === "stat" && STAT_KEYS.has(modifier.statKey)) effects.statBonuses[modifier.statKey] += value;
+        else if (modifier.kind === "rolls" && STAT_KEYS.has(modifier.statKey)) effects.rollBonuses[modifier.statKey] += value;
+        else if (modifier.kind === "skill" && STAT_KEYS.has(modifier.statKey)) {
+          const key = `${modifier.statKey}:${modifier.skillIndex}`;
+          effects.specificSkillBonuses[key] = (effects.specificSkillBonuses[key] || 0) + value;
+        }
+      });
     });
+  }
+
+  normalizeDirectModifierList(state.directModifiers).forEach(modifier => {
+    const value = parseModifierValue(modifier.value);
+    if (modifier.targetType === "stat" && STAT_KEYS.has(modifier.targetKey)) {
+      effects.statBonuses[modifier.targetKey] += value;
+      return;
+    }
+
+    if (modifier.targetType === "subskill" && isValidSubskillKey(modifier.targetKey)) {
+      effects.specificSkillBonuses[modifier.targetKey] = (effects.specificSkillBonuses[modifier.targetKey] || 0) + value;
+      return;
+    }
+
+    if (modifier.targetType === "derived") {
+      if (modifier.targetKey === "ac") effects.acBonus += value;
+      else if (modifier.targetKey === "movement") effects.movementBonus += value;
+      else if (modifier.targetKey === "hpMax") effects.derivedBonuses.hpMax += value;
+      else if (modifier.targetKey === "ceMax") effects.derivedBonuses.ceMax += value;
+      else if (modifier.targetKey === "aptitudeBonus") effects.derivedBonuses.aptitudeBonus += value;
+    }
   });
 
   return effects;
+}
+
+export function getDirectModifiersForTarget(state, targetType, targetKey) {
+  return normalizeDirectModifierList(state?.directModifiers)
+    .filter(entry => entry.targetType === targetType && entry.targetKey === targetKey);
 }
 
 export function getSkillOptions(statKey) {

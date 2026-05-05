@@ -1,5 +1,5 @@
 import { ARCHETYPES, CENTER_STATS, RIGHT_STATS } from "./state/store.js";
-import { computeActiveModifierEffects, getRollModifierSources } from "./modifiers.js";
+import { computeActiveModifierEffects, getRollModifierSources, normalizeDirectModifierList } from "./modifiers.js";
 import { updateTechniquesDerivedUI } from "./techniques.js";
 
 let _getState = null;
@@ -9,6 +9,15 @@ let _initialized = false;
 let _isOverrideMode = false;
 let _rollModeMenu = null;
 let _pendingRollModeAction = null;
+let _activeDirectModifierTarget = null;
+
+const DIRECT_DERIVED_LABELS = {
+  hpMax: "Max HP",
+  ceMax: "Max CE",
+  ac: "Armor Class",
+  movement: "Movement",
+  aptitudeBonus: "Aptitude Bonus",
+};
 
 function getState() {
   return _getState ? _getState() : null;
@@ -28,6 +37,67 @@ function ensureRestState(state) {
   if (!state || typeof state !== "object") return;
   if (!state.restState || typeof state.restState !== "object") state.restState = {};
   state.restState.quickRestUsed = Boolean(state.restState.quickRestUsed);
+}
+
+function ensureDirectModifierState(state) {
+  if (!state || typeof state !== "object") return;
+  if (!Array.isArray(state.directModifiers)) state.directModifiers = [];
+}
+
+function parseDirectModifierValue(rawValue) {
+  const parsed = parseInt(rawValue, 10);
+  if (!Number.isFinite(parsed)) return 0;
+  return Math.max(-999, Math.min(999, parsed));
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
+function getStatLabel(statKey) {
+  const def = [...CENTER_STATS, ...RIGHT_STATS].find(entry => entry.key === statKey);
+  if (!def) return "Stat";
+  return def.label.charAt(0) + def.label.slice(1).toLowerCase();
+}
+
+function parseSubskillTargetKey(targetKey) {
+  const [statKey, rawSkillIndex] = String(targetKey || "").split(":");
+  const skillIndex = parseInt(rawSkillIndex, 10);
+  if (!statKey || !Number.isInteger(skillIndex)) return null;
+  const statDef = [...CENTER_STATS, ...RIGHT_STATS].find(entry => entry.key === statKey);
+  if (!statDef || skillIndex < 0 || skillIndex >= statDef.skills.length) return null;
+  return { statKey, skillIndex, skillName: statDef.skills[skillIndex], statLabel: getStatLabel(statKey) };
+}
+
+function getDirectModifierTargetLabel(targetType, targetKey) {
+  if (targetType === "stat") return `${getStatLabel(targetKey)} Level`;
+  if (targetType === "subskill") {
+    const parsed = parseSubskillTargetKey(targetKey);
+    if (!parsed) return "Substat";
+    return `${parsed.skillName} (${parsed.statLabel})`;
+  }
+  if (targetType === "derived") return DIRECT_DERIVED_LABELS[targetKey] || "Derived Field";
+  return "Modifier Target";
+}
+
+function getTargetDirectModifiers(state, targetType, targetKey) {
+  ensureDirectModifierState(state);
+  return normalizeDirectModifierList(state.directModifiers)
+    .filter(entry => entry.targetType === targetType && entry.targetKey === targetKey);
+}
+
+function getDirectModifierTotal(state, targetType, targetKey) {
+  return getTargetDirectModifiers(state, targetType, targetKey)
+    .reduce((sum, entry) => sum + parseDirectModifierValue(entry.value), 0);
+}
+
+function formatSignedValue(value) {
+  return value >= 0 ? `+${value}` : `${value}`;
 }
 
 function parseOptionalInt(rawValue) {
@@ -184,6 +254,237 @@ function openRollModeMenu(event, onSelectMode) {
   menu.style.top = `${top}px`;
 }
 
+function getModifierContextMenu() {
+  return document.getElementById("sheetModifierContextMenu");
+}
+
+function closeModifierContextMenu() {
+  const menu = getModifierContextMenu();
+  if (!menu) return;
+  menu.hidden = true;
+  menu.dataset.targetType = "";
+  menu.dataset.targetKey = "";
+  menu.dataset.targetLabel = "";
+}
+
+function openModifierContextMenu(event, targetType, targetKey) {
+  event.preventDefault();
+  event.stopPropagation();
+
+  const menu = getModifierContextMenu();
+  if (!menu) return;
+
+  menu.hidden = false;
+  menu.dataset.targetType = targetType;
+  menu.dataset.targetKey = targetKey;
+  menu.dataset.targetLabel = getDirectModifierTargetLabel(targetType, targetKey);
+  const viewportWidth = window.innerWidth;
+  const viewportHeight = window.innerHeight;
+  const rect = menu.getBoundingClientRect();
+  const left = Math.max(8, Math.min(event.clientX, viewportWidth - rect.width - 8));
+  const top = Math.max(8, Math.min(event.clientY, viewportHeight - rect.height - 8));
+  menu.style.left = `${left}px`;
+  menu.style.top = `${top}px`;
+}
+
+function getDirectModifierTargetValues(state, targetType, targetKey, effects) {
+  const directTotal = getDirectModifierTotal(state, targetType, targetKey);
+
+  if (targetType === "stat") {
+    const totalValue = getEffectiveStatLevel(state, effects, targetKey);
+    return { baseValue: totalValue - directTotal, totalValue, directTotal };
+  }
+
+  if (targetType === "subskill") {
+    const parsed = parseSubskillTargetKey(targetKey);
+    if (!parsed) return { baseValue: 0, totalValue: 0, directTotal };
+    const totalValue = getSubskillValue(state, effects, parsed.statKey, parsed.skillIndex);
+    return { baseValue: totalValue - directTotal, totalValue, directTotal };
+  }
+
+  if (targetType === "derived") {
+    if (targetKey === "aptitudeBonus") {
+      const totalValue = getAptitudeBonusValue(state, effects);
+      return { baseValue: totalValue - directTotal, totalValue, directTotal };
+    }
+
+    const numericValue = parseInt(state?.[targetKey], 10);
+    const totalValue = Number.isFinite(numericValue) ? numericValue : 0;
+    return { baseValue: totalValue - directTotal, totalValue, directTotal };
+  }
+
+  return { baseValue: 0, totalValue: 0, directTotal };
+}
+
+function setDirectModifierFormOpen(isOpen) {
+  const form = document.getElementById("sheetModifierForm");
+  if (!form) return;
+  form.hidden = !isOpen;
+}
+
+function closeDirectModifierPanel() {
+  const panel = document.getElementById("sheetModifierPanel");
+  if (!panel) return;
+  panel.hidden = true;
+  _activeDirectModifierTarget = null;
+  setDirectModifierFormOpen(false);
+}
+
+function renderDirectModifierPanel() {
+  const state = getState();
+  const panel = document.getElementById("sheetModifierPanel");
+  if (!state || !panel || !_activeDirectModifierTarget) return;
+  ensureDirectModifierState(state);
+
+  const { targetType, targetKey, label } = _activeDirectModifierTarget;
+  const effects = computeActiveModifierEffects(state);
+  const totals = getDirectModifierTargetValues(state, targetType, targetKey, effects);
+  const entries = getTargetDirectModifiers(state, targetType, targetKey);
+
+  const headingEl = document.getElementById("sheetModifierTargetLabel");
+  const baseEl = document.getElementById("sheetModifierBaseValue");
+  const deltaEl = document.getElementById("sheetModifierDeltaValue");
+  const totalEl = document.getElementById("sheetModifierTotalValue");
+  const listEl = document.getElementById("sheetModifierList");
+
+  if (headingEl) headingEl.textContent = label || getDirectModifierTargetLabel(targetType, targetKey);
+  if (baseEl) baseEl.textContent = `${totals.baseValue}`;
+  if (deltaEl) deltaEl.textContent = formatSignedValue(totals.directTotal);
+  if (totalEl) totalEl.textContent = `${totals.totalValue}`;
+
+  if (!listEl) return;
+  if (!entries.length) {
+    listEl.innerHTML = '<div class="sheet-modifier-empty">No direct modifiers yet.</div>';
+    return;
+  }
+
+  listEl.innerHTML = entries.map(entry => {
+    const sourceText = entry.source ? escapeHtml(entry.source) : "No source";
+    return `
+      <div class="sheet-modifier-row" data-direct-modifier-id="${escapeHtml(entry.id)}">
+        <div class="sheet-modifier-row-main">
+          <span class="sheet-modifier-row-value">${formatSignedValue(parseDirectModifierValue(entry.value))}</span>
+          <span class="sheet-modifier-row-source">${sourceText}</span>
+        </div>
+        <button type="button" class="inventory-mini-btn danger" data-action="removeDirectModifier" data-modifier-id="${escapeHtml(entry.id)}">Remove</button>
+      </div>
+    `;
+  }).join("");
+}
+
+function openDirectModifierPanel(targetType, targetKey) {
+  const panel = document.getElementById("sheetModifierPanel");
+  if (!panel) return;
+  _activeDirectModifierTarget = {
+    targetType,
+    targetKey,
+    label: getDirectModifierTargetLabel(targetType, targetKey),
+  };
+  panel.hidden = false;
+  setDirectModifierFormOpen(false);
+  renderDirectModifierPanel();
+}
+
+function addDirectModifierFromForm() {
+  const state = getState();
+  if (!state || !_activeDirectModifierTarget) return;
+
+  const valueInput = document.getElementById("sheetModifierValueInput");
+  const sourceInput = document.getElementById("sheetModifierSourceInput");
+  if (!valueInput || !sourceInput) return;
+
+  const value = parseDirectModifierValue(valueInput.value);
+  if (value === 0) {
+    valueInput.focus();
+    return;
+  }
+
+  ensureDirectModifierState(state);
+  state.directModifiers = normalizeDirectModifierList([
+    ...state.directModifiers,
+    {
+      id: `direct_mod_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      targetType: _activeDirectModifierTarget.targetType,
+      targetKey: _activeDirectModifierTarget.targetKey,
+      value,
+      source: sourceInput.value,
+    },
+  ]);
+
+  valueInput.value = "";
+  sourceInput.value = "";
+  setDirectModifierFormOpen(false);
+  applyCharacterStateToUI();
+  scheduleSave();
+}
+
+function removeDirectModifier(modifierId) {
+  const state = getState();
+  if (!state || !modifierId) return;
+  ensureDirectModifierState(state);
+
+  const beforeCount = state.directModifiers.length;
+  state.directModifiers = normalizeDirectModifierList(state.directModifiers)
+    .filter(entry => entry.id !== modifierId);
+  if (state.directModifiers.length === beforeCount) return;
+
+  applyCharacterStateToUI();
+  scheduleSave();
+}
+
+function initDirectModifierUI() {
+  const menu = getModifierContextMenu();
+  const menuBtn = document.getElementById("sheetModifierContextAdjustBtn");
+  const panel = document.getElementById("sheetModifierPanel");
+  const closeBtn = document.getElementById("sheetModifierCloseBtn");
+  const addBtn = document.getElementById("sheetModifierAddBtn");
+  const saveBtn = document.getElementById("sheetModifierSaveBtn");
+  const cancelBtn = document.getElementById("sheetModifierCancelBtn");
+  const listEl = document.getElementById("sheetModifierList");
+
+  if (!menu || !menuBtn || !panel || !closeBtn || !addBtn || !saveBtn || !cancelBtn || !listEl) return;
+
+  menuBtn.addEventListener("click", () => {
+    const targetType = menu.dataset.targetType;
+    const targetKey = menu.dataset.targetKey;
+    closeModifierContextMenu();
+    if (!targetType || !targetKey) return;
+    openDirectModifierPanel(targetType, targetKey);
+  });
+
+  closeBtn.addEventListener("click", closeDirectModifierPanel);
+
+  addBtn.addEventListener("click", () => {
+    setDirectModifierFormOpen(true);
+    const valueInput = document.getElementById("sheetModifierValueInput");
+    if (valueInput) valueInput.focus();
+  });
+
+  saveBtn.addEventListener("click", addDirectModifierFromForm);
+  cancelBtn.addEventListener("click", () => setDirectModifierFormOpen(false));
+
+  listEl.addEventListener("click", e => {
+    const button = e.target.closest("button[data-action='removeDirectModifier']");
+    if (!button) return;
+    removeDirectModifier(button.dataset.modifierId || "");
+  });
+
+  document.addEventListener("click", e => {
+    if (!menu.hidden && !menu.contains(e.target)) closeModifierContextMenu();
+    if (!panel.hidden && !panel.contains(e.target) && !(e.target instanceof Element && e.target.closest(".stat-block, .vital-box, .header-mini-vital"))) {
+      closeDirectModifierPanel();
+    }
+  });
+
+  document.addEventListener("scroll", () => closeModifierContextMenu(), true);
+  document.addEventListener("keydown", e => {
+    if (e.key === "Escape") {
+      closeModifierContextMenu();
+      closeDirectModifierPanel();
+    }
+  });
+}
+
 function getBlackFlashRange(techniqueScore) {
   if (!Number.isFinite(techniqueScore) || techniqueScore < 2) return null;
   if (techniqueScore > 7) return null;
@@ -208,10 +509,11 @@ function parseXpValue(rawValue) {
   return Math.max(0, parsed);
 }
 
-function getAptitudeBonusValue(state) {
+function getAptitudeBonusValue(state, effects = null) {
   const overridden = getDerivedOverride(state, "aptitudeBonus");
   if (Number.isFinite(overridden)) return overridden;
-  return 2;
+  const activeEffects = effects || computeActiveModifierEffects(state);
+  return 2 + (activeEffects?.derivedBonuses?.aptitudeBonus || 0);
 }
 
 export function promoteStatFromFullAptitudes(state, statKey) {
@@ -307,10 +609,6 @@ function getArchetypePermanentAptitudeSource(state, statKey, skillIndex) {
     && parseInt(entry?.skillIndex, 10) === skillIndex) || null;
 }
 
-function formatSignedValue(value) {
-  return value >= 0 ? `+${value}` : `${value}`;
-}
-
 function setInputValueWithPulse(inputEl, nextValue) {
   if (!inputEl) return;
   const next = String(nextValue ?? "");
@@ -338,7 +636,7 @@ function getSubskillValue(state, effects, statKey, skillIndex) {
   const skillState = state?.stats?.[statKey]?.skills?.[skillIndex] || {};
   const lockedFromArchetype = getArchetypePermanentAptitudeSource(state, statKey, skillIndex);
   const aptitudeBonus = (lockedFromArchetype || getAptitudeState(skillState) > 0)
-    ? getAptitudeBonusValue(state)
+    ? getAptitudeBonusValue(state, effects)
     : 0;
   const statSkillBonus = effects?.skillBonuses?.[statKey] || 0;
   const specificSkillBonus = effects?.specificSkillBonuses?.[`${statKey}:${skillIndex}`] || 0;
@@ -355,8 +653,8 @@ function applyDerivedCharacterFields({ preserveCurrent = true } = {}) {
   const speedLevel = getEffectiveStatLevel(state, effects, "speed");
   const domainCtBonus = state?.techniques?.mode === "domain" ? 10 : 0;
 
-  const nextHpMax = Math.max(1, 10 + (powerLevel * 5));
-  const nextCeMax = Math.max(1, 15 + (techniqueLevel * 5) + domainCtBonus);
+  const nextHpMax = Math.max(1, 10 + (powerLevel * 5) + (effects?.derivedBonuses?.hpMax || 0));
+  const nextCeMax = Math.max(1, 15 + (techniqueLevel * 5) + domainCtBonus + (effects?.derivedBonuses?.ceMax || 0));
   const nextAc = Math.max(0, techniqueLevel + speedLevel + (effects.acBonus || 0));
   const nextMovement = Math.max(0, 30 + (speedLevel * 5) + (effects.movementBonus || 0));
 
@@ -456,6 +754,18 @@ function buildStatBlocks(defs, container) {
     };
 
     const statRollBtn = scoreSide.querySelector(".roll-btn");
+    const statScoreInput = scoreSide.querySelector(".stat-score-input");
+    scoreSide.addEventListener("contextmenu", event => {
+      const target = event.target;
+      if (target instanceof Element && target.closest(".roll-btn")) return;
+      openModifierContextMenu(event, "stat", def.key);
+    });
+    if (statScoreInput) {
+      statScoreInput.title = "Base stat value (right-click to adjust modifiers)";
+      statScoreInput.addEventListener("contextmenu", event => {
+        openModifierContextMenu(event, "stat", def.key);
+      });
+    }
     statRollBtn.addEventListener("click", () => runStatRoll("normal"));
     statRollBtn.addEventListener("contextmenu", event => {
       openRollModeMenu(event, selectedMode => runStatRoll(selectedMode));
@@ -495,6 +805,13 @@ function buildStatBlocks(defs, container) {
         <span class="skill-name" title="Roll ${skill}">${skill}</span>
       `;
       skillsSide.appendChild(row);
+
+      row.title = "Right-click row area to adjust modifiers";
+      row.addEventListener("contextmenu", event => {
+        const target = event.target;
+        if (target instanceof Element && target.closest(".skill-name, .skill-bonus-input")) return;
+        openModifierContextMenu(event, "subskill", `${def.key}:${i}`);
+      });
 
       row.querySelector(".skill-dot").addEventListener("click", () => {
         // In normal mode, dots are fully locked
@@ -777,6 +1094,7 @@ export function applyCharacterStateToUI() {
 
   ensureOverrideState(state);
   ensureRestState(state);
+  ensureDirectModifierState(state);
   applyDerivedCharacterFields({ preserveCurrent: true });
 
   document.getElementById("charName").value = state.charName || "";
@@ -828,6 +1146,7 @@ export function applyCharacterStateToUI() {
   ensureDerivedOverrideMarker("moveInput", "movement");
   ensureDerivedOverrideMarker("aptitudeBonusInput", "aptitudeBonus");
   syncRestControlsUI(state);
+  if (_activeDirectModifierTarget) renderDirectModifierPanel();
 }
 
 export function initCharacter({ getState: getStateFn, scheduleSave: scheduleSaveFn, showRollToast: showRollToastFn }) {
@@ -874,6 +1193,23 @@ export function initCharacter({ getState: getStateFn, scheduleSave: scheduleSave
   wireDerivedOverrideInput("ceMax", "ceMax");
   wireDerivedOverrideInput("moveInput", "movement");
   wireDerivedOverrideInput("aptitudeBonusInput", "aptitudeBonus");
+
+  [
+    ["hpMax", "derived", "hpMax"],
+    ["ceMax", "derived", "ceMax"],
+    ["acInput", "derived", "ac"],
+    ["moveInput", "derived", "movement"],
+    ["aptitudeBonusInput", "derived", "aptitudeBonus"],
+  ].forEach(([id, targetType, targetKey]) => {
+    const input = document.getElementById(id);
+    if (!input) return;
+    input.title = `${input.title ? `${input.title} ` : ""}(Right-click to adjust modifiers)`;
+    input.addEventListener("contextmenu", event => {
+      openModifierContextMenu(event, targetType, targetKey);
+    });
+  });
+
+  initDirectModifierUI();
 
   const overrideBtn = document.getElementById("overrideModeBtn");
   if (overrideBtn) {

@@ -118,6 +118,7 @@ export function defaultState() {
     yen: "",
     rollHistory: [],
     inventoryItems: [],
+    directModifiers: [],
     inventorySlots: [null, null, null, null, null],
     dormItemIds: [],
     notes: [],

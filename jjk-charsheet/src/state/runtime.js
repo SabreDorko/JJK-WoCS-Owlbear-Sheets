@@ -6,6 +6,7 @@ export function mergeLoadedState({ saved, defaultState, centerStats, rightStats 
   if (!next.overrides || typeof next.overrides !== "object") next.overrides = { derived: {}, subskills: {} };
   if (!next.overrides.derived || typeof next.overrides.derived !== "object") next.overrides.derived = {};
   if (!next.overrides.subskills || typeof next.overrides.subskills !== "object") next.overrides.subskills = {};
+  if (!Array.isArray(next.directModifiers)) next.directModifiers = [];
 
   if (next.archetype2 || next.subArchetype2) {
     next.hasSecondArchetype = true;

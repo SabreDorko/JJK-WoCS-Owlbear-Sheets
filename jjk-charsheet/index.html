@@ -636,6 +636,58 @@
   <div id="groupRollHistoryList" class="roll-history-list" style="display:none;"></div>
 </div>
 
+<div id="sheetModifierContextMenu" class="sheet-modifier-context-menu" hidden>
+  <button id="sheetModifierContextAdjustBtn" type="button" class="sheet-modifier-context-item">Adjust Modifiers</button>
+</div>
+
+<aside id="sheetModifierPanel" class="sheet-modifier-panel" hidden>
+  <div class="sheet-modifier-panel-header">
+    <div>
+      <div class="sheet-modifier-panel-title">Adjust Modifiers</div>
+      <div id="sheetModifierTargetLabel" class="sheet-modifier-panel-target">Target</div>
+    </div>
+    <button id="sheetModifierCloseBtn" type="button" class="inventory-mini-btn">Close</button>
+  </div>
+
+  <div class="sheet-modifier-totals">
+    <div class="sheet-modifier-total-row">
+      <span class="sheet-modifier-total-label">Base</span>
+      <span id="sheetModifierBaseValue" class="sheet-modifier-total-value">0</span>
+    </div>
+    <div class="sheet-modifier-total-row">
+      <span class="sheet-modifier-total-label">Direct Modifiers</span>
+      <span id="sheetModifierDeltaValue" class="sheet-modifier-total-value">+0</span>
+    </div>
+    <div class="sheet-modifier-total-row emphasized">
+      <span class="sheet-modifier-total-label">Total</span>
+      <span id="sheetModifierTotalValue" class="sheet-modifier-total-value">0</span>
+    </div>
+  </div>
+
+  <div class="sheet-modifier-list-wrap">
+    <div id="sheetModifierList" class="sheet-modifier-list"></div>
+  </div>
+
+  <div class="sheet-modifier-actions">
+    <button id="sheetModifierAddBtn" type="button" class="inventory-mini-btn">+ Add Modifier</button>
+  </div>
+
+  <div id="sheetModifierForm" class="sheet-modifier-form" hidden>
+    <label class="inventory-field">
+      <span class="field-label">Value</span>
+      <input id="sheetModifierValueInput" class="meta-input" type="number" step="1" placeholder="5" />
+    </label>
+    <label class="inventory-field">
+      <span class="field-label">Source</span>
+      <input id="sheetModifierSourceInput" class="meta-input" maxlength="120" placeholder="Grit" />
+    </label>
+    <div class="inventory-form-actions inventory-field-full">
+      <button id="sheetModifierSaveBtn" type="button" class="meta-toggle-btn">Save</button>
+      <button id="sheetModifierCancelBtn" type="button" class="inventory-secondary-btn">Cancel</button>
+    </div>
+  </div>
+</aside>
+
 <script type="module" src="./src/main.js"></script>
 
 <!-- Info Modal -->
