@@ -178,7 +178,7 @@
     "modifiers": [],
     "aliases": ["sword polish"],
     "stackable": true,
-    "quantity": 5
+      "quantity": 1
   },
   {
     "id": "first-aid-kit",
@@ -188,7 +188,7 @@
     "modifiers": [],
     "aliases": ["first aid kit"],
     "stackable": false,
-    "quantity": 2
+      "quantity": 1
   },
   {
     "id": "cigarettes",
@@ -198,7 +198,7 @@
     "modifiers": [],
     "aliases": ["cigarettes"],
     "stackable": true,
-    "quantity": 10
+      "quantity": 1
   },
   {
     "id": "sentimental-possession",
@@ -299,7 +299,7 @@
     "modifiers": [],
     "aliases": ["caffeine patch"],
     "stackable": true,
-    "quantity": 5
+      "quantity": 1
   },
   {
     "id": "mysterious-herbs",
@@ -319,6 +319,6 @@
     "modifiers": [],
     "aliases": ["poison vial"],
     "stackable": true,
-    "quantity": 5
+      "quantity": 1
   }
 ]
