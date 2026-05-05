@@ -1351,7 +1351,7 @@
     }
     .skill-mod-badge {
       flex: 0 0 auto;
-      margin-right: 2px;
+      margin-left: 1px;
     }
     .vital-mod-badge {
       position: absolute;

@@ -1043,8 +1043,8 @@ function buildStatBlocks(defs, container) {
         <input class="skill-bonus-input" type="text"
                id="bonus_${def.key}_${i}" value="${formatSignedValue(subskillValue)}" ${_isOverrideMode ? "" : "readonly"} title="${hasOverride ? "Overridden" : "Auto-calculated"}" />
         <button type="button" class="override-marker-btn${hasOverride ? " visible" : ""}" data-subskill-override-clear="${def.key}:${i}" title="${_isOverrideMode ? "Click to clear override" : "Overridden"}" ${_isOverrideMode ? "" : "tabindex=\"-1\""}>*</button>
-        <span class="direct-modified-badge skill-mod-badge${subskillHasDirectModifiers ? " visible" : ""}" title="${subskillHasDirectModifiers ? "Modified" : ""}" aria-label="${subskillHasDirectModifiers ? "Modified" : ""}"></span>
         <span class="skill-name" title="Roll ${skill}">${skill}</span>
+         <span class="direct-modified-badge skill-mod-badge${subskillHasDirectModifiers ? " visible" : ""}" title="${subskillHasDirectModifiers ? "Modified" : ""}" aria-label="${subskillHasDirectModifiers ? "Modified" : ""}"></span>
       `;
       skillsSide.appendChild(row);
 
