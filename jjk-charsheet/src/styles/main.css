@@ -1202,7 +1202,7 @@
     .skill-row {
       display: flex;
       align-items: center;
-      gap: 4px;
+      gap: 2px;
     }
     .skill-dot {
       width: 11px; height: 11px;
