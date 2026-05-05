@@ -51,6 +51,8 @@ function critBadgeHTML(critStatus) {
     return `<div style="color:#2a6e2a;font-family:'Cinzel',serif;font-size:8px;margin-top:4px;">✦ CRIT SUCCESS</div>`;
   if (critStatus === "fail")
     return `<div style="color:#8b1a1a;font-family:'Cinzel',serif;font-size:8px;margin-top:4px;">✦ CRIT FAIL</div>`;
+  if (critStatus === "miss")
+    return `<div style="color:#8b1a1a;font-family:'Cinzel',serif;font-size:8px;margin-top:4px;">FAIL</div>`;
   if (critStatus === "pass")
     return `<div style="color:#2a6e2a;font-family:'Cinzel',serif;font-size:8px;margin-top:4px;">✦ PASS</div>`;
   return "";
@@ -206,11 +208,13 @@ export function showRollToast(statLabel, diceCount, rolls, total, critStatus, sk
     critLine = `<div style="font-family:'Cinzel',serif;font-size:10px;letter-spacing:1px;color:#2a6e2a;margin-top:3px;">✦ CRITICAL SUCCESS</div>`;
   if (critStatus === "fail")
     critLine = `<div style="font-family:'Cinzel',serif;font-size:10px;letter-spacing:1px;color:#8b1a1a;margin-top:3px;">✦ CRITICAL FAIL</div>`;
+  if (critStatus === "miss")
+    critLine = `<div style="font-family:'Cinzel',serif;font-size:10px;letter-spacing:1px;color:#8b1a1a;margin-top:3px;">FAIL</div>`;
   if (critStatus === "pass")
     critLine = `<div style="font-family:'Cinzel',serif;font-size:10px;letter-spacing:1px;color:#2a6e2a;margin-top:3px;">✦ PASS</div>`;
 
   const toast = document.createElement("div");
-  toast.className = "roll-toast" + (critStatus === "success" ? " crit-success" : critStatus === "fail" ? " crit-fail" : critStatus === "pass" ? " pass" : "");
+  toast.className = "roll-toast" + (critStatus === "success" ? " crit-success" : critStatus === "fail" ? " crit-fail" : critStatus === "pass" ? " pass" : critStatus === "miss" ? " fail" : "");
   toast.innerHTML = `
     <div class="roll-toast-title">${label} Roll${modeSuffix}</div>
     <div class="roll-toast-body">${formatRollBody({ diceCount, rolls, total, breakdown, rollMode })}</div>

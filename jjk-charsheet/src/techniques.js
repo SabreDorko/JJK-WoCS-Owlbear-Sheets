@@ -124,7 +124,8 @@ function performApplicationCast(state, techniqueIndex, applicationIndex) {
       rollStatus = "pass";
     }
   } else {
-    rollStatus = "fail";
+    // Missed DC, but not a critical failure.
+    rollStatus = "miss";
   }
 
   const breakdown = {

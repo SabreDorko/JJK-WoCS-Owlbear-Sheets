@@ -87,6 +87,7 @@ function parseSubskillTargetKey(targetKey) {
 
 function getDirectModifierTargetLabel(targetType, targetKey) {
   if (targetType === "stat") return `${getStatLabel(targetKey)} Level`;
+  if (targetType === "statRoll") return `${getStatLabel(targetKey)} Rolls`;
   if (targetType === "subskill") {
     const parsed = parseSubskillTargetKey(targetKey);
     if (!parsed) return "Substat";
@@ -104,6 +105,10 @@ function getTargetDirectModifiers(state, targetType, targetKey) {
 
 function hasDirectModifiers(state, targetType, targetKey) {
   return getTargetDirectModifiers(state, targetType, targetKey).length > 0;
+}
+
+function hasAnyStatDirectModifiers(state, statKey) {
+  return hasDirectModifiers(state, "stat", statKey) || hasDirectModifiers(state, "statRoll", statKey);
 }
 
 function setModifiedBadgeState(badgeEl, isVisible) {
@@ -397,6 +402,12 @@ function getDirectModifierTargetValues(state, targetType, targetKey, effects) {
     return getDirectModifierSummaryDelta(state, targetType, targetKey, baseValue);
   }
 
+  if (targetType === "statRoll") {
+    const baseEffects = computeActiveModifierEffects({ ...state, directModifiers: [] });
+    const baseValue = baseEffects?.rollBonuses?.[targetKey] || 0;
+    return getDirectModifierSummaryDelta(state, targetType, targetKey, baseValue);
+  }
+
   if (targetType === "subskill") {
     const parsed = parseSubskillTargetKey(targetKey);
     if (!parsed) return { baseValue: 0, totalValue: 0, deltaValue: 0 };
@@ -448,6 +459,17 @@ function setDirectModifierFormOpen(isOpen) {
   }
   form.hidden = false;
   requestAnimationFrame(() => form.classList.add("is-open"));
+}
+
+function syncDirectModifierOperationAvailability() {
+  const operationInput = document.getElementById("sheetModifierOperationInput");
+  if (!operationInput) return;
+  const isRollTarget = _activeDirectModifierTarget?.targetType === "statRoll";
+  [...operationInput.options].forEach(option => {
+    if (!option) return;
+    option.disabled = isRollTarget && option.value !== "add";
+  });
+  if (isRollTarget && operationInput.value !== "add") operationInput.value = "add";
 }
 
 function closeDirectModifierPanel() {
@@ -516,13 +538,23 @@ function renderDirectModifierPanel() {
 
 function openDirectModifierPanel(targetType, targetKey) {
   const panel = document.getElementById("sheetModifierPanel");
+  const statModeWrap = document.getElementById("sheetModifierStatTargetModeWrap");
+  const statModeSelect = document.getElementById("sheetModifierStatTargetMode");
   if (!panel) return;
+
+  const resolvedType = targetType === "statRoll" ? "statRoll" : targetType;
   _activeDirectModifierTarget = {
-    targetType,
+    targetType: resolvedType,
     targetKey,
-    label: getDirectModifierTargetLabel(targetType, targetKey),
+    label: getDirectModifierTargetLabel(resolvedType, targetKey),
   };
+
+  const isStatTarget = resolvedType === "stat" || resolvedType === "statRoll";
+  if (statModeWrap) statModeWrap.hidden = !isStatTarget;
+  if (statModeSelect && isStatTarget) statModeSelect.value = resolvedType;
+
   _editingDirectModifierId = null;
+  syncDirectModifierOperationAvailability();
   panel.hidden = false;
   requestAnimationFrame(() => panel.classList.add("is-open"));
   setDirectModifierFormOpen(false);
@@ -609,6 +641,7 @@ function beginEditDirectModifier(modifierId) {
 
   _editingDirectModifierId = modifierId;
   operationInput.value = current.operation || "add";
+  syncDirectModifierOperationAvailability();
   valueInput.value = String(current.value);
   valueInput.step = operationInput.value === "add" ? "1" : "0.1";
   sourceInput.value = current.source || "";
@@ -625,6 +658,7 @@ function initDirectModifierUI() {
   const cancelBtn = document.getElementById("sheetModifierCancelBtn");
   const listEl = document.getElementById("sheetModifierList");
   const operationInput = document.getElementById("sheetModifierOperationInput");
+  const statModeSelect = document.getElementById("sheetModifierStatTargetMode");
 
   if (!menu || !menuBtn || !panel || !closeBtn || !saveBtn || !cancelBtn || !listEl || !operationInput) return;
 
@@ -653,6 +687,19 @@ function initDirectModifierUI() {
     valueInput.step = operationInput.value === "add" ? "1" : "0.1";
   });
 
+  if (statModeSelect) {
+    statModeSelect.addEventListener("change", () => {
+      if (!_activeDirectModifierTarget || _activeDirectModifierTarget.targetType === "subskill" || _activeDirectModifierTarget.targetType === "derived") return;
+      const nextType = statModeSelect.value === "statRoll" ? "statRoll" : "stat";
+      _activeDirectModifierTarget.targetType = nextType;
+      _activeDirectModifierTarget.label = getDirectModifierTargetLabel(nextType, _activeDirectModifierTarget.targetKey);
+      _editingDirectModifierId = null;
+      setDirectModifierFormOpen(false);
+      syncDirectModifierOperationAvailability();
+      renderDirectModifierPanel();
+    });
+  }
+
   listEl.addEventListener("click", e => {
     const addBtn = e.target.closest("#sheetModifierAddBtn");
     if (addBtn) {
@@ -664,6 +711,7 @@ function initDirectModifierUI() {
       if (sourceInput) sourceInput.value = "";
       if (operationInputInner) operationInputInner.value = "add";
       if (valueInput) valueInput.step = "1";
+      syncDirectModifierOperationAvailability();
       setDirectModifierFormOpen(true);
       if (valueInput) valueInput.focus();
       return;
@@ -948,7 +996,7 @@ function buildStatBlocks(defs, container) {
 
     const scoreSide = document.createElement("div");
     scoreSide.className = "stat-score-side";
-    const statHasDirectModifiers = hasDirectModifiers(state, "stat", def.key);
+    const statHasDirectModifiers = hasAnyStatDirectModifiers(state, def.key);
     scoreSide.innerHTML = `
       <div class="stat-label">${def.label}</div>
       <span class="direct-modified-badge stat-mod-badge${statHasDirectModifiers ? " visible" : ""}" title="${statHasDirectModifiers ? "Modified" : ""}" aria-label="${statHasDirectModifiers ? "Modified" : ""}"></span>

@@ -57,9 +57,10 @@ export function normalizeDirectModifierList(rawList) {
       const value = parseDirectModifierValue(entry?.value, operation);
       const source = String(entry?.source || "").trim().slice(0, 120);
 
-      if (!["stat", "subskill", "derived"].includes(targetType)) return null;
+      if (!["stat", "statRoll", "subskill", "derived"].includes(targetType)) return null;
       if (!targetKey) return null;
       if (targetType === "stat" && !STAT_KEYS.has(targetKey)) return null;
+      if (targetType === "statRoll" && !STAT_KEYS.has(targetKey)) return null;
       if (targetType === "subskill" && !isValidSubskillKey(targetKey)) return null;
       if (targetType === "derived" && !DIRECT_DERIVED_KEYS.has(targetKey)) return null;
       if (!Number.isFinite(value)) return null;
@@ -197,6 +198,15 @@ export function computeActiveModifierEffects(state) {
       });
     });
   }
+
+  // Direct stat roll modifiers affect the flat bonus after dice are rolled.
+  const directList = normalizeDirectModifierList(state.directModifiers);
+  STAT_DEFS.forEach(def => {
+    const statKey = def.key;
+    const directRollMods = directList.filter(entry => entry.targetType === "statRoll" && entry.targetKey === statKey);
+    if (!directRollMods.length) return;
+    effects.rollBonuses[statKey] = Math.round(applyDirectModifiers(effects.rollBonuses[statKey], directRollMods));
+  });
 
   return effects;
 }

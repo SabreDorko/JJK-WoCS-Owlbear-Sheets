@@ -405,6 +405,15 @@
       line-height: 1.2;
       color: var(--ink);
     }
+    .sheet-modifier-mode {
+      display: grid;
+      gap: 2px;
+      margin-top: 5px;
+      max-width: 145px;
+    }
+    .sheet-modifier-mode[hidden] {
+      display: none !important;
+    }
     .sheet-modifier-totals {
       border: 1px solid var(--border);
       background: rgba(240, 235, 224, 0.6);
@@ -985,6 +994,11 @@
       background: #f0f7f0;
     }
     .roll-toast.pass .roll-toast-title { color: #2a6e2a; }
+    .roll-toast.fail {
+      border-color: #8b1a1a;
+      background: #fdf0f0;
+    }
+    .roll-toast.fail .roll-toast-title { color: #8b1a1a; }
     .roll-toast-container {
       position: fixed;
       right: 12px;
