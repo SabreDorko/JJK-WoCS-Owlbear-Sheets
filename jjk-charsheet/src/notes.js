@@ -88,7 +88,7 @@ function renderNotes(state) {
         <div class="notes-item-head">
           <button type="button" class="notes-pin-btn${pinClass}" data-note-pin="${escapeHtml(note.id)}" aria-label="Pin note" title="Pin">
             <svg class="notes-pin-icon" viewBox="0 0 20 20" width="16" height="16" aria-hidden="true" focusable="false">
-              <path d="M10.5 2.5c-.28 0-.5.22-.5.5v3.09l-3.16 1.05a.5.5 0 0 0-.13.92l2.79 1.61-.7 6.08a.5.5 0 0 0 .77.48l2.43-1.62 2.43 1.62a.5.5 0 0 0 .77-.48l-.7-6.08 2.79-1.61a.5.5 0 0 0-.13-.92L11 6.09V3a.5.5 0 0 0-.5-.5z" fill="${note.pinned ? 'var(--accent)' : 'var(--ink-faint)'}"/>
+              <path d="M7.5 2.5c-.2.1-.3.4-.2.6l2.2 4.2-4.2 4.2c-.2.2-.2.5 0 .7l2.1 2.1c.2.2.5.2.7 0l4.2-4.2 4.2 2.2c.2.1.5 0 .6-.2.1-.2.1-.5-.1-.7l-2.7-2.7.7-2.1c.1-.3-.2-.6-.5-.5l-2.1.7-2.7-2.7c-.2-.2-.5-.2-.7-.1z" fill="${note.pinned ? 'var(--accent)' : 'var(--ink-faint)'}"/>
             </svg>
           </button>
           <button type="button" class="notes-toggle-btn${toggleCollapsedClass}" data-note-toggle="${escapeHtml(note.id)}" aria-label="Toggle note">
