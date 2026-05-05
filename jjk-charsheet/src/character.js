@@ -492,11 +492,11 @@ function renderDirectModifierPanel() {
   `;
 
   if (!entries.length) {
-    listEl.innerHTML = `${addRow}<div class="sheet-modifier-empty">No direct modifiers yet.</div>`;
+    listEl.innerHTML = `<div class="sheet-modifier-empty">No direct modifiers yet.</div>${addRow}`;
     return;
   }
 
-  listEl.innerHTML = addRow + entries.map(entry => {
+  listEl.innerHTML = entries.map(entry => {
     const sourceText = entry.source ? escapeHtml(entry.source) : "No source";
     const modifierLabel = getDirectModifierOperationLabel(entry.operation, entry.value);
     return `
@@ -511,7 +511,7 @@ function renderDirectModifierPanel() {
         </div>
       </div>
     `;
-  }).join("");
+  }).join("") + addRow;
 }
 
 function openDirectModifierPanel(targetType, targetKey) {
