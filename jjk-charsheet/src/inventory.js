@@ -7,6 +7,15 @@ import {
   getStatDefinitions,
   normalizeModifierList,
 } from "./modifiers.js";
+import {
+  WEAPON_TYPES, WEAPON_TYPE_LABELS, WEAPON_STAT_OPTIONS, WEAPON_STAT_LABELS,
+  WEAPON_STAT_LEVEL_ABBREVIATIONS, WEAPON_DAMAGE_DICE,
+  normalizeWeaponType, normalizeWeaponStat, parseWeaponRange, parseWeaponPolearmReach,
+  getWeaponReachInFeet, shouldDisplayWeaponRange, parseWeaponDamageCount,
+  normalizeWeaponDamageDie, normalizeWeaponDamageParts, formatWeaponDamageParts,
+  getWeaponDamageBonusAbbreviation, getWeaponDamageBonusTooltip,
+  getWeaponDamageText, normalizeWeaponGrip,
+} from "./weapons.js";
 
 let _getState = null;
 let _scheduleSave = null;
@@ -24,6 +33,7 @@ let openOverflowChoice = null;
 let draftItemModifiers = [];
 let editingModifierIndex = null;
 let isModifierEditMode = false;
+let _refreshCombatTab = null;
 
 function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
@@ -49,113 +59,9 @@ function scheduleSave() {
 const HAND_SLOT_KEYS = ["rightHand", "leftHand"];
 const CLOTHING_SELECTABLE_SLOT_KEYS = ["head", "body", "legs", "feet", "accessory"];
 const ITEM_TYPES = ["clothing", "weapon", "item"];
-const WEAPON_TYPES = ["bludgeoning", "slashing", "ranged", "polearm"];
-const WEAPON_TYPE_LABELS = {
-  bludgeoning: "Bludgeoning",
-  slashing: "Slashing",
-  ranged: "Ranged",
-  polearm: "Polearm",
-};
-const WEAPON_STAT_OPTIONS = ["power", "speed", "technique"];
-const WEAPON_STAT_LABELS = {
-  power: "Power",
-  speed: "Speed",
-  technique: "Tech",
-};
-const WEAPON_STAT_LEVEL_ABBREVIATIONS = {
-  power: "PL",
-  speed: "SL",
-  technique: "TL",
-};
-const WEAPON_DAMAGE_DICE = ["d4", "d6", "d8", "d10", "d12"];
 
 function normalizeItemType(rawType) {
   return ITEM_TYPES.includes(rawType) ? rawType : "clothing";
-}
-
-function normalizeWeaponType(rawType) {
-  return WEAPON_TYPES.includes(rawType) ? rawType : "bludgeoning";
-}
-
-function normalizeWeaponStat(rawStat) {
-  if (rawStat === "tech") return "technique";
-  return WEAPON_STAT_OPTIONS.includes(rawStat) ? rawStat : "power";
-}
-
-function parseWeaponRange(rawValue) {
-  const parsed = parseInt(rawValue, 10);
-  if (!Number.isFinite(parsed) || parsed <= 0) return null;
-  return clamp(parsed, 1, 9999);
-}
-
-function parseWeaponPolearmReach(rawValue) {
-  return rawValue === true || rawValue === "true" || rawValue === 1;
-}
-
-function getWeaponReachInFeet(item) {
-  const weaponType = normalizeWeaponType(item?.weaponType);
-  if (weaponType === "ranged") return parseWeaponRange(item?.weaponRange);
-  if (weaponType === "slashing" || weaponType === "bludgeoning") return 5;
-  if (weaponType === "polearm") return parseWeaponPolearmReach(item?.weaponPolearmReach) ? 10 : 5;
-  return null;
-}
-
-function shouldDisplayWeaponRange(item) {
-  const weaponType = normalizeWeaponType(item?.weaponType);
-  return weaponType === "ranged" || weaponType === "polearm";
-}
-
-function parseWeaponDamageCount(rawValue) {
-  const parsed = parseInt(rawValue, 10);
-  if (!Number.isFinite(parsed)) return 1;
-  return clamp(parsed, 1, 99);
-}
-
-function normalizeWeaponDamageDie(rawDie) {
-  const normalized = String(rawDie || "").toLowerCase();
-  if (WEAPON_DAMAGE_DICE.includes(normalized)) return normalized;
-  return "d6";
-}
-
-function normalizeWeaponDamageParts(rawParts) {
-  if (!Array.isArray(rawParts)) return [{ count: 1, die: "d6" }];
-
-  const parsed = rawParts
-    .map(part => ({
-      count: parseWeaponDamageCount(part?.count),
-      die: normalizeWeaponDamageDie(part?.die),
-    }))
-    .filter(part => Number.isFinite(part.count) && part.count > 0);
-
-  return parsed.length ? parsed : [{ count: 1, die: "d6" }];
-}
-
-function formatWeaponDamageParts(parts) {
-  return normalizeWeaponDamageParts(parts)
-    .map(part => `${part.count}${part.die}`)
-    .join(" + ");
-}
-
-function getWeaponDamageBonusAbbreviation(rawStat) {
-  const weaponStat = normalizeWeaponStat(rawStat);
-  return WEAPON_STAT_LEVEL_ABBREVIATIONS[weaponStat] || "PL";
-}
-
-function getWeaponDamageBonusTooltip(rawStat) {
-  const weaponStat = normalizeWeaponStat(rawStat);
-  const weaponStatLabel = weaponStat === "technique"
-    ? "Technique"
-    : (WEAPON_STAT_LABELS[weaponStat] || "Power");
-  return `${weaponStatLabel} Level`;
-}
-
-function getWeaponDamageText(item) {
-  return `${formatWeaponDamageParts(item?.weaponDamageParts)} + ${getWeaponDamageBonusAbbreviation(item?.weaponStat)}`;
-}
-
-function normalizeWeaponGrip(rawGrip, slotsNeeded) {
-  if (rawGrip === "twoHanded" || rawGrip === "oneHanded") return rawGrip;
-  return clamp(parseInt(slotsNeeded, 10) || 1, 1, 3) >= 2 ? "twoHanded" : "oneHanded";
 }
 
 function getItemTypeLabel(itemType) {
@@ -2395,13 +2301,15 @@ export function renderInventory() {
   renderInventorySlots();
   renderDormInventory();
   if (_refreshCharacterStats) _refreshCharacterStats();
+  if (_refreshCombatTab) _refreshCombatTab();
 }
 
-export function initInventory({ getState: getStateFn, scheduleSave: scheduleSaveFn, refreshCharacterStats: refreshCharacterStatsFn = null, refreshArchetypeState: refreshArchetypeStateFn = null }) {
+export function initInventory({ getState: getStateFn, scheduleSave: scheduleSaveFn, refreshCharacterStats: refreshCharacterStatsFn = null, refreshArchetypeState: refreshArchetypeStateFn = null, refreshCombatTab: refreshCombatTabFn = null }) {
   _getState = getStateFn;
   _scheduleSave = scheduleSaveFn;
   _refreshCharacterStats = refreshCharacterStatsFn;
   _refreshArchetypeState = refreshArchetypeStateFn;
+  _refreshCombatTab = refreshCombatTabFn;
 
   ensureWeaponEditorFields();
 

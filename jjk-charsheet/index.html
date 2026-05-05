@@ -15,7 +15,7 @@
     <div class="tab active" data-tab="character">Character</div>
     <div class="tab" data-tab="archetype">Archetype</div>
     <div class="tab" data-tab="inventory">Inventory</div>
-    <div class="tab disabled" data-tab="combat">Combat<span class="tab-soon">soon</span></div>
+    <div class="tab" data-tab="combat">Combat</div>
     <div class="tab" data-tab="jujutsu">Jujutsu</div>
     <div class="tab" data-tab="notes">Notes</div>
   </div>
@@ -437,13 +437,66 @@
         </div>
       </div>
     </div>
-
+    <!-- Combat Panel -->
     <div class="tab-panel" id="panel-combat">
-      <div class="soon-panel">
-        <div class="soon-kanji">戦</div>
-        <div class="soon-text">Combat — Coming Soon</div>
+      <div class="combat-shell">
+
+        <div class="combat-header-grid">
+          <div class="combat-header-field">
+            <span class="combat-label">Actions</span>
+            <div class="combat-value" id="combatActionsValue">—</div>
+          </div>
+          <div class="combat-header-field">
+            <span class="combat-label">Black Flash Range</span>
+            <div class="combat-value" id="combatBlackFlashValue">—</div>
+          </div>
+          <div class="combat-header-field">
+            <span class="combat-label">Initiative</span>
+            <div class="combat-value" id="combatInitiativeValue">—</div>
+          </div>
+          <div class="vital-box combat-imbue-field">
+            <div class="combat-imbue-split">
+              <div class="combat-imbue-left">
+                <span class="vital-label">Imbue</span>
+                <input type="number" id="combatImbueInput" class="combat-imbue-input" min="1" max="3" value="1" />
+              </div>
+              <div class="combat-imbue-divider"></div>
+              <div class="combat-imbue-right">
+                <div class="combat-imbue-die" id="combatImbueDie">1d4</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="combat-divider"></div>
+
+        <section class="combat-weapons-section">
+          <div class="combat-section-title">Equipped Weapons</div>
+          <div id="combatEquippedWeaponsList" class="combat-weapons-list">
+            <span class="combat-empty">No weapons equipped.</span>
+          </div>
+        </section>
+
+        <div class="combat-divider"></div>
+
+        <div class="combat-arts-grid">
+          <section class="combat-arts-section">
+            <div class="combat-arts-title">Martial Arts</div>
+            <div id="combatMartialArtsList" class="combat-arts-list">
+              <span class="combat-empty">No martial arts available.</span>
+            </div>
+          </section>
+          <section class="combat-arts-section">
+            <div class="combat-arts-title">Weapon Arts</div>
+            <div id="combatWeaponArtsList" class="combat-arts-list">
+              <span class="combat-empty">No weapon arts available.</span>
+            </div>
+          </section>
+        </div>
+
       </div>
     </div>
+    <!-- Jujutsu Panel -->
     <div class="tab-panel" id="panel-jujutsu">
       <div class="jujutsu-shell">
         <div class="jujutsu-subtab-bar" role="tablist" aria-label="Jujutsu sections">

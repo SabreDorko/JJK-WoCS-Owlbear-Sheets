@@ -16,6 +16,7 @@ import {
 } from "./state/runtime.js";
 
 import { initInventory, renderInventory } from "./inventory.js";
+import { initCombat, computeCombatTabData, renderCombatTabData } from "./combat.js";
 import {
   initCharacter,
   applyCharacterStateToUI,
@@ -49,6 +50,7 @@ import { initUiShell } from "./ui-shell.js";
 import { initNotes, applyNotesStateToUI } from "./notes.js";
 import { initTraining, renderTraining } from "./training.js";
 import { initSkills, renderSkills } from "./skills.js";
+
 
 // ── RUNTIME STATE ─────────────────────────────────────────────────────────────
 let state           = defaultState();
@@ -158,6 +160,10 @@ function applyStateToUI() {
   renderRollHistory();
   renderPartyList();
   renderInventory();
+
+  // Update Combat tab
+  const combatData = computeCombatTabData(state);
+  renderCombatTabData(combatData);
 }
 
 // ── TABS ──────────────────────────────────────────────────────────────────────
@@ -186,6 +192,7 @@ async function init() {
     getState: () => state,
     scheduleSave,
     showRollToast,
+    refreshCombatTab: () => renderCombatTabData(computeCombatTabData(state)),
   });
 
   initTechniques({
@@ -213,6 +220,10 @@ async function init() {
     scheduleSave,
     refreshCharacterStats: applyCharacterStateToUI,
     refreshArchetypeState: applyArchetypeStateToUI,
+    // Refresh Combat tab when inventory changes
+    refreshCombatTab: () => {
+      renderCombatTabData(computeCombatTabData(state));
+    },
   });
 
   initNotes({
@@ -233,6 +244,12 @@ async function init() {
     scheduleSave,
     refreshTraining: () => renderTraining(state),
     refreshCharacterStats: applyCharacterStateToUI,
+  });
+
+  initCombat({
+    getState: () => state,
+    scheduleSave,
+    showRollToast,
   });
 
   // Re-render training slots whenever grade changes (slot unlock is grade-gated)

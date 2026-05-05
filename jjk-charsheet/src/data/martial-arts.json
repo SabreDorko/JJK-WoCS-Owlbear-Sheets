@@ -1,0 +1,16 @@
+[
+  {
+    "id": "martial-iron-fist",
+    "title": "Iron Fist",
+    "description": "A powerful punch that deals extra damage.",
+    "statRequirement": { "stat": "power", "value": 4 },
+    "usesPerEncounter": 2
+  },
+  {
+    "id": "martial-quick-step",
+    "title": "Quick Step",
+    "description": "Dodge an attack with a burst of speed.",
+    "statRequirement": { "stat": "speed", "value": 3 },
+    "usesPerEncounter": 1
+  }
+]

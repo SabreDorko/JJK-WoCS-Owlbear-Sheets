@@ -1,0 +1,18 @@
+[
+  {
+    "id": "weapon-spin-slash",
+    "title": "Spin Slash",
+    "description": "A spinning attack that hits all adjacent enemies.",
+    "statRequirement": { "stat": "technique", "value": 3 },
+    "weaponTypeRequirement": "slashing",
+    "usesPerEncounter": 1
+  },
+  {
+    "id": "weapon-precision-shot",
+    "title": "Precision Shot",
+    "description": "A carefully aimed ranged attack for extra damage.",
+    "statRequirement": { "stat": "speed", "value": 4 },
+    "weaponTypeRequirement": "ranged",
+    "usesPerEncounter": 2
+  }
+]

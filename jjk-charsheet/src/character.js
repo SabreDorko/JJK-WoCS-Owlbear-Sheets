@@ -1,5 +1,5 @@
 import { ARCHETYPES, CENTER_STATS, RIGHT_STATS } from "./state/store.js";
-import { applyDirectModifiers, computeActiveModifierEffects, getRollModifierSources, normalizeDirectModifierList } from "./modifiers.js";
+import { computeActiveModifierEffects, applyDirectModifiers, normalizeDirectModifierList } from "./modifiers.js";
 import { updateTechniquesDerivedUI } from "./techniques.js";
 
 let _getState = null;
@@ -12,6 +12,7 @@ let _pendingRollModeAction = null;
 let _pendingRollModeModifierAction = null;
 let _activeDirectModifierTarget = null;
 let _editingDirectModifierId = null;
+let _refreshCombatTab = null;
 
 const DIRECT_DERIVED_LABELS = {
   hpMax: "Max HP",
@@ -767,13 +768,6 @@ function parseXpValue(rawValue) {
   return Math.max(0, parsed);
 }
 
-function getAptitudeBonusValue(state, effects = null, options = {}) {
-  const overridden = getDerivedOverride(state, "aptitudeBonus");
-  const baseValue = Number.isFinite(overridden) ? overridden : 2;
-  if (options?.includeDirect === false) return baseValue;
-  return Math.round(applyDirectModifiersForTarget(state, "derived", "aptitudeBonus", baseValue));
-}
-
 export function promoteStatFromFullAptitudes(state, statKey) {
   const statState = state?.stats?.[statKey];
   if (!statState || !Array.isArray(statState.skills) || !statState.skills.length) return false;
@@ -884,28 +878,33 @@ function setInputValueWithPulse(inputEl, nextValue) {
   }, { once: true });
 }
 
-function getEffectiveStatLevel(state, effects, statKey, options = {}) {
-  const baseValue = parseStatScore(state?.stats?.[statKey]?.score) + (effects?.statBonuses?.[statKey] || 0);
-  if (options?.includeDirect === false) return baseValue;
-  return Math.max(0, Math.round(applyDirectModifiersForTarget(state, "stat", statKey, baseValue)));
+function getEffectiveStatLevel(state, effects, statKey) {
+  const base = parseStatScore(state?.stats?.[statKey]?.score) + (effects?.statBonuses?.[statKey] || 0);
+  const directMods = normalizeDirectModifierList(state?.directModifiers || [])
+    .filter(e => e.targetType === "stat" && e.targetKey === statKey);
+  return Math.max(0, Math.round(applyDirectModifiers(base, directMods)));
 }
 
-function getSubskillValue(state, effects, statKey, skillIndex, options = {}) {
-  const overridden = getSubskillOverride(state, statKey, skillIndex);
-  if (Number.isFinite(overridden)) {
-    if (options?.includeDirect === false) return overridden;
-    return applyDirectModifiersForTarget(state, "subskill", `${statKey}:${skillIndex}`, overridden);
-  }
+function getSubskillValue(state, effects, statKey, skillIndex) {
   const skillState = state?.stats?.[statKey]?.skills?.[skillIndex] || {};
-  const lockedFromArchetype = getArchetypePermanentAptitudeSource(state, statKey, skillIndex);
-  const aptitudeBonus = (lockedFromArchetype || getAptitudeState(skillState) > 0)
-    ? getAptitudeBonusValue(state, effects)
-    : 0;
+  const aptitude = parseInt(skillState.aptitude, 10) || 0;
+  const aptitudeBonus = aptitude > 0 ? getAptitudeBonusValue(state, effects) : 0;
   const statSkillBonus = effects?.skillBonuses?.[statKey] || 0;
-  const specificSkillBonus = effects?.specificSkillBonuses?.[`${statKey}:${skillIndex}`] || 0;
-  const baseValue = aptitudeBonus + statSkillBonus + specificSkillBonus;
-  if (options?.includeDirect === false) return baseValue;
-  return Math.round(applyDirectModifiersForTarget(state, "subskill", `${statKey}:${skillIndex}`, baseValue));
+  const specificBonus = effects?.specificSkillBonuses?.[`${statKey}:${skillIndex}`] || 0;
+  const baseValue = aptitudeBonus + statSkillBonus + specificBonus;
+
+  // Apply direct modifiers for this subskill
+  const directMods = normalizeDirectModifierList(state?.directModifiers || [])
+    .filter(e => e.targetType === "subskill" && e.targetKey === `${statKey}:${skillIndex}`);
+  return Math.round(applyDirectModifiers(baseValue, directMods));
+}
+
+function getAptitudeBonusValue(state, effects) {
+  const overridden = parseInt(state?.overrides?.derived?.aptitudeBonus, 10);
+  const base = Number.isFinite(overridden) ? overridden : 2;
+  const directMods = normalizeDirectModifierList(state?.directModifiers || [])
+    .filter(e => e.targetType === "derived" && e.targetKey === "aptitudeBonus");
+  return Math.round(applyDirectModifiers(base, directMods));
 }
 
 function applyDerivedCharacterFields({ preserveCurrent = true } = {}) {
@@ -1256,6 +1255,7 @@ function buildStatBlocks(defs, container) {
         updateBlackFlashRangeDisplay();
         updateTechniquesDerivedUI();
       }
+      if (_refreshCombatTab) _refreshCombatTab(); // ← add this
       scheduleSave();
     });
   });
@@ -1459,12 +1459,14 @@ export function applyCharacterStateToUI() {
   updateDerivedModifierBadges(state);
   syncRestControlsUI(state);
   if (_activeDirectModifierTarget) renderDirectModifierPanel();
+  if (_refreshCombatTab) _refreshCombatTab();
 }
 
-export function initCharacter({ getState: getStateFn, scheduleSave: scheduleSaveFn, showRollToast: showRollToastFn }) {
+export function initCharacter({ getState: getStateFn, scheduleSave: scheduleSaveFn, showRollToast: showRollToastFn, refreshCombatTab: refreshCombatTabFn = null }) {
   _getState = getStateFn;
   _scheduleSave = scheduleSaveFn;
   _showRollToast = showRollToastFn;
+  _refreshCombatTab = refreshCombatTabFn;
 
   window.onArchetypeChange = function () {
     handleArchetypeChange("archetypeSelect", "subArchetypeSelect", "archetype", "subArchetype");
@@ -1535,6 +1537,13 @@ export function initCharacter({ getState: getStateFn, scheduleSave: scheduleSave
       openModifierContextMenu(event, targetType, targetKey);
     });
   });
+
+  const gradeSelect = document.getElementById("gradeSelect");
+  if (gradeSelect) {
+    gradeSelect.addEventListener("change", () => {
+      if (_refreshCombatTab) _refreshCombatTab();
+    });
+  }
 
   initDirectModifierUI();
 

@@ -3947,6 +3947,331 @@
       .techniques-app-card-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     }
 
+    /* ── COMBAT TAB ─────────────────────────────────────── */
+    .combat-shell {
+      display: flex;
+      flex-direction: column;
+      gap: 11px;
+    }
+
+    .combat-header-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+
+    .combat-header-field {
+      border: 1.5px solid var(--ink);
+      background: var(--parchment);
+      padding: 7px 9px 8px;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+    }
+
+    .combat-header-field::after {
+      content: '';
+      position: absolute;
+      top: 2px; left: 2px; right: 2px; bottom: 2px;
+      border: 0.5px solid var(--border);
+      pointer-events: none;
+    }
+
+    .combat-label {
+      font-family: 'Cinzel', serif;
+      font-size: 7.5px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--ink-faint);
+      margin-bottom: 5px;
+    }
+
+    .combat-value {
+      font-family: 'Cinzel', serif;
+      font-size: 22px;
+      font-weight: 600;
+      color: var(--ink);
+      line-height: 1;
+    }
+
+    .combat-divider {
+      height: 1px;
+      background: linear-gradient(to right, transparent, var(--border-strong) 20%, var(--border-strong) 80%, transparent);
+    }
+
+    .combat-arts-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      align-items: start;
+    }
+
+    .combat-arts-section {
+      border: 1.5px solid var(--ink);
+      background: var(--parchment);
+      padding: 8px 9px;
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+    }
+
+    .combat-arts-title {
+      font-family: 'Cinzel', serif;
+      font-size: 9px;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: var(--ink);
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 5px;
+      margin-bottom: 2px;
+    }
+
+    .combat-arts-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .combat-art-item {
+      border: 1px solid var(--border);
+      background: rgba(240, 235, 224, 0.7);
+      padding: 6px 7px;
+    }
+
+    .combat-art-item strong {
+      font-family: 'Cinzel', serif;
+      font-size: 10px;
+      letter-spacing: 0.7px;
+      text-transform: uppercase;
+      color: var(--ink);
+      display: block;
+      margin-bottom: 2px;
+    }
+
+    .combat-art-item span {
+      font-size: 12px;
+      color: var(--ink-light);
+      line-height: 1.3;
+      display: block;
+    }
+
+    .combat-art-item em {
+      font-size: 11px;
+      color: var(--ink-faint);
+      display: block;
+      margin-top: 3px;
+    }
+
+    .combat-equipped-weapons-title {
+      font-family: 'Cinzel', serif;
+      font-size: 9px;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: var(--ink);
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      padding: 5px 0;
+      margin-top: 4px;
+    }
+
+    .combat-equipped-weapons-list {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+
+    .combat-weapon-item {
+      border: 1px solid var(--border-strong);
+      background: rgba(240, 235, 224, 0.75);
+      padding: 5px 7px;
+      font-family: 'Crimson Text', serif;
+      font-size: 13px;
+      display: flex;
+      align-items: baseline;
+      gap: 6px;
+    }
+
+    .combat-weapon-item strong {
+      color: var(--ink);
+      font-style: italic;
+    }
+
+    .combat-weapon-item span {
+      font-size: 11px;
+      color: var(--ink-faint);
+    }
+
+    .combat-section-title {
+      font-family: 'Cinzel', serif;
+      font-size: 9px;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: var(--ink);
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 5px;
+      margin-bottom: 7px;
+    }
+
+    .combat-weapons-section {
+      border: 1.5px solid var(--ink);
+      background: var(--parchment);
+      padding: 8px 9px;
+    }
+
+    .combat-weapons-list {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 7px;
+    }
+
+    .combat-weapon-card {
+      border: 1px solid var(--border-strong);
+      background: rgba(240, 235, 224, 0.75);
+      padding: 6px 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .combat-weapon-header {
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+    }
+
+    .combat-weapon-name {
+      font-family: 'Crimson Text', serif;
+      font-size: 15px;
+      font-style: italic;
+      color: var(--ink);
+      line-height: 1.1;
+    }
+
+    .combat-weapon-type {
+      font-family: 'Cinzel', serif;
+      font-size: 8px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--ink-faint);
+    }
+
+    .combat-weapon-stats {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 2px;
+    }
+
+    .combat-weapon-stat {
+      font-family: 'Cinzel', serif;
+      font-size: 10px;
+      letter-spacing: 0.5px;
+      color: var(--ink-light);
+    }
+
+    .combat-weapon-desc {
+      font-family: 'Crimson Text', serif;
+      font-size: 12px;
+      color: var(--ink-faint);
+      font-style: italic;
+      border-top: 1px dashed var(--border);
+      padding-top: 4px;
+      margin-top: 2px;
+      line-height: 1.3;
+    }
+
+    .combat-empty {
+      font-family: 'Crimson Text', serif;
+      font-size: 13px;
+      color: var(--ink-faint);
+      font-style: italic;
+    }
+
+    /* ── COMBAT IMBUE BOX ────────────────────────────────────── */
+    .combat-imbue-field {
+      padding: 0;
+      overflow: hidden;
+    }
+
+    .combat-imbue-split {
+      display: flex;
+      width: 100%;
+      height: 100%;
+      min-height: 72px;
+    }
+
+    .combat-imbue-left {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      padding: 7px 8px;
+      background: var(--parchment-dark);
+      border-right: 1.5px solid var(--ink);
+      flex: 0 0 auto;
+      min-width: 52px;
+    }
+
+    .combat-imbue-right {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex: 1;
+      padding: 7px 8px;
+    }
+
+    .combat-imbue-input {
+      font-family: 'Cinzel', serif;
+      font-size: 22px;
+      font-weight: 600;
+      background: transparent;
+      border: none;
+      border-bottom: 1.5px solid var(--border-strong);
+      color: var(--ink);
+      outline: none;
+      width: 44px;
+      text-align: center;
+    }
+
+    .combat-imbue-input::-webkit-inner-spin-button,
+    .combat-imbue-input::-webkit-outer-spin-button { -webkit-appearance: none; }
+    .combat-imbue-input { -moz-appearance: textfield; appearance: textfield; }
+
+    .combat-imbue-die {
+      font-family: 'Cinzel', serif;
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--accent);
+    }
+
+    /* ── COMBAT WEAPON ACTIONS ───────────────────────────────── */
+    .combat-weapon-actions {
+      display: flex;
+      gap: 6px;
+      margin-top: 5px;
+    }
+
+    .combat-roll-btn {
+      font-family: 'Cinzel', serif;
+      font-size: 8px;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      background: var(--parchment);
+      color: var(--ink);
+      border: 1px solid var(--border-strong);
+      padding: 3px 8px;
+      cursor: pointer;
+      transition: background 0.12s, color 0.12s;
+    }
+
+    .combat-roll-btn:hover {
+      background: var(--ink);
+      color: var(--parchment);
+    }
+
     /* ── PARTY TAB ── */
     .party-panel {
       display: flex;
