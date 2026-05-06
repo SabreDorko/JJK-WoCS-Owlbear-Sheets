@@ -131,6 +131,7 @@ function performApplicationCast(state, techniqueIndex, applicationIndex) {
   const breakdown = {
     skillModifier: talentBonus,
     equipmentBonuses: getRollModifierSources(state, "technique"),
+    die: "d6",
   };
 
   // Show the toast and log the roll

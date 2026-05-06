@@ -65,7 +65,8 @@ function formatSignedValue(value) {
 function formatRollFormula(entry, forcedRolls, forcedTotal) {
   const rolls = Array.isArray(forcedRolls) ? forcedRolls : entry.rolls;
   const total = Number.isFinite(forcedTotal) ? forcedTotal : entry.total;
-  const base = `${entry.diceCount}d6: [${rolls.join(", ")}]`;
+  const die = entry.die || "d6";
+  const base = `${entry.diceCount}${die}: [${rolls.join(", ")}]`;
   const breakdown = entry.breakdown;
   if (!breakdown) return `${base} = <strong>${total}</strong>`;
 
@@ -215,9 +216,11 @@ export function showRollToast(statLabel, diceCount, rolls, total, critStatus, sk
 
   const toast = document.createElement("div");
   toast.className = "roll-toast" + (critStatus === "success" ? " crit-success" : critStatus === "fail" ? " crit-fail" : critStatus === "pass" ? " pass" : critStatus === "miss" ? " fail" : "");
+  // Accept die type in breakdown or as breakdown.die, fallback to d6
+  const die = breakdown?.die || "d6";
   toast.innerHTML = `
     <div class="roll-toast-title">${label} Roll${modeSuffix}</div>
-    <div class="roll-toast-body">${formatRollBody({ diceCount, rolls, total, breakdown, rollMode })}</div>
+    <div class="roll-toast-body">${formatRollBody({ diceCount, rolls, total, breakdown, rollMode, die })}</div>
     ${critLine}
   `;
 

@@ -65,7 +65,7 @@
   {
     "id": "roudhouse",
     "title": "Roundhouse",
-    "description": "Roll a Combat roll at Disadvantage to hit. If you hit, deal TLd6+TL.",
+    "description": "Roll to Kick.. If you hit, deal TLd6+TL.",
     "statRequirement": { "stat": "technique", "value": 2 },
     "cooldown": 1
   },  
@@ -100,7 +100,7 @@
   {
     "id": "tatsumaki",
     "title": "Tatsumaki",
-    "description": "Travel 20ft. in a straight line, dealing TLd6+TL to all adjacent targets in the path.",
+    "description": "Travel 20ft. in a straight line, rolling Combat roll to hit and deal TLd6+TL to all adjacent targets in the path.",
     "statRequirement": { "stat": "technique", "value": 5 },
     "cooldown": 4
   },  
@@ -112,9 +112,37 @@
     "cooldown": 2
   },  
   {
+    "id": "clothesline",
+    "title": "Clothesline",
+    "description": "Roll a Combat roll to hit. Deal SLd4+SL on a hit and the target is knocked prone.",
+    "statRequirement": { "stat": "speed", "value": 4 },
+    "cooldown": 1
+  },
+  {
+    "id": "speed-blitz",
+    "title": "Speed Blitz",
+    "description": "Roll an Undodgeable Combat roll to hit. Deal SLd4+SL on a hit. If you miss, you have Disadvantage on all Dodge and Block rolls until the start of your next turn.",
+    "statRequirement": { "stat": "speed", "value": 5 },
+    "cooldown": 3
+  },
+  {
+    "id": "throat-strike",
+    "title": "Throat Strike",
+    "description": "Roll a Contested Stealth or Deception check against a target's Perception or Insight to hit. This attack counts as a Sneak Attack. If you hit, deal SLd4+SL and the target is unable to speak until the end of your next turn. This effect only applies once per combat.",
+    "statRequirement": { "stat": "cooperation", "value": 4 },
+    "cooldown": 1
+  },
+  {
+    "id": "low-blow",
+    "title": "Low Blow",
+    "description": "Roll a Contested Stealth or Deception check against a target's Perception or Insight to hit. If you hit, deal SLd4+SL and the target suffers from the Stunned condition. This attack cannot be used on the same opponent more than once per combat.",
+    "statRequirement": { "stat": "cooperation", "value": 5 },
+    "cooldown": 0
+  },
+  {
     "id": "shoulder-bash",
     "title": "Shoulder Bash",
-    "description": "Roll to Kick. If you hit, the target suffers the Stunned condition.",
+    "description": "Roll a Combat roll to hit. Deal either PLd4+PL or SLd4+SL on a hit. If you hit, the target is knocked back 10ft.",
     "statRequirement": {
       "mode": "any",
       "requirements": [
@@ -122,12 +150,25 @@
         { "stat": "power", "value": 4 }
       ]
     },
+    "cooldown": 1
+  },
+  {
+    "id": "capoerira-kick",
+    "title": "Capoeira Kick",
+    "description": "Roll a Combat roll to hit. Deal either SLd4+SL or TLd4+TL on a hit. If you hit, add a bonus equal to half your Technique Level rounded down to your AC until the start of your next turn.",
+    "statRequirement": {
+      "mode": "any",
+      "requirements": [
+        { "stat": "speed", "value": 4 },
+        { "stat": "technique", "value": 4 }
+      ]
+    },
     "cooldown": 2
   },
   {
     "id": "tie-shan-kao",
     "title": "Tie Shan Kao",
-    "description": "A powerful technique requiring both speed and teamwork. Requires Speed 5 and Cooperation 5.",
+    "description": "Roll a Contested Stealth or Deception check against a target's Perception or Insight to hit. This attack counts as a Sneak Attack. If you hit, deal SLd4+SL and the target suffers from the Stunned condition. This attack may only be used once per combat.",
     "statRequirement": {
       "mode": "all",
       "requirements": [
@@ -135,6 +176,58 @@
         { "stat": "cooperation", "value": 5 }
       ]
     },
-    "cooldown": 3
+    "cooldown": 0
+  },
+  {
+    "id": "heart-jab",
+    "title": "Heart Jab",
+    "description": "Roll a Contested Stealth or Deception check against a target's Perception or Insight to hit. If you hit, deal TLd6+TL and the target suffers the Stunned condition. This attack may only be used once per combat.",
+    "statRequirement": {
+      "mode": "all",
+      "requirements": [
+        { "stat": "technique", "value": 5 },
+        { "stat": "cooperation", "value": 5 }
+      ]
+    },
+    "cooldown": 0
+  },
+  {
+    "id": "rokuogan",
+    "title": "Rokuogan",
+    "description": "Roll an unblockable Combat roll to hit. If you hit, deal either PLd6+PL or TLd6+TL damage. This attack may only be used once per combat and for the next two rounds, you may not use Martial Arts Attacks with a Requirement higher than 1.",
+    "statRequirement": {
+      "mode": "all",
+      "requirements": [
+        { "stat": "power", "value": 5 },
+        { "stat": "technique", "value": 5 }
+      ]
+    },
+    "cooldown": 0
+  },
+  {
+    "id": "whip-punch",
+    "title": "Whip Punch",
+    "description": "Roll a Combat roll to hit. You may choose to either add 10ft. of extra range, dealing a flat amount of damage equal to your Speed Level, or deal SLd4+TLd4+TL. This attack may only be used once per combat and you are Stunned for one turn after using it.",
+    "statRequirement": {
+      "mode": "all",
+      "requirements": [
+        { "stat": "speed", "value": 5 },
+        { "stat": "technique", "value": 5 }
+      ]
+    },
+    "cooldown": 0
+  },
+  {
+    "id": "bullet-punch",
+    "title": "Bullet Punch",
+    "description": "Roll a Combat roll to hit. You can choose to reduce the target's reactions to this attack by your Speed Level / 2 rounded down and deal a flat amount of damage equal to your Speed Level, or deal PLd4+SLd4+PL. This attack may only be used once per combat and you are Stunned for one turn after using it.",
+    "statRequirement": {
+      "mode": "all",
+      "requirements": [
+        { "stat": "speed", "value": 5 },
+        { "stat": "technique", "value": 5 }
+      ]
+    },
+    "cooldown": 0
   }
 ]

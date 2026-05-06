@@ -75,28 +75,28 @@ export function computeCombatTabData(state) {
         name: "Punch",
         type: "Unarmed",
         rangeText: "Melee",
-        damageStr: `${powerLevel}d4 + ${powerLevel}`,
+        damageStr: `1d4 + ${powerLevel}`,
         hitStr: powerLevel > 0
           ? `${powerLevel}d6 +${combatBonus}`
           : `—`,
         diceCount: powerLevel,
         bonus: combatBonus,
         statLabel: "Power",
-        damageParts: [{ count: powerLevel || 1, die: "d4" }],
+        damageParts: [{ count: 1, die: "d4" }],
         damageBonus: powerLevel,
       },
       {
         name: "Kick",
         type: "Unarmed",
         rangeText: "Melee",
-        damageStr: `${techniqueLevel}d4 + ${techniqueLevel}`,
+        damageStr: `1d4 + ${techniqueLevel}`,
         hitStr: techniqueLevel > 0
           ? `${powerLevel}d6 +${combatBonus}`
           : `—`,
         diceCount: powerLevel,
         bonus: combatBonus,
         statLabel: "Technique",
-        damageParts: [{ count: techniqueLevel || 1, die: "d4" }],
+        damageParts: [{ count: 1, die: "d4" }],
         damageBonus: techniqueLevel,
       },
     ];
@@ -147,6 +147,7 @@ export function computeCombatTabData(state) {
     precisionBonus,
     powerLevel,
     speedLevel,
+    techniqueLevel,
     imbue,
     unarmedAttacks,
     martialArts,
@@ -182,24 +183,43 @@ export function renderCombatTabData(data) {
   if (imbueInput) imbueInput.value = data.imbue.level;
   if (imbueDieEl) imbueDieEl.textContent = data.imbue.die;
 
-  const attacksEl = document.getElementById("combatAttacksList");
-  if (attacksEl) {
-    const unarmedRows = data.unarmedAttacks.map((a, i) => renderUnarmedRow(a, i, data)).join("");
-    const weaponRows = data.equippedWeapons?.length
-      ? data.equippedWeapons.map((w, i) => renderAttackRow(w, i, data)).join("")
-      : "";
-    attacksEl.innerHTML = unarmedRows + weaponRows
-      || '<span class="combat-empty">No attacks available.</span>';
+  // Strikes (unarmed)
+  const strikesEl = document.getElementById("combatStrikesList");
+  if (strikesEl) {
+    strikesEl.innerHTML = data.unarmedAttacks.map((a, i) => renderUnarmedRow(a, i)).join("");
   }
 
+  // Weapons
+  const attacksEl = document.getElementById("combatAttacksList");
+  if (attacksEl) {
+    attacksEl.innerHTML = data.equippedWeapons?.length
+      ? data.equippedWeapons.map((w, i) => renderAttackRow(w, i, data)).join("")
+      : '<span class="combat-empty">No weapons equipped.</span>';
+  }
+
+  // Arts — apply search filters
+  filterAndRenderArts(data);
+}
+
+function filterAndRenderArts(data) {
+  const martialSearch = document.getElementById("combatMartialArtsSearch")?.value.toLowerCase() || "";
+  const weaponSearch = document.getElementById("combatWeaponArtsSearch")?.value.toLowerCase() || "";
+
+  const filteredMartial = data.martialArts.filter(art =>
+    !martialSearch || art.title.toLowerCase().includes(martialSearch) || art.description.toLowerCase().includes(martialSearch)
+  );
+  const filteredWeapon = data.weaponArts.filter(art =>
+    !weaponSearch || art.title.toLowerCase().includes(weaponSearch) || art.description.toLowerCase().includes(weaponSearch)
+  );
+
   const martialArtsEl = document.getElementById("combatMartialArtsList");
-  if (martialArtsEl) martialArtsEl.innerHTML = data.martialArts?.length
-    ? data.martialArts.map(renderMartialArt).join("")
+  if (martialArtsEl) martialArtsEl.innerHTML = filteredMartial.length
+    ? filteredMartial.map(renderMartialArt).join("")
     : '<span class="combat-empty">No martial arts available.</span>';
 
   const weaponArtsEl = document.getElementById("combatWeaponArtsList");
-  if (weaponArtsEl) weaponArtsEl.innerHTML = data.weaponArts?.length
-    ? data.weaponArts.map(renderWeaponArt).join("")
+  if (weaponArtsEl) weaponArtsEl.innerHTML = filteredWeapon.length
+    ? filteredWeapon.map(renderWeaponArt).join("")
     : '<span class="combat-empty">No weapon arts available.</span>';
 }
 
@@ -233,17 +253,15 @@ function renderWeaponArt(art) {
 function renderUnarmedRow(attack, index) {
   const hitStr = attack.diceCount > 0 && attack.bonus !== 0
     ? `${attack.diceCount}d6 ${attack.bonus > 0 ? "+" : ""}${attack.bonus}`
-    : attack.diceCount > 0
-    ? `${attack.diceCount}d6`
-    : "—";
+    : attack.diceCount > 0 ? `${attack.diceCount}d6` : "—";
 
   return `
     <div class="combat-attack-row combat-attack-row--unarmed">
       <div class="combat-attack-name">${escapeHtml(attack.name)}</div>
       <div class="combat-attack-type">${escapeHtml(attack.type)}</div>
       <div class="combat-attack-range">${escapeHtml(attack.rangeText)}</div>
-      <div class="combat-attack-damage combat-attack-rollable" data-action="rollUnarmedDamage" data-unarmed-index="${index}" title="Click to roll damage">${escapeHtml(attack.damageStr)}</div>
       <div class="combat-attack-hit combat-attack-rollable" data-action="rollUnarmedHit" data-unarmed-index="${index}" title="Click to roll to hit">${escapeHtml(hitStr)}</div>
+      <div class="combat-attack-damage combat-attack-rollable" data-action="rollUnarmedDamage" data-unarmed-index="${index}" title="Click to roll damage">${escapeHtml(attack.damageStr)}</div>
     </div>`;
 }
 
@@ -252,23 +270,15 @@ function renderAttackRow(weapon, index, data) {
   const isPolearm = normalizeWeaponType(weapon.weaponType) === "polearm";
   const typeLabel = WEAPON_TYPE_LABELS[weapon.weaponType] ?? weapon.weaponType;
 
-  // Determine which stat to use for the bonus
   let statKey = weapon.weaponStat || "power";
-  let statLevel = 0;
-  if (statKey === "power") statLevel = data.powerLevel;
-  else if (statKey === "speed") statLevel = data.speedLevel;
-  else if (statKey === "technique") statLevel = data.techniqueLevel || 0;
-  else statLevel = data.powerLevel; // fallback
+  let statLevel = statKey === "speed" ? data.speedLevel : statKey === "technique" ? (data.techniqueLevel || 0) : data.powerLevel;
 
-  // Build the damage string with the actual stat value
   let damageStr = "";
   if (Array.isArray(weapon.weaponDamageParts) && weapon.weaponDamageParts.length > 0) {
-    damageStr = weapon.weaponDamageParts.map(part => `${part.count}${part.die}`).join(" + ");
-    damageStr += statLevel ? ` + ${statLevel}` : "";
-  } else if (weapon.damage) {
-    damageStr = weapon.damage + (statLevel ? ` + ${statLevel}` : "");
+    damageStr = weapon.weaponDamageParts.map(p => `${p.count}${p.die}`).join(" + ");
+    if (statLevel) damageStr += ` + ${statLevel}`;
   } else {
-    damageStr = statLevel ? `+${statLevel}` : "";
+    damageStr = statLevel ? `+${statLevel}` : "—";
   }
 
   let rangeText = "Melee";
@@ -286,13 +296,20 @@ function renderAttackRow(weapon, index, data) {
     ? `${diceCount}d6 ${bonus > 0 ? "+" : ""}${bonus}`
     : `${diceCount}d6`;
 
+  const descLine = weapon.description
+    ? `<div class="combat-attack-desc">${escapeHtml(weapon.description)}</div>`
+    : "";
+
   return `
     <div class="combat-attack-row" data-weapon-index="${index}">
-      <div class="combat-attack-name">${escapeHtml(weapon.name)}</div>
+      <div class="combat-attack-name-wrap">
+        <div class="combat-attack-name">${escapeHtml(weapon.name)}</div>
+        ${descLine}
+      </div>
       <div class="combat-attack-type">${escapeHtml(typeLabel)}</div>
       <div class="combat-attack-range">${escapeHtml(rangeText)}</div>
-      <div class="combat-attack-damage combat-attack-rollable" data-action="rollDamage" data-weapon-index="${index}" title="Click to roll damage">${escapeHtml(damageStr)}</div>
       <div class="combat-attack-hit combat-attack-rollable" data-action="rollHit" data-weapon-index="${index}" title="Click to roll to hit">${escapeHtml(hitStr)}</div>
+      <div class="combat-attack-damage combat-attack-rollable" data-action="rollDamage" data-weapon-index="${index}" title="Click to roll damage">${escapeHtml(damageStr)}</div>
     </div>`;
 }
 
@@ -319,13 +336,45 @@ export function initCombat({ getState, scheduleSave, showRollToast }) {
     });
   }
 
+  // Collapse button
+  const collapseBtn = document.getElementById("combatActionsCollapseBtn");
+  const collapsePanel = document.getElementById("combatActionsPanel");
+  if (collapseBtn && collapsePanel) {
+    collapseBtn.addEventListener("click", () => {
+      const isOpen = collapseBtn.getAttribute("aria-expanded") === "true";
+      collapseBtn.setAttribute("aria-expanded", isOpen ? "false" : "true");
+      collapsePanel.classList.toggle("collapsed", isOpen);
+    });
+  }
+
+  // Arts tabs
+  const artsTabs = document.querySelectorAll(".combat-arts-tab");
+  artsTabs.forEach(tab => {
+    tab.addEventListener("click", () => {
+      artsTabs.forEach(t => t.classList.remove("active"));
+      tab.classList.add("active");
+      const target = tab.dataset.artsTab;
+      document.getElementById("combatArtsTabPanelMartial").hidden = target !== "martial";
+      document.getElementById("combatArtsTabPanelWeapon").hidden = target !== "weapon";
+    });
+  });
+
+  // Search bars — re-filter on input without full re-render
+  ["combatMartialArtsSearch", "combatWeaponArtsSearch"].forEach(id => {
+    document.getElementById(id)?.addEventListener("input", () => {
+      const state = _getState();
+      if (!state) return;
+      filterAndRenderArts(computeCombatTabData(state));
+    });
+  });
+
+  // Roll delegation
   const panel = document.getElementById("panel-combat");
   if (panel) {
     panel.addEventListener("click", e => {
       const target = e.target.closest("[data-action]");
       if (!target) return;
       const action = target.dataset.action;
-
       const state = _getState();
       if (!state) return;
       const data = computeCombatTabData(state);
@@ -344,13 +393,25 @@ export function initCombat({ getState, scheduleSave, showRollToast }) {
         if (!Number.isInteger(unarmedIndex)) return;
         const attack = data.unarmedAttacks[unarmedIndex];
         if (!attack) return;
-        if (action === "rollUnarmedHit") rollUnarmedHit(attack, data);
+        if (action === "rollUnarmedHit") rollUnarmedHit(attack);
         if (action === "rollUnarmedDamage") rollUnarmedDamage(attack);
       }
     });
   }
+  
+  // Sub-collapse buttons
+  ["combatAttacksCollapseBtn", "combatBasicActionsCollapseBtn"].forEach(btnId => {
+    const btn = document.getElementById(btnId);
+    const panelId = btnId.replace("CollapseBtn", "Panel");
+    const panel = document.getElementById(panelId);
+    if (!btn || !panel) return;
+    btn.addEventListener("click", () => {
+      const isOpen = btn.getAttribute("aria-expanded") === "true";
+      btn.setAttribute("aria-expanded", isOpen ? "false" : "true");
+      panel.classList.toggle("collapsed", isOpen);
+    });
+  });
 }
-
 function rollDice(count, sides) {
   return Array.from({ length: count }, () => Math.floor(Math.random() * sides) + 1);
 }
@@ -396,7 +457,7 @@ function rollHit(weapon, data) {
     rolls,
     total,
     critStatus,
-    `${weapon.name} — ${skillLabel}`,
+    `${weapon.name} — ${skillLabel} — Roll to Hit`,
     { skillModifier: bonus },
     null,
   );
@@ -435,7 +496,7 @@ function rollDamage(weapon, data) {
     total,
     null,
     `${weapon.name} — Damage`,
-    { skillModifier: statBonus },
+    { skillModifier: statBonus, die: weapon.weaponDamageParts[0]?.die || "d6" },
     null,
   );
 }
@@ -452,7 +513,7 @@ function rollUnarmedHit(attack, data) {
     rolls,
     total,
     critStatus,
-    `${attack.name} — Combat`,
+    `${attack.name} — Roll to Hit`,
     { skillModifier: attack.bonus },
     null,
   );
@@ -461,16 +522,18 @@ function rollUnarmedHit(attack, data) {
 function rollUnarmedDamage(attack) {
   if (!_showRollToast) return;
   const count = attack.damageParts[0]?.count || 1;
-  const rolls = rollDice(count, 4);
+  const die = attack.damageParts[0]?.die || "d4";
+  const dieNum = Number(die.replace("d", "")) || 4;
+  const rolls = rollDice(count, dieNum);
   const total = rolls.reduce((a, b) => a + b, 0) + attack.damageBonus;
   _showRollToast(
     attack.statLabel,
-    attack.damageParts[0]?.count || 1,
+    count,
     rolls,
     total,
     null,
     `${attack.name} — Damage`,
-    { skillModifier: attack.damageBonus },
+    { skillModifier: attack.damageBonus, die },
     null
   );
 }

@@ -4084,7 +4084,7 @@
 
     .combat-section-title {
       font-family: 'Cinzel', serif;
-      font-size: 9px;
+      font-size: 11px;
       letter-spacing: 1.5px;
       text-transform: uppercase;
       color: var(--ink);
@@ -4233,6 +4233,280 @@
       color: var(--ink-faint);
       display: block;
       margin-top: 3px;
+    }
+
+    /* ── COLLAPSIBLE BOXES ───────────────────────────────── */
+    .combat-collapsible-box {
+      padding: 0;
+      overflow: hidden;
+      display: block;
+      text-align: left;
+    }
+
+    .combat-collapse-btn {
+      width: 100%;
+      background: transparent;
+      border: none;
+      padding: 8px 9px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      text-align: left;
+    }
+
+    .combat-collapse-btn::after {
+      content: '';
+      width: 7px;
+      height: 7px;
+      border-right: 1.6px solid var(--ink-faint);
+      border-bottom: 1.6px solid var(--ink-faint);
+      transform: rotate(45deg);
+      transform-origin: center;
+      transition: transform 220ms ease;
+      flex-shrink: 0;
+    }
+
+    .combat-collapse-btn[aria-expanded="false"]::after {
+      transform: rotate(-45deg);
+    }
+
+    .combat-collapse-panel {
+      padding: 0 9px 9px;
+      overflow: hidden;
+      max-height: 2000px;
+      opacity: 1;
+      transition: max-height 280ms ease, opacity 180ms ease;
+    }
+
+    .combat-collapse-panel.collapsed {
+      max-height: 0;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    /* ── ATTACK SUBHEADERS ───────────────────────────────── */
+    .combat-attack-subheader {
+      font-family: 'Cinzel', serif;
+      font-size: 8px;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: var(--ink-faint);
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 4px;
+      margin-bottom: 5px;
+    }
+
+    /* ── WEAPON DESCRIPTION ──────────────────────────────── */
+    .combat-attack-name-wrap {
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+      min-width: 0;
+    }
+
+    .combat-attack-desc {
+      font-family: 'Crimson Text', serif;
+      font-size: 11px;
+      color: var(--ink-faint);
+      font-style: italic;
+      line-height: 1.2;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* ── ARTS TABS ───────────────────────────────────────── */
+    .combat-arts-tab-bar {
+      display: flex;
+      border-bottom: 1.5px solid var(--ink);
+    }
+
+    .combat-arts-tab {
+      font-family: 'Cinzel', serif;
+      font-size: 9px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      background: var(--parchment-dark);
+      color: var(--ink-faint);
+      border: none;
+      border-right: 1px solid var(--border);
+      padding: 6px 10px;
+      cursor: pointer;
+      transition: color 120ms ease, background 120ms ease;
+    }
+
+    .combat-arts-tab:hover { color: var(--ink); }
+
+    .combat-arts-tab.active {
+      background: var(--parchment);
+      color: var(--ink);
+      font-weight: 600;
+    }
+
+    .combat-arts-tab-panel {
+      padding: 8px 9px;
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+    }
+
+    .combat-arts-tab-panel[hidden] {
+      display: none !important;
+    }
+
+    /* ── ARTS SEARCH ─────────────────────────────────────── */
+    .combat-arts-search {
+      font-family: 'Crimson Text', serif;
+      font-size: 12px;
+      background: transparent;
+      border: none;
+      border-bottom: 1px solid var(--border);
+      color: var(--ink);
+      outline: none;
+      padding: 3px 0;
+      width: 100%;
+    }
+
+    .combat-arts-search::placeholder { color: var(--ink-faint); }
+    .combat-arts-search:focus { border-bottom-color: var(--ink); }
+
+    /* ── ACTIONS COUNT IN HEADER ─────────────────────────── */
+    .combat-collapse-btn-inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+      gap: 8px;
+    }
+
+    .combat-actions-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .combat-actions-count-label {
+      font-family: 'Cinzel', serif;
+      font-size: 9px;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: var(--ink-faint);
+      font-weight: 400;
+    }
+
+    #combatActionsValue {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--ink);
+    }
+
+    /* ── SUB-COLLAPSE ────────────────────────────────────── */
+    .combat-sub-collapse {
+      border-top: 1px solid var(--border);
+      margin-top: 6px;
+      padding-top: 6px;
+    }
+
+    .combat-sub-collapse:first-child {
+      border-top: none;
+      margin-top: 0;
+      padding-top: 0;
+    }
+
+    .combat-sub-collapse-btn {
+      width: 100%;
+      background: transparent;
+      border: none;
+      padding: 4px 0;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-family: 'Cinzel', serif;
+      font-size: 9px;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: var(--ink);
+      text-align: left;
+    }
+
+    .combat-sub-collapse-btn::after {
+      content: '';
+      width: 6px;
+      height: 6px;
+      border-right: 1.5px solid var(--ink-faint);
+      border-bottom: 1.5px solid var(--ink-faint);
+      transform: rotate(45deg);
+      transform-origin: center;
+      transition: transform 220ms ease;
+      flex-shrink: 0;
+    }
+
+    .combat-sub-collapse-btn[aria-expanded="false"]::after {
+      transform: rotate(-45deg);
+    }
+
+    .combat-sub-collapse-panel {
+      padding-top: 6px;
+      overflow: hidden;
+      max-height: 2000px;
+      opacity: 1;
+      transition: max-height 280ms ease, opacity 180ms ease;
+    }
+
+    .combat-sub-collapse-panel.collapsed {
+      max-height: 0;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    /* ── BASIC ACTIONS ───────────────────────────────────── */
+    .combat-basic-action-item {
+      border: 1px solid var(--border);
+      background: rgba(240, 235, 224, 0.7);
+      padding: 6px 7px;
+      margin-bottom: 5px;
+    }
+
+    .combat-basic-action-item:last-child {
+      margin-bottom: 0;
+    }
+
+    .combat-basic-action-header {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 3px;
+    }
+
+    .combat-basic-action-name {
+      font-family: 'Cinzel', serif;
+      font-size: 10px;
+      letter-spacing: 0.7px;
+      text-transform: uppercase;
+      color: var(--ink);
+    }
+
+    .combat-basic-action-cost {
+      font-family: 'Cinzel', serif;
+      font-size: 8px;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      color: var(--accent);
+      white-space: nowrap;
+    }
+
+    .combat-basic-action-alt {
+      color: var(--ink-faint);
+    }
+
+    .combat-basic-action-desc {
+      font-family: 'Crimson Text', serif;
+      font-size: 12px;
+      color: var(--ink-light);
+      line-height: 1.35;
     }
 
     /* ── EMPTY STATE ─────────────────────────────────────── */

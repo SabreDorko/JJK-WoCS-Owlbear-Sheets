@@ -441,11 +441,7 @@
     <div class="tab-panel" id="panel-combat">
       <div class="combat-shell">
 
-        <div class="combat-header-grid">
-          <div class="combat-header-field">
-            <span class="combat-label">Actions</span>
-            <div class="combat-value" id="combatActionsValue">—</div>
-          </div>
+        <div class="combat-header-grid" style="grid-template-columns: 1fr 1fr 1fr auto;">
           <div class="combat-header-field">
             <span class="combat-label">Black Flash Range</span>
             <div class="combat-value" id="combatBlackFlashValue">—</div>
@@ -471,33 +467,93 @@
 
         <div class="combat-actions-shell">
 
-          <section class="combat-actions-section">
-            <div class="combat-section-title">Attacks</div>
-            <div class="combat-attack-header-row">
-              <span>Weapon</span>
-              <span>Type</span>
-              <span>Range</span>
-              <span>Damage</span>
-              <span>To Hit</span>
-            </div>
-            <div id="combatAttacksList" class="combat-attacks-list">
-              <span class="combat-empty">No weapons equipped.</span>
-            </div>
-          </section>
+          <!-- Actions collapsible box -->
+          <div class="vital-box combat-collapsible-box">
+            <button type="button" class="combat-collapse-btn" id="combatActionsCollapseBtn" aria-expanded="true">
+              <span class="combat-section-title" style="margin-bottom:0;border-bottom:none;">
+                Actions &nbsp;·&nbsp; <span class="combat-actions-count-label">Number of Actions:</span> <span id="combatActionsValue">—</span>
+              </span>
+            </button>
 
-          <section class="combat-actions-section">
-            <div class="combat-section-title">Martial Arts</div>
-            <div id="combatMartialArtsList" class="combat-arts-list">
-              <span class="combat-empty">No martial arts available.</span>
-            </div>
-          </section>
+            <div id="combatActionsPanel" class="combat-collapse-panel">
 
-          <section class="combat-actions-section">
-            <div class="combat-section-title">Weapon Arts</div>
-            <div id="combatWeaponArtsList" class="combat-arts-list">
-              <span class="combat-empty">No weapon arts available.</span>
+              <!-- Attacks collapsible -->
+              <div class="combat-sub-collapse">
+                <button type="button" class="combat-sub-collapse-btn" id="combatAttacksCollapseBtn" aria-expanded="true">
+                  Attacks
+                </button>
+                <div id="combatAttacksPanel" class="combat-sub-collapse-panel">
+                  <div class="combat-attack-header-row">
+                    <span>Name</span>
+                    <span>Type</span>
+                    <span>Range</span>
+                    <span>To Hit</span>
+                    <span>Damage</span>
+                  </div>
+                  <div class="combat-attack-subheader">Strikes</div>
+                  <div id="combatStrikesList" class="combat-attacks-list"></div>
+                  <div class="combat-attack-subheader" style="margin-top:8px;">Weapons</div>
+                  <div id="combatAttacksList" class="combat-attacks-list">
+                    <span class="combat-empty">No weapons equipped.</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Basic Actions collapsible -->
+              <div class="combat-sub-collapse">
+                <button type="button" class="combat-sub-collapse-btn" id="combatBasicActionsCollapseBtn" aria-expanded="true">
+                  Basic Actions
+                </button>
+                <div id="combatBasicActionsPanel" class="combat-sub-collapse-panel">
+                  <div class="combat-basic-action-item">
+                    <div class="combat-basic-action-header">
+                      <span class="combat-basic-action-name">Stealth</span>
+                      <span class="combat-basic-action-cost">Action <span class="combat-basic-action-alt">/ Bonus Action*</span></span>
+                    </div>
+                    <div class="combat-basic-action-desc">Roll Stealth to hide from sight. If already outside the opponent's line of sight, this can be performed as a Bonus Action instead.</div>
+                  </div>
+                  <div class="combat-basic-action-item">
+                    <div class="combat-basic-action-header">
+                      <span class="combat-basic-action-name">Dash</span>
+                      <span class="combat-basic-action-cost">Action</span>
+                    </div>
+                    <div class="combat-basic-action-desc">Double your movement speed for the turn.</div>
+                  </div>
+                  <div class="combat-basic-action-item">
+                    <div class="combat-basic-action-header">
+                      <span class="combat-basic-action-name">Press</span>
+                      <span class="combat-basic-action-cost">Bonus Action</span>
+                    </div>
+                    <div class="combat-basic-action-desc">When ending your turn adjacent to a target, press them. Their next attack suffers a penalty equal to your highest stat to damage and −2 to hit anyone other than you, but deals +2 damage and +1 to hit you. Only one person may press a single target. Effect ends if the target moves more than 50 ft. away.</div>
+                  </div>
+                </div>
+              </div>
+
             </div>
-          </section>
+          </div>
+
+          <!-- Arts box with tabs -->
+          <div class="vital-box combat-collapsible-box">
+            <div class="combat-arts-tab-bar">
+              <button type="button" class="combat-arts-tab active" id="combatArtsTabMartial" data-arts-tab="martial">Martial Arts</button>
+              <button type="button" class="combat-arts-tab" id="combatArtsTabWeapon" data-arts-tab="weapon">Weapon Arts</button>
+            </div>
+
+            <div id="combatArtsTabPanelMartial" class="combat-arts-tab-panel">
+              <input type="text" class="combat-arts-search" id="combatMartialArtsSearch" placeholder="Search martial arts..." />
+              <div id="combatMartialArtsList" class="combat-arts-list">
+                <span class="combat-empty">No martial arts available.</span>
+              </div>
+            </div>
+
+            <div id="combatArtsTabPanelWeapon" class="combat-arts-tab-panel" hidden>
+              <input type="text" class="combat-arts-search" id="combatWeaponArtsSearch" placeholder="Search weapon arts..." />
+              <div id="combatWeaponArtsList" class="combat-arts-list">
+                <span class="combat-empty">No weapon arts available.</span>
+              </div>
+            </div>
+
+          </div>
 
           <section class="combat-actions-section">
             <div class="combat-section-title">Archetype Features</div>

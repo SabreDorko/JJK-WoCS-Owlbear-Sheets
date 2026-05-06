@@ -1,12 +1,9 @@
 // Returns the fully computed value for a subskill (statKey, skillIndex) using the current state
 // This is the value that should be used for combat, initiative, etc.
-export function getComputedSubskillValue(state, statKey, skillIndex) {
-  const effects = computeActiveModifierEffects(state);
-  return getSubskillValue(state, effects, statKey, skillIndex);
-}
 import { ARCHETYPES, CENTER_STATS, RIGHT_STATS } from "./state/store.js";
-import { computeActiveModifierEffects, applyDirectModifiers, normalizeDirectModifierList } from "./modifiers.js";
+import { computeActiveModifierEffects, applyDirectModifiers, normalizeDirectModifierList, getRollModifierSources } from "./modifiers.js";
 import { updateTechniquesDerivedUI } from "./techniques.js";
+// import { showRollToast } from "./rolls.js";
 
 let _getState = null;
 let _scheduleSave = null;
@@ -247,6 +244,7 @@ function showRollToast(statLabel, diceCount, rolls, total, critStatus, skillName
     _showRollToast(statLabel, diceCount, rolls, total, critStatus, skillName, breakdown, rollMode);
   }
 }
+
 
 function rollDicePool(diceCount) {
   return Array.from({ length: diceCount }, () => Math.floor(Math.random() * 6) + 1);
@@ -1043,6 +1041,7 @@ function buildStatBlocks(defs, container) {
         rollResult.secondTotal,
         rollResult.selectedRollIndex,
       );
+      if (breakdown) breakdown.die = "d6";
       showRollToast(def.label, n, rollResult.rolls, rollResult.total, null, null, breakdown, rollMode === "normal" ? null : rollMode);
     };
 
@@ -1223,6 +1222,7 @@ function buildStatBlocks(defs, container) {
           rollResult.secondTotal,
           rollResult.selectedRollIndex,
         );
+        if (breakdown) breakdown.die = "d6";
         showRollToast(
           def.label,
           n,
@@ -1625,4 +1625,9 @@ export function initCharacter({ getState: getStateFn, scheduleSave: scheduleSave
 
   _initialized = true;
   applyCharacterStateToUI();
+}
+
+export function getComputedSubskillValue(state, statKey, skillIndex) {
+  const effects = computeActiveModifierEffects(state);
+  return getSubskillValue(state, effects, statKey, skillIndex);
 }
