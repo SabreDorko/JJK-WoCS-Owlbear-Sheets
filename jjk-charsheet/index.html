@@ -460,7 +460,6 @@
                 <span class="vital-label">Imbue</span>
                 <input type="number" id="combatImbueInput" class="combat-imbue-input" min="1" max="3" value="1" />
               </div>
-              <div class="combat-imbue-divider"></div>
               <div class="combat-imbue-right">
                 <div class="combat-imbue-die" id="combatImbueDie">1d4</div>
               </div>
@@ -470,30 +469,44 @@
 
         <div class="combat-divider"></div>
 
-        <section class="combat-weapons-section">
-          <div class="combat-section-title">Equipped Weapons</div>
-          <div id="combatEquippedWeaponsList" class="combat-weapons-list">
-            <span class="combat-empty">No weapons equipped.</span>
-          </div>
-        </section>
+        <div class="combat-actions-shell">
 
-        <div class="combat-divider"></div>
+          <section class="combat-actions-section">
+            <div class="combat-section-title">Attacks</div>
+            <div class="combat-attack-header-row">
+              <span>Weapon</span>
+              <span>Type</span>
+              <span>Range</span>
+              <span>Damage</span>
+              <span>To Hit</span>
+            </div>
+            <div id="combatAttacksList" class="combat-attacks-list">
+              <span class="combat-empty">No weapons equipped.</span>
+            </div>
+          </section>
 
-        <div class="combat-arts-grid">
-          <section class="combat-arts-section">
-            <div class="combat-arts-title">Martial Arts</div>
+          <section class="combat-actions-section">
+            <div class="combat-section-title">Martial Arts</div>
             <div id="combatMartialArtsList" class="combat-arts-list">
               <span class="combat-empty">No martial arts available.</span>
             </div>
           </section>
-          <section class="combat-arts-section">
-            <div class="combat-arts-title">Weapon Arts</div>
+
+          <section class="combat-actions-section">
+            <div class="combat-section-title">Weapon Arts</div>
             <div id="combatWeaponArtsList" class="combat-arts-list">
               <span class="combat-empty">No weapon arts available.</span>
             </div>
           </section>
-        </div>
 
+          <section class="combat-actions-section">
+            <div class="combat-section-title">Archetype Features</div>
+            <div id="combatArchetypeFeaturesList" class="combat-arts-list">
+              <span class="combat-empty">No features available.</span>
+            </div>
+          </section>
+
+        </div>
       </div>
     </div>
     <!-- Jujutsu Panel -->
