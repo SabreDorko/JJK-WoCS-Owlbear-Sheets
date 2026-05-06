@@ -1,3 +1,9 @@
+// Returns the fully computed value for a subskill (statKey, skillIndex) using the current state
+// This is the value that should be used for combat, initiative, etc.
+export function getComputedSubskillValue(state, statKey, skillIndex) {
+  const effects = computeActiveModifierEffects(state);
+  return getSubskillValue(state, effects, statKey, skillIndex);
+}
 import { ARCHETYPES, CENTER_STATS, RIGHT_STATS } from "./state/store.js";
 import { computeActiveModifierEffects, applyDirectModifiers, normalizeDirectModifierList } from "./modifiers.js";
 import { updateTechniquesDerivedUI } from "./techniques.js";
@@ -886,10 +892,25 @@ function getEffectiveStatLevel(state, effects, statKey) {
 }
 
 function getSubskillValue(state, effects, statKey, skillIndex) {
+  // Use manual override if set
+  const override = getSubskillOverride?.(state, statKey, skillIndex);
+  if (override !== null && override !== undefined) return override;
+
+  // Count all sources of aptitude for this subskill
+  let aptitudeCount = 0;
+  // 1. Manual aptitude (checkbox/dot)
   const skillState = state?.stats?.[statKey]?.skills?.[skillIndex] || {};
-  const aptitude = parseInt(skillState.aptitude, 10) || 0;
-  const hasPermanentAptitude = !!getArchetypePermanentAptitudeSource?.(state, statKey, skillIndex);
-  const aptitudeBonus = (aptitude > 0 || hasPermanentAptitude) ? getAptitudeBonusValue(state, effects) : 0;
+  if (parseInt(skillState.aptitude, 10) > 0) aptitudeCount++;
+  // 2. Permanent aptitude from archetype
+  if (getArchetypePermanentAptitudeSource?.(state, statKey, skillIndex)) aptitudeCount++;
+  // 3. Inventory or custom modifiers (effects.specificSkillBonuses for this subskill, if used for aptitude)
+  //    (If you have a more specific way to detect inventory-granted aptitudes, add here)
+  // 4. Any other sources (add as needed)
+
+  // Each aptitude grants a bonus (default 2, or use getAptitudeBonusValue if it returns per-aptitude value)
+  const perAptitudeBonus = 2; // Change if your system uses a different value per aptitude
+  const aptitudeBonus = aptitudeCount * perAptitudeBonus;
+
   const statSkillBonus = effects?.skillBonuses?.[statKey] || 0;
   const specificBonus = effects?.specificSkillBonuses?.[`${statKey}:${skillIndex}`] || 0;
   const baseValue = aptitudeBonus + statSkillBonus + specificBonus;

@@ -8,6 +8,7 @@ import {
   normalizeWeaponType,
 } from "./weapons.js";
 import { computeActiveModifierEffects } from "./modifiers.js";
+import { getComputedSubskillValue } from "./character.js";
 
 // ── HELPERS ───────────────────────────────────────────────────────────────────
 
@@ -63,12 +64,12 @@ export function computeCombatTabData(state) {
   const actions = getActionsForGrade(state?.grade);
 
   // Tempo: Speed skill index 3
-  const tempoBonus = getSubskillValue(state, effects, "speed", 3);
+  const tempoBonus = getComputedSubskillValue(state, "speed", 3);
   const initiative = tempoBonus >= 0 ? `+${tempoBonus}` : `${tempoBonus}`;
 
   // Combat (Power:1) and Precision (Speed:0) for hit rolls
-  const combatBonus = getSubskillValue(state, effects, "power", 1);
-  const precisionBonus = getSubskillValue(state, effects, "speed", 0);
+  const combatBonus = getComputedSubskillValue(state, "power", 1);
+  const precisionBonus = getComputedSubskillValue(state, "speed", 0);
   const powerLevel = getEffectiveStatLevel(state, effects, "power");
   const speedLevel = getEffectiveStatLevel(state, effects, "speed");
 
