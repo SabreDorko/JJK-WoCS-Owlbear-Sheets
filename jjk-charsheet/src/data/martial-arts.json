@@ -103,5 +103,38 @@
     "description": "Travel 20ft. in a straight line, dealing TLd6+TL to all adjacent targets in the path.",
     "statRequirement": { "stat": "technique", "value": 5 },
     "cooldown": 4
+  },  
+  {
+    "id": "elbow-strike",
+    "title": "Elbow Strike",
+    "description": "Roll a Combat roll to hit. Deal SLd4+SL on a hit. The target must make a Fortitude check with a DC equal to your SL*2+4. If they fail, they suffer from the Bleed condition.",
+    "statRequirement": { "stat": "speed", "value": 3 },
+    "cooldown": 2
+  },  
+  {
+    "id": "shoulder-bash",
+    "title": "Shoulder Bash",
+    "description": "Roll to Kick. If you hit, the target suffers the Stunned condition.",
+    "statRequirement": {
+      "mode": "any",
+      "requirements": [
+        { "stat": "speed", "value": 4 },
+        { "stat": "power", "value": 4 }
+      ]
+    },
+    "cooldown": 2
+  },
+  {
+    "id": "tie-shan-kao",
+    "title": "Tie Shan Kao",
+    "description": "A powerful technique requiring both speed and teamwork. Requires Speed 5 and Cooperation 5.",
+    "statRequirement": {
+      "mode": "all",
+      "requirements": [
+        { "stat": "speed", "value": 5 },
+        { "stat": "cooperation", "value": 5 }
+      ]
+    },
+    "cooldown": 3
   }
 ]

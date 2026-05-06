@@ -95,7 +95,7 @@ export function computeCombatTabData(state) {
           : `—`,
         diceCount: powerLevel,
         bonus: combatBonus,
-        statLabel: "Power",
+        statLabel: "Technique",
         damageParts: [{ count: techniqueLevel || 1, die: "d4" }],
         damageBonus: techniqueLevel,
       },
@@ -110,12 +110,24 @@ export function computeCombatTabData(state) {
     })
     .filter(Boolean);
 
-  const martialArts = martialArtsData.filter(art => {
-    const stat = art.statRequirement?.stat;
-    const value = art.statRequirement?.value;
-    if (!stat || value == null) return false;
-    return getEffectiveStatLevel(state, effects, stat) >= value;
-  });
+  // Support for single, any, or all stat requirements
+  function checkStatRequirement(requirement) {
+    if (!requirement) return false;
+    // Legacy: single stat
+    if (requirement.stat && typeof requirement.value === 'number') {
+      return getEffectiveStatLevel(state, effects, requirement.stat) >= requirement.value;
+    }
+    // New: any/all mode
+    if (requirement.mode === 'any' && Array.isArray(requirement.requirements)) {
+      return requirement.requirements.some(req => checkStatRequirement(req));
+    }
+    if (requirement.mode === 'all' && Array.isArray(requirement.requirements)) {
+      return requirement.requirements.every(req => checkStatRequirement(req));
+    }
+    return false;
+  }
+
+  const martialArts = martialArtsData.filter(art => checkStatRequirement(art.statRequirement));
 
   const weaponArts = weaponArtsData.filter(art => {
     const stat = art.statRequirement?.stat;
@@ -395,28 +407,35 @@ function rollDamage(weapon, data) {
   const parts = weapon.weaponDamageParts || [{ count: 1, die: "d6" }];
 
   let total = 0;
+  const allRolls = [];
   const rollDetails = [];
   parts.forEach(part => {
     const sides = parseInt(String(part.die).replace("d", ""), 10) || 6;
     const rolls = rollDice(part.count, sides);
+    allRolls.push(...rolls);
     const partTotal = rolls.reduce((a, b) => a + b, 0);
     total += partTotal;
     rollDetails.push(`${part.count}${part.die}: [${rolls.join(", ")}]`);
   });
 
-  // Stat level bonus (Power or Speed level as flat damage bonus)
-  const isRanged = normalizeWeaponType(weapon.weaponType) === "ranged";
-  const statBonus = isRanged ? data.speedLevel : data.powerLevel;
+
+  // Use weaponStat for stat bonus
+  let statKey = weapon.weaponStat || "power";
+  let statBonus = 0;
+  if (statKey === "power") statBonus = data.powerLevel;
+  else if (statKey === "speed") statBonus = data.speedLevel;
+  else if (statKey === "technique") statBonus = data.techniqueLevel || 0;
+  else statBonus = data.powerLevel; // fallback
   total += statBonus;
 
   _showRollToast(
-    `${weapon.name} — Damage`,
-    0,
-    [],
+    statKey.charAt(0).toUpperCase() + statKey.slice(1),
+    weapon.weaponDamageParts[0]?.count || 1,
+    allRolls,
     total,
     null,
-    `${rollDetails.join(" + ")} + ${statBonus}`,
-    {},
+    `${weapon.name} — Damage`,
+    { skillModifier: statBonus },
     null,
   );
 }
@@ -428,7 +447,7 @@ function rollUnarmedHit(attack, data) {
   const allOnes = rolls.every(r => r === 1);
   const critStatus = allOnes ? "fail" : total >= attack.diceCount * 6 ? "success" : null;
   _showRollToast(
-    "Power",
+    attack.statLabel,
     attack.diceCount,
     rolls,
     total,
@@ -445,13 +464,13 @@ function rollUnarmedDamage(attack) {
   const rolls = rollDice(count, 4);
   const total = rolls.reduce((a, b) => a + b, 0) + attack.damageBonus;
   _showRollToast(
-    `${attack.name} — Damage`,
-    0,
-    [],
+    attack.statLabel,
+    attack.damageParts[0]?.count || 1,
+    rolls,
     total,
     null,
-    `${count}d4 [${rolls.join(", ")}] + ${attack.damageBonus}`,
-    {},
-    null,
+    `${attack.name} — Damage`,
+    { skillModifier: attack.damageBonus },
+    null
   );
 }
