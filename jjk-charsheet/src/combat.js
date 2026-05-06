@@ -157,7 +157,13 @@ export function renderCombatTabData(data) {
   const initiativeStr = data.tempoBonus !== 0
     ? `${data.speedLevel}d6 ${data.tempoBonus > 0 ? "+" : ""}${data.tempoBonus}`
     : `${data.speedLevel}d6`;
-  set("combatInitiativeValue", initiativeStr);
+  const initiativeEl = document.getElementById("combatInitiativeValue");
+  if (initiativeEl) {
+    initiativeEl.textContent = initiativeStr;
+    initiativeEl.style.cursor = "pointer";
+    initiativeEl.title = "Click to roll initiative";
+    initiativeEl.onclick = () => rollInitiative(data);
+  }
 
   const imbueDieEl = document.getElementById("combatImbueDie");
   const imbueInput = document.getElementById("combatImbueInput");
@@ -186,20 +192,29 @@ export function renderCombatTabData(data) {
 }
 
 function renderMartialArt(art) {
+  const cooldownText = art.cooldown === 0 ? 'No Cooldown' : `Cooldown: ${art.cooldown} turn${art.cooldown === 1 ? '' : 's'}`;
+  const reqText = (art.statRequirement.value && art.statRequirement.value !== 0)
+    ? `Req: ${art.statRequirement.stat} ${art.statRequirement.value}`
+    : '';
   return `
     <div class="combat-art-item">
       <strong>${escapeHtml(art.title)}</strong>
       <span>${escapeHtml(art.description)}</span>
-      <em>Cooldown: ${art.cooldown} turn${art.cooldown === 1 ? '' : 's'} &nbsp;·&nbsp; Req: ${art.statRequirement.stat} ${art.statRequirement.value}</em>
+      <em>${cooldownText}${reqText ? ' &nbsp;·&nbsp; ' + reqText : ''}</em>
     </div>`;
 }
 
 function renderWeaponArt(art) {
+  const usesText = `Uses: ${art.usesPerEncounter}`;
+  const reqText = (art.statRequirement.value && art.statRequirement.value !== 0)
+    ? `Req: ${art.statRequirement.stat} ${art.statRequirement.value}, ${art.weaponTypeRequirement}`
+    : `Req: ${art.weaponTypeRequirement}`;
+  const cooldownText = art.cooldown === 0 ? 'No Cooldown' : (art.cooldown ? `Cooldown: ${art.cooldown} turn${art.cooldown === 1 ? '' : 's'}` : '');
   return `
     <div class="combat-art-item">
       <strong>${escapeHtml(art.title)}</strong>
       <span>${escapeHtml(art.description)}</span>
-      <em>Uses: ${art.usesPerEncounter} &nbsp;·&nbsp; Req: ${art.statRequirement.stat} ${art.statRequirement.value}, ${art.weaponTypeRequirement}</em>
+      <em>${usesText} &nbsp;·&nbsp; ${reqText}${cooldownText ? ' &nbsp;·&nbsp; ' + cooldownText : ''}</em>
     </div>`;
 }
 
@@ -328,6 +343,27 @@ function rollDice(count, sides) {
   return Array.from({ length: count }, () => Math.floor(Math.random() * sides) + 1);
 }
 
+function rollInitiative(data) {
+  if (!_showRollToast) return;
+  const diceCount = data.speedLevel;
+  if (!diceCount || diceCount < 1) return;
+  const bonus = data.tempoBonus || 0;
+  const rolls = rollDice(diceCount, 6);
+  const total = rolls.reduce((a, b) => a + b, 0) + bonus;
+  const allOnes = rolls.every(r => r === 1);
+  const critStatus = allOnes ? "fail" : total >= diceCount * 6 ? "success" : null;
+  _showRollToast(
+    "Speed",
+    diceCount,
+    rolls,
+    total,
+    critStatus,
+    "Initiative",
+    { skillModifier: bonus },
+    null,
+  );
+}
+
 function rollHit(weapon, data) {
   if (!_showRollToast) return;
   const isRanged = normalizeWeaponType(weapon.weaponType) === "ranged";
@@ -374,12 +410,12 @@ function rollDamage(weapon, data) {
   total += statBonus;
 
   _showRollToast(
-    "Damage",
+    `${weapon.name} — Damage`,
     0,
     [],
     total,
     null,
-    `${weapon.name} — ${rollDetails.join(" + ")} + ${statBonus}`,
+    `${rollDetails.join(" + ")} + ${statBonus}`,
     {},
     null,
   );
@@ -409,12 +445,12 @@ function rollUnarmedDamage(attack) {
   const rolls = rollDice(count, 4);
   const total = rolls.reduce((a, b) => a + b, 0) + attack.damageBonus;
   _showRollToast(
-    "Damage",
+    `${attack.name} — Damage`,
     0,
     [],
     total,
     null,
-    `${attack.name} — ${count}d4 [${rolls.join(", ")}] + ${attack.damageBonus}`,
+    `${count}d4 [${rolls.join(", ")}] + ${attack.damageBonus}`,
     {},
     null,
   );

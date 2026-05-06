@@ -1,3 +1,8 @@
+/* Initiative clickable hover effect */
+#combatInitiativeValue[style*="cursor: pointer"]:hover {
+  color: var(--accent);
+  transition: color 0.15s;
+}
 /* ── NOTES SEARCH & PIN ── */
 .notes-search-row {
   margin-bottom: 8px;
