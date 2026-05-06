@@ -2,14 +2,14 @@
   {
     "id": "tackle",
     "title": "Tackle",
-    "description": "Deal damage equal to your PL + SL. If you damage the target, knock them prone. However, if they reduce the damage to 0, nothing happens.",
+    "description": "Deal damage equal to your PL + SL. If you damage the target, knock them Prone. However, if they reduce the damage to 0, nothing happens.",
     "statRequirement": { "stat": "power", "value": 0 },
     "cooldown": 0
   },
   {
     "id": "grapple",
     "title": "Grapple",
-    "description": "Roll a contested Strength check against the target. If you win, the target is now grappled.",
+    "description": "Roll a contested Strength check against the target. If you win, the target is now Grappled.",
     "statRequirement": { "stat": "power", "value": 0 },
     "cooldown": 0
   },
@@ -30,8 +30,78 @@
   {
     "id": "targeted-strike",
     "title": "Targeted Strike",
-    "description": "Roll Combat to Hit. Deal PLd6+PL on a hit.",
-    "statRequirement": { "stat": "power", "value": 2 },
+    "description": "Roll to Punch. If you hit, the target suffers the Stunned condition.",
+    "statRequirement": { "stat": "power", "value": 3 },
+    "cooldown": 2
+  },  
+  {
+    "id": "headbutt",
+    "title": "Headbutt",
+    "description": "Roll a Combat roll to hit. If you hit, roll a contested Strength - Intelligence Level and deal 1d12 + PL. Whoever has the lower result suffers the Concussed condition.",
+    "statRequirement": { "stat": "power", "value": 3 },
+    "cooldown": 2
+  },  
+  {
+    "id": "chokehold",
+    "title": "Chokehold",
+    "description": "Roll a contested Strength check against the target. If you win, the target is Grappled and takes PL*2 damage per round until they escape. Targets may roll Acrobatics to escape.",
+    "statRequirement": { "stat": "power", "value": 4 },
+    "cooldown": 2
+  },  
+  {
+    "id": "manji-kick",
+    "title": "Manji Kick",
+    "description": "Roll a Combat roll to hit. Deal PLd6+(PL*2) damage on a hit. Take 2d4 damage if you miss and your movement speed is halved until the end of your next turn.",
+    "statRequirement": { "stat": "power", "value": 5 },
+    "cooldown": 4
+  },  
+  {
+    "id": "russian-hook",
+    "title": "Russian Hook",
+    "description": "Roll a Combat roll at Disadvantage to hit. If you hit, deal PLd8+PL. This martial art may only be used once per combat.",
+    "statRequirement": { "stat": "power", "value": 5 },
+    "cooldown": 0
+  },  
+  {
+    "id": "roudhouse",
+    "title": "Roundhouse",
+    "description": "Roll a Combat roll at Disadvantage to hit. If you hit, deal TLd6+TL.",
+    "statRequirement": { "stat": "technique", "value": 2 },
     "cooldown": 1
+  },  
+  {
+    "id": "jiu-jutsu-hold",
+    "title": "Jiu-Jutsu Hold",
+    "description": "Roll a contested Technique check against the target. If you win, the target is Grappled.",
+    "statRequirement": { "stat": "technique", "value": 2 },
+    "cooldown": 1
+  },  
+  {
+    "id": "dropkick",
+    "title": "Dropkick",
+    "description": "Roll to Kick. If you hit, the target suffers the Stunned condition.",
+    "statRequirement": { "stat": "technique", "value": 3 },
+    "cooldown": 2
+  },  
+  {
+    "id": "one-inch-punch",
+    "title": "One-Inch Punch",
+    "description": "Roll to Punch. This counts as a Sneak Attack.",
+    "statRequirement": { "stat": "technique", "value": 4 },
+    "cooldown": 3
+  },  
+  {
+    "id": "perfect-parry",
+    "title": "Perfect Parry",
+    "description": "Reaction. Roll a contested Technique and Speed check against the attacker. If you succeed, you negate all damage from the attack and may make a free Kick or Punch. However, if you fail, you take 1.5x the amount of damage from the attack.",
+    "statRequirement": { "stat": "technique", "value": 5 },
+    "cooldown": 4
+  },  
+  {
+    "id": "tatsumaki",
+    "title": "Tatsumaki",
+    "description": "Travel 20ft. in a straight line, dealing TLd6+TL to all adjacent targets in the path.",
+    "statRequirement": { "stat": "technique", "value": 5 },
+    "cooldown": 4
   }
 ]
