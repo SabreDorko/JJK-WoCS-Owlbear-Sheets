@@ -1,18 +1,43 @@
 [
+  
   {
-    "id": "weapon-spin-slash",
-    "title": "Spin Slash",
-    "description": "A spinning attack that hits all adjacent enemies.",
-    "statRequirement": { "stat": "technique", "value": 3 },
-    "weaponTypeRequirement": "slashing",
+    "id": "spinning-swing",
+    "title": "Spinning Swing",
+    "description": "Spin your weapon around yourself, dealing weapon damage to all adjacent targets. Afterwards, you must perform an acrobatics check of (PL*3) or fall prone.",
+    "statRequirement": { "stat": "power", "value": 3 },
+    "weaponTypeRequirement": "bludgeoning",
     "usesPerEncounter": 1
   },
   {
-    "id": "weapon-precision-shot",
-    "title": "Precision Shot",
-    "description": "A carefully aimed ranged attack for extra damage.",
-    "statRequirement": { "stat": "speed", "value": 4 },
-    "weaponTypeRequirement": "ranged",
+    "id": "impact",
+    "title": "Impact",
+    "description": "A powerful blow with the user’s full weight behind it. When hit, the opponent must make a strength contest against the user. If they lose, they get knocked back (PL*5) ft.",
+    "statRequirement": { "stat": "power", "value": 3 },
+    "weaponTypeRequirement": "bludgeoning",
+    "usesPerEncounter": 3
+  },
+  {
+    "id": "heavy-blow",
+    "title": "Heavy Blow",
+    "description": "On hit, the opponent has to make a fortitude check with a DC of your (PL*3), or lose one reaction for the rest of the round.",
+    "statRequirement": { "stat": "power", "value": 3 },
+    "weaponTypeRequirement": "bludgeoning",
     "usesPerEncounter": 2
+  },
+  {
+    "id": "bone-breaker",
+    "title": "Bone Breaker",
+    "description": "A strike that sends shockwaves through your opponent’s body. On hit, they must make a fortitude check with a DC of your (PL*3). If they fail, their movement is halved for 2 turns.",
+    "statRequirement": { "stat": "power", "value": 4 },
+    "weaponTypeRequirement": "bludgeoning",
+    "usesPerEncounter": 2
+  },
+  {
+    "id": "shatter",
+    "title": "Shatter",
+    "description": "A powerful hit with large wind up and centrifugal force. If blocked, the opponent must make a fortitude check with a DC of your (PL*3+3). If failed, their block only lessens 25% of the damage for 2 turns.",
+    "statRequirement": { "stat": "power", "value": 5 },
+    "weaponTypeRequirement": "bludgeoning",
+    "usesPerEncounter": 1
   }
 ]

@@ -75,9 +75,9 @@ export function computeCombatTabData(state) {
         name: "Punch",
         type: "Unarmed",
         rangeText: "Melee",
-        damageStr: `${powerLevel}d4 + ${powerLevel} (PL)`,
+        damageStr: `${powerLevel}d4 + ${powerLevel}`,
         hitStr: powerLevel > 0
-          ? `${powerLevel}d6 +${combatBonus} (Combat)`
+          ? `${powerLevel}d6 +${combatBonus}`
           : `—`,
         diceCount: powerLevel,
         bonus: combatBonus,
@@ -89,9 +89,9 @@ export function computeCombatTabData(state) {
         name: "Kick",
         type: "Unarmed",
         rangeText: "Melee",
-        damageStr: `${techniqueLevel}d4 + ${techniqueLevel} (TL)`,
+        damageStr: `${techniqueLevel}d4 + ${techniqueLevel}`,
         hitStr: techniqueLevel > 0
-          ? `${powerLevel}d6 +${combatBonus} (Combat)`
+          ? `${powerLevel}d6 +${combatBonus}`
           : `—`,
         diceCount: powerLevel,
         bonus: combatBonus,
@@ -205,9 +205,9 @@ function renderWeaponArt(art) {
 
 function renderUnarmedRow(attack, index) {
   const hitStr = attack.diceCount > 0 && attack.bonus !== 0
-    ? `${attack.diceCount}d6 ${attack.bonus > 0 ? "+" : ""}${attack.bonus} (Combat)`
+    ? `${attack.diceCount}d6 ${attack.bonus > 0 ? "+" : ""}${attack.bonus}`
     : attack.diceCount > 0
-    ? `${attack.diceCount}d6 (Combat)`
+    ? `${attack.diceCount}d6`
     : "—";
 
   return `
@@ -224,7 +224,25 @@ function renderAttackRow(weapon, index, data) {
   const isRanged = normalizeWeaponType(weapon.weaponType) === "ranged";
   const isPolearm = normalizeWeaponType(weapon.weaponType) === "polearm";
   const typeLabel = WEAPON_TYPE_LABELS[weapon.weaponType] ?? weapon.weaponType;
-  const damage = getWeaponDamageText(weapon);
+
+  // Determine which stat to use for the bonus
+  let statKey = weapon.weaponStat || "power";
+  let statLevel = 0;
+  if (statKey === "power") statLevel = data.powerLevel;
+  else if (statKey === "speed") statLevel = data.speedLevel;
+  else if (statKey === "technique") statLevel = data.techniqueLevel || 0;
+  else statLevel = data.powerLevel; // fallback
+
+  // Build the damage string with the actual stat value
+  let damageStr = "";
+  if (Array.isArray(weapon.weaponDamageParts) && weapon.weaponDamageParts.length > 0) {
+    damageStr = weapon.weaponDamageParts.map(part => `${part.count}${part.die}`).join(" + ");
+    damageStr += statLevel ? ` + ${statLevel}` : "";
+  } else if (weapon.damage) {
+    damageStr = weapon.damage + (statLevel ? ` + ${statLevel}` : "");
+  } else {
+    damageStr = statLevel ? `+${statLevel}` : "";
+  }
 
   let rangeText = "Melee";
   if (isPolearm) {
@@ -237,17 +255,16 @@ function renderAttackRow(weapon, index, data) {
 
   const diceCount = isRanged ? data.speedLevel : data.powerLevel;
   const bonus = isRanged ? data.precisionBonus : data.combatBonus;
-  const skillLabel = isRanged ? "Precision" : "Combat";
   const hitStr = bonus !== 0
-    ? `${diceCount}d6 ${bonus > 0 ? "+" : ""}${bonus} (${skillLabel})`
-    : `${diceCount}d6 (${skillLabel})`;
+    ? `${diceCount}d6 ${bonus > 0 ? "+" : ""}${bonus}`
+    : `${diceCount}d6`;
 
   return `
     <div class="combat-attack-row" data-weapon-index="${index}">
       <div class="combat-attack-name">${escapeHtml(weapon.name)}</div>
       <div class="combat-attack-type">${escapeHtml(typeLabel)}</div>
       <div class="combat-attack-range">${escapeHtml(rangeText)}</div>
-      <div class="combat-attack-damage combat-attack-rollable" data-action="rollDamage" data-weapon-index="${index}" title="Click to roll damage">${escapeHtml(damage)}</div>
+      <div class="combat-attack-damage combat-attack-rollable" data-action="rollDamage" data-weapon-index="${index}" title="Click to roll damage">${escapeHtml(damageStr)}</div>
       <div class="combat-attack-hit combat-attack-rollable" data-action="rollHit" data-weapon-index="${index}" title="Click to roll to hit">${escapeHtml(hitStr)}</div>
     </div>`;
 }
