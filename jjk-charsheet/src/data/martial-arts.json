@@ -14,13 +14,6 @@
     "cooldown": 0
   },
   {
-    "id": "punch",
-    "title": "Punch",
-    "description": "Roll Combat to Hit. Deal PLd4+PL on a hit.",
-    "statRequirement": { "stat": "power", "value": 1 },
-    "cooldown": 0
-  },
-  {
     "id": "flurry-of-blows",
     "title": "Flurry of Blows",
     "description": "Roll Combat to Hit. Deal PLd6+PL on a hit.",
