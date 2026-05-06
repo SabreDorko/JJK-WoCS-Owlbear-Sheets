@@ -39,5 +39,29 @@
     "statRequirement": { "stat": "power", "value": 5 },
     "weaponTypeRequirement": "bludgeoning",
     "usesPerEncounter": 1
+  },
+  {
+    "id": "artery-knick",
+    "title": "Artery Knick",
+    "description": "Perform a slashing attack attempting to target an opponent’s vitals. If you hit, the target must roll a Fortitude check against a DC equal to your Technique Level * 3. If they fail, they suffer from the Bleed condition.",
+    "statRequirement": { "stat": "technique", "value": 3 },
+    "weaponTypeRequirement": "slashing",
+    "usesPerEncounter": 2
+  },
+  {
+    "id": "descending-slash",
+    "title": "Descending Slash",
+    "description": "A downward slashing attack performed from high up, dealing an additional 1d4 for every 10 ft. fallen. At a base, jump up 10 ft. to perform this technique. After 20 ft. fallen, take 1d4 (unmitigatable and unreactable) recoil damage for every 10 ft. fallen.",
+    "statRequirement": { "stat": "technique", "value": 3 },
+    "weaponTypeRequirement": "slashing",
+    "usesPerEncounter": 4
+  },
+  {
+    "id": "sword-dance",
+    "title": "Sword Dance",
+    "description": "Perform a slashing attack. You may then move up to 10ft. freely without consuming movement speed.",
+    "statRequirement": { "stat": "technique", "value": 3 },
+    "weaponTypeRequirement": "slashing",
+    "usesPerEncounter": 3
   }
 ]
