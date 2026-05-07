@@ -63,5 +63,53 @@
     "statRequirement": { "stat": "technique", "value": 3 },
     "weaponTypeRequirement": "slashing",
     "usesPerEncounter": 3
+  },
+  {
+    "id": "disarming-shot",
+    "title": "Disarming Shot",
+    "description": "Make a Ranged attack that deals half damage. If you hit, the target must make a Fortitude or Acrobatics check against a DC equal to your Speed Level * 3. If they fair, an item they are currently holding is sent 15ft. away from the target in a random direction.",
+    "statRequirement": { "stat": "speed", "value": 3 },
+    "weaponTypeRequirement": "ranged",
+    "usesPerEncounter": 3
+  },
+  {
+    "id": "covering-fire",
+    "title": "Covering Fire",
+    "description": "Reaction. You may attempt to intercept a projectile in your weapon range by rolling a Precision check against a DC equal to your Speed Level * 3. If you succeed, reduce the Projectile's Roll to Hit by your Speed Level + 3.",
+    "statRequirement": { "stat": "speed", "value": 3 },
+    "weaponTypeRequirement": "ranged",
+    "usesPerEncounter": 2
+  },
+  {
+    "id": "unloading-shot",
+    "title": "Unloading Shot",
+    "description": "You may make two Ranged attacks with your weapon of choice in a single Action. Each shot knocks the opponent back 5ft if they are within 15ft. of you. However, you have a -2 to all Speed Rolls until the end of your next turn.",
+    "statRequirement": { "stat": "speed", "value": 4 },
+    "weaponTypeRequirement": "ranged",
+    "usesPerEncounter": 1
+  },
+  {
+    "id": "ricochet-shot",
+    "title": "Ricochet Shot",
+    "description": "Roll a Ranged Sneak Attack. You may ricochet the attack off of a surface to hit any target that's within 30ft. of that spot.",
+    "statRequirement": { "stat": "speed", "value": 4 },
+    "weaponTypeRequirement": "ranged",
+    "usesPerEncounter": 1
+  },
+  {
+    "id": "debilitating-shot",
+    "title": "Debilitating Shot",
+    "description": "Make a Ranged Attack against a target, aiming for either one of their hands or one of their legs. If you hit, the target receives a debuff for 1d4 turns (this debuff may be healed through RCT). If you hit their hand, the target suffers a penalty on rolls to hit and Domain Expansions equal to your Speed Level/2 rounded down. If you hit their leg, the target's move speed is reduced by 20ft.",
+    "statRequirement": { "stat": "speed", "value": 5 },
+    "weaponTypeRequirement": "ranged",
+    "usesPerEncounter": 1
+  },
+  {
+    "id": "perfect-shot",
+    "title": "Perfect Shot",
+    "description": "Spend Two Actions preparing a Ranged Attack. You must not receive damage or take any other actions during this time. If you successfully prepare this attack, the next Ranged Attack you make deals double damage and becomes undodgeable. (Black Flash overrides this attack's damage multiplier.)",
+    "statRequirement": { "stat": "speed", "value": 5 },
+    "weaponTypeRequirement": "ranged",
+    "usesPerEncounter": 1
   }
 ]
