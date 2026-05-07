@@ -1,617 +1,670 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>JJK Character Sheet</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600&family=Crimson+Text:ital,wght@0,400;0,600;1,400&family=Noto+Serif+JP:wght@300;400;600&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="./src/styles/main.css" />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600&family=Crimson+Text:ital,wght@0,400;0,600;1,400&family=Noto+Serif+JP:wght@300;400;600&display=swap"
+    rel="stylesheet" />
+  <link rel="stylesheet" href="./src/styles/main.css" />
 </head>
+
 <body>
-<div class="sheet-wrapper">
+  <div class="sheet-wrapper">
 
-  <div class="tab-bar">
-    <div class="tab active" data-tab="character">Character</div>
-    <div class="tab" data-tab="archetype">Archetype</div>
-    <div class="tab" data-tab="inventory">Inventory</div>
-    <div class="tab" data-tab="combat">Combat</div>
-    <div class="tab" data-tab="jujutsu">Jujutsu</div>
-    <div class="tab" data-tab="notes">Notes</div>
-  </div>
+    <div class="tab-bar">
+      <div class="tab active" data-tab="character">Character</div>
+      <div class="tab" data-tab="archetype">Archetype</div>
+      <div class="tab" data-tab="inventory">Inventory</div>
+      <div class="tab" data-tab="combat">Combat</div>
+      <div class="tab" data-tab="jujutsu">Jujutsu</div>
+      <div class="tab" data-tab="notes">Notes</div>
+    </div>
 
-  <div class="tab-content">
+    <div class="tab-content">
 
-    <!-- ══ CHARACTER TAB ══ -->
-    <div class="tab-panel active" id="panel-character">
+      <!-- ══ CHARACTER TAB ══ -->
+      <div class="tab-panel active" id="panel-character">
 
-      <!-- Header -->
-      <div class="header-grid">
-        <div>
-          <div class="jjk-label">呪術廻戦 · Jujutsu Kaisen</div>
-          <input class="name-input" id="charName" placeholder="Character Name" />
-          <div class="field-label">Character Name</div>
-          <div class="meta-field player-name-field">
-            <div class="field-label">Player Name</div>
-            <input class="meta-input" id="playerName" placeholder="—" />
+        <!-- Header -->
+        <div class="header-grid">
+          <div>
+            <div class="jjk-label">呪術廻戦 · Jujutsu Kaisen</div>
+            <input class="name-input" id="charName" placeholder="Character Name" />
+            <div class="field-label">Character Name</div>
+            <div class="meta-field player-name-field">
+              <div class="field-label">Player Name</div>
+              <input class="meta-input" id="playerName" placeholder="—" />
+            </div>
+            <button class="info-btn" id="infoBtn" aria-label="About this extension">
+              <svg width="14" height="14" viewBox="0 0 11 11" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="5.5" cy="5.5" r="5" stroke="currentColor" stroke-width="1" />
+                <rect x="5" y="4.5" width="1" height="3.5" fill="currentColor" />
+                <rect x="5" y="3" width="1" height="1" fill="currentColor" />
+              </svg>
+              About
+            </button>
+            <button class="info-btn" id="overrideModeBtn" type="button" aria-label="Toggle override mode"
+              title="Enable manual overrides">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"
+                aria-hidden="true" focusable="false">
+                <path d="M3 17.25V21h3.75L19.81 7.94l-3.75-3.75L3 17.25z" stroke="currentColor" stroke-width="1.4"
+                  fill="none" />
+                <path d="M14.06 4.19l3.75 3.75" stroke="currentColor" stroke-width="1.4" />
+              </svg>
+              <span id="overrideModeBtnLabel">Override</span>
+            </button>
           </div>
-          <button class="info-btn" id="infoBtn" aria-label="About this extension">
-            <svg width="14" height="14" viewBox="0 0 11 11" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <circle cx="5.5" cy="5.5" r="5" stroke="currentColor" stroke-width="1"/>
-              <rect x="5" y="4.5" width="1" height="3.5" fill="currentColor"/>
-              <rect x="5" y="3" width="1" height="1" fill="currentColor"/>
-            </svg>
-            About
-          </button>
-          <button class="info-btn" id="overrideModeBtn" type="button" aria-label="Toggle override mode" title="Enable manual overrides">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">
-              <path d="M3 17.25V21h3.75L19.81 7.94l-3.75-3.75L3 17.25z" stroke="currentColor" stroke-width="1.4" fill="none"/>
-              <path d="M14.06 4.19l3.75 3.75" stroke="currentColor" stroke-width="1.4"/>
-            </svg>
-            <span id="overrideModeBtnLabel">Override</span>
-          </button>
-        </div>
-        <div style="display:flex;align-items:center;justify-content:center;padding-top:4px;">
-          <div class="crest"><div class="crest-inner">術</div></div>
-        </div>
-        <div class="meta-grid">
-          <div class="meta-field">
-            <div class="field-label">Age</div>
-            <input class="meta-input" id="ageInput" type="number" placeholder="—" min="0" />
+          <div style="display:flex;align-items:center;justify-content:center;padding-top:4px;">
+            <div class="crest">
+              <div class="crest-inner">術</div>
+            </div>
           </div>
-          <div class="meta-field">
-            <div class="field-label">Grade</div>
-            <select class="meta-select" id="gradeSelect">
-              <option value="">— Grade —</option>
-              <option>4</option>
-              <option>Semi-3</option>
-              <option>3</option>
-              <option>Semi-2</option>
-              <option>2</option>
-              <option>Semi-1</option>
-              <option>1</option>
-              <option>Special Grade</option>
-            </select>
-          </div>
-          <div class="meta-field" style="grid-column:1/-1;">
-            <div class="field-label">Cursed Technique</div>
-            <input class="meta-input" id="ctInput" placeholder="—" />
-          </div>
-          <div class="header-mini-vitals">
-            <div class="vital-box header-mini-vital" id="aptitudeBonusVitalBox">
-              <span class="vital-label">Aptitude Bonus</span>
-              <div class="header-mini-value">
-                <input class="header-mini-input" id="aptitudeBonusInput" type="text" inputmode="numeric" placeholder="+2" />
+          <div class="meta-grid">
+            <div class="meta-field">
+              <div class="field-label">Age</div>
+              <input class="meta-input" id="ageInput" type="number" placeholder="—" min="0" />
+            </div>
+            <div class="meta-field">
+              <div class="field-label">Grade</div>
+              <select class="meta-select" id="gradeSelect">
+                <option value="">— Grade —</option>
+                <option>4</option>
+                <option>Semi-3</option>
+                <option>3</option>
+                <option>Semi-2</option>
+                <option>2</option>
+                <option>Semi-1</option>
+                <option>1</option>
+                <option>Special Grade</option>
+              </select>
+            </div>
+            <div class="meta-field" style="grid-column:1/-1;">
+              <div class="field-label">Cursed Technique</div>
+              <input class="meta-input" id="ctInput" placeholder="—" />
+            </div>
+            <div class="header-mini-vitals">
+              <div class="vital-box header-mini-vital" id="aptitudeBonusVitalBox">
+                <span class="vital-label">Aptitude Bonus</span>
+                <div class="header-mini-value">
+                  <input class="header-mini-input" id="aptitudeBonusInput" type="text" inputmode="numeric"
+                    placeholder="+2" />
+                </div>
+              </div>
+              <div class="vital-box header-mini-vital">
+                <span class="vital-label">XP</span>
+                <div class="header-mini-value">
+                  <input class="header-mini-input" id="xpInput" type="number" min="0" placeholder="0" />
+                </div>
               </div>
             </div>
-            <div class="vital-box header-mini-vital">
-              <span class="vital-label">XP</span>
-              <div class="header-mini-value">
-                <input class="header-mini-input" id="xpInput" type="number" min="0" placeholder="0" />
+          </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <!-- Main body -->
+        <div class="main-body">
+
+          <!-- Vitals column -->
+          <div class="vitals-col">
+
+            <!-- Health -->
+            <div class="vital-box" id="hpVitalBox">
+              <span class="vital-label">Health</span>
+              <div class="hp-row">
+                <input class="hp-input" id="hpCurrent" placeholder="0" type="number" min="0" />
+                <span class="hp-sep">/</span>
+                <input class="hp-input" id="hpMax" placeholder="0" type="number" min="0" onchange="syncHP()" />
+              </div>
+            </div>
+
+            <!-- Cursed Energy -->
+            <div class="vital-box" id="ceVitalBox">
+              <span class="vital-label">Cursed Energy</span>
+              <div class="hp-row">
+                <input class="hp-input" id="ceCurrent" placeholder="0" type="number" min="0" />
+                <span class="hp-sep">/</span>
+                <input class="hp-input" id="ceMax" placeholder="0" type="number" min="0" />
+              </div>
+            </div>
+
+            <!-- Armor Class -->
+            <div class="vital-box" id="acVitalBox">
+              <div class="shield-wrap">
+                <svg viewBox="0 0 60 68" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M30 4L5 13V36C5 50 17 62 30 66C43 62 55 50 55 36V13L30 4Z" stroke="#1a1410"
+                    stroke-width="1.8" fill="#e2d9c8" />
+                  <path d="M30 9L9 17V36C9 48 19 58 30 62C41 58 51 48 51 36V17L30 9Z" stroke="#1a1410"
+                    stroke-width="0.8" fill="none" stroke-dasharray="2 2" />
+                  <foreignObject x="11" y="22" width="38" height="28">
+                    <div xmlns="http://www.w3.org/1999/xhtml"
+                      style="display:flex;align-items:center;justify-content:center;height:100%">
+                      <input id="acInput" class="ac-inside" placeholder="—" />
+                    </div>
+                  </foreignObject>
+                </svg>
+              </div>
+              <div class="vital-label" style="text-align:center;margin-top:2px;margin-bottom:0;">Armor Class</div>
+            </div>
+
+            <!-- Movement -->
+            <div class="vital-box" id="movementVitalBox">
+              <span class="vital-label">Movement</span>
+              <div class="move-row">
+                <input class="move-input" id="moveInput" placeholder="—" />
+                <span class="move-unit">ft</span>
+              </div>
+            </div>
+
+          </div><!-- /vitals -->
+
+          <!-- Center stats: Power, Speed, Technique -->
+          <div class="stats-col" id="centerStats"></div>
+
+          <!-- Right stats: Intelligence, Cooperation -->
+          <div class="intel-col" id="rightStats"></div>
+
+        </div><!-- /main-body -->
+      </div><!-- /character panel -->
+
+      <!-- ══ PLACEHOLDER TABS ══ -->
+      <div class="tab-panel" id="panel-inventory">
+        <div class="inventory-layout">
+          <div class="inventory-main-col">
+            <div class="inventory-card inventory-wallet-card">
+              <div class="inventory-card-title">Wallet</div>
+              <label class="inventory-yen-row" for="yenInput">
+                <span class="field-label">Yen</span>
+                <div class="inventory-yen-input-wrap">
+                  <span class="inventory-yen-symbol" aria-hidden="true">¥</span>
+                  <input id="yenInput" class="meta-input inventory-yen-input" type="text" inputmode="numeric"
+                    placeholder="0" />
+                  <button type="button" class="inventory-mini-btn inventory-yen-adjust-btn" data-yen-adjust="add"
+                    aria-label="Add yen" title="Add yen">
+                    <svg class="inventory-yen-adjust-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                      <path fill="currentColor" d="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6V5z" />
+                    </svg>
+                  </button>
+                  <button type="button" class="inventory-mini-btn inventory-yen-adjust-btn" data-yen-adjust="subtract"
+                    aria-label="Deduct yen" title="Deduct yen">
+                    <svg class="inventory-yen-adjust-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                      <path fill="currentColor" d="M5 11h14v2H5z" />
+                    </svg>
+                  </button>
+                </div>
+                <div id="yenAdjustPopover" class="inventory-yen-popover" hidden>
+                  <div id="yenAdjustTitle" class="inventory-yen-popover-title">Adjust Yen</div>
+                  <div class="inventory-yen-popover-row">
+                    <span class="inventory-yen-symbol" aria-hidden="true">¥</span>
+                    <input id="yenAdjustAmountInput" class="meta-input inventory-yen-adjust-input" type="text"
+                      inputmode="numeric" placeholder="0" />
+                    <button id="yenAdjustApplyBtn" type="button" class="inventory-mini-btn">Apply</button>
+                    <button id="yenAdjustCancelBtn" type="button" class="inventory-mini-btn">Cancel</button>
+                  </div>
+                </div>
+              </label>
+            </div>
+
+            <div class="inventory-card inventory-active-card">
+              <div class="inventory-card-title">Inventory</div>
+              <div id="inventorySlotsList" class="inventory-slot-list" data-drop-zone="inventory-list"></div>
+            </div>
+
+            <div class="inventory-card">
+              <button id="dormToggleBtn" class="inventory-collapse-btn" type="button"
+                aria-expanded="false">Storage</button>
+              <div id="dormPanel" class="inventory-collapsible">
+                <div id="dormInventoryList" class="inventory-slot-list" data-drop-zone="dorm-list"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="inventory-body-col">
+            <div class="inventory-card inventory-body-card">
+              <div class="inventory-card-title">Equipment</div>
+              <div id="equippedSlotsGrid" class="equipped-slots-grid"></div>
+            </div>
+
+            <div id="itemEditorToolbar" class="inventory-creator-wrap">
+              <div id="itemTypeField" class="inventory-type-toolbar" aria-hidden="true">
+                <div class="inventory-type-tabs" role="tablist" aria-label="Item group">
+                  <button type="button" class="inventory-type-tab active" data-item-type="clothing" role="tab"
+                    aria-selected="true">Clothing / Accessory</button>
+                  <button type="button" class="inventory-type-tab" data-item-type="weapon" role="tab"
+                    aria-selected="false">Weapon</button>
+                  <button type="button" class="inventory-type-tab" data-item-type="item" role="tab"
+                    aria-selected="false">Item</button>
+                </div>
+                <input id="itemTypeSelect" type="hidden" value="clothing" />
+              </div>
+              <button id="toggleItemEditorBtn" class="inventory-plus-btn" type="button" aria-expanded="false"
+                aria-controls="itemEditorPanel" aria-label="Create item" title="Create item">
+                <svg class="inventory-plus-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <path class="inventory-plus-icon-line inventory-plus-icon-line-horizontal" fill="currentColor"
+                    d="M5 11h14v2H5z" />
+                  <path class="inventory-plus-icon-line inventory-plus-icon-line-vertical" fill="currentColor"
+                    d="M11 5h2v14h-2z" />
+                </svg>
+              </button>
+            </div>
+
+            <div id="itemEditorPanel" class="inventory-card inventory-editor-panel collapsed">
+              <div class="inventory-card-title" id="itemEditorTitle">Create Item</div>
+              <div class="inventory-form-grid">
+                <label class="inventory-field">
+                  <span class="field-label">Item Name</span>
+                  <input id="itemNameInput" class="meta-input" maxlength="60"
+                    placeholder="Kimono, Headphones, Bandages..." />
+                </label>
+                <div class="inventory-field inventory-field-full" id="itemModifiersField">
+                  <div class="inventory-modifiers-header-row">
+                    <span class="field-label">Modifiers</span>
+                    <button id="itemEditModifiersBtn" class="inventory-mini-btn" type="button">Edit</button>
+                  </div>
+                  <div id="itemModifiersSummary" class="inventory-modifiers-summary">No modifiers added.</div>
+                  <div id="itemModifiersEditor" class="inventory-modifiers-editor" hidden>
+                    <div id="itemModifiersList" class="inventory-modifiers-list"></div>
+                    <button id="itemAddModifierBtn" class="inventory-mini-btn" type="button">Add Modifier</button>
+                    <div id="itemModifierForm" class="inventory-modifier-form" hidden>
+                      <label class="inventory-field">
+                        <span class="field-label">Type</span>
+                        <select id="itemModifierKindSelect" class="meta-select">
+                          <option value="stat">Stat</option>
+                          <option value="rolls">Stat Rolls</option>
+                          <option value="skill">Substat</option>
+                          <option value="ac">Armor Class</option>
+                          <option value="movement">Movement</option>
+                          <option value="storage">Storage Slots</option>
+                        </select>
+                      </label>
+                      <label id="itemModifierStatField" class="inventory-field">
+                        <span class="field-label">Stat</span>
+                        <select id="itemModifierStatSelect" class="meta-select"></select>
+                      </label>
+                      <label id="itemModifierSkillField" class="inventory-field" hidden>
+                        <span class="field-label">Substat</span>
+                        <select id="itemModifierSkillSelect" class="meta-select"></select>
+                      </label>
+                      <label class="inventory-field">
+                        <span class="field-label">Value</span>
+                        <input id="itemModifierValueInput" class="meta-input" type="number" step="1" value="1" />
+                      </label>
+                      <div class="inventory-form-actions inventory-field-full">
+                        <button id="itemModifierSaveBtn" class="meta-toggle-btn" type="button">Save Modifier</button>
+                        <button id="itemModifierCancelBtn" class="inventory-secondary-btn" type="button">Cancel</button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <label class="inventory-field" id="itemStackableField" hidden>
+                  <span class="field-label">Stackable</span>
+                  <input id="itemStackableToggle" class="inventory-stackable-toggle" type="checkbox" />
+                </label>
+                <label class="inventory-field" id="itemQuantityField" hidden>
+                  <span class="field-label">Amount</span>
+                  <input id="itemQuantityInput" class="meta-input" type="number" min="1" step="1" value="1" />
+                </label>
+                <label class="inventory-field inventory-field-full">
+                  <span class="field-label">Description</span>
+                  <textarea id="itemDescriptionInput" class="inventory-textarea" rows="3" maxlength="280"
+                    placeholder="Short details, uses, limitations..."></textarea>
+                </label>
+                <label class="inventory-field" id="itemWeaponGripField" hidden>
+                  <span class="field-label">Weapon Grip</span>
+                  <select id="itemWeaponGripSelect" class="meta-select">
+                    <option value="oneHanded">One-Handed</option>
+                    <option value="twoHanded">Two-Handed</option>
+                  </select>
+                </label>
+                <label class="inventory-field" id="itemSlotsNeededField">
+                  <span class="field-label" id="itemSlotsNeededLabel">Body Slots Needed</span>
+                  <select id="itemSlotsNeededSelect" class="meta-select">
+                    <option value="1">1 slot</option>
+                    <option value="2">2 slots</option>
+                    <option value="3">3 slots</option>
+                  </select>
+                </label>
+                <label class="inventory-field">
+                  <span class="field-label">Preferred Location</span>
+                  <select id="itemPreferredLocation" class="meta-select">
+                    <option value="inventory">Active Inventory</option>
+                    <option value="dorm">Storage</option>
+                    <option value="equipped">Equip Now</option>
+                  </select>
+                </label>
+                <div class="inventory-field inventory-field-full" id="itemAllowedSlotsField">
+                  <span class="field-label">Can Equip To</span>
+                  <div id="itemAllowedSlots" class="slot-option-grid">
+                    <label><input type="checkbox" value="head" /> Head</label>
+                    <label><input type="checkbox" value="body" /> Body</label>
+                    <label><input type="checkbox" value="legs" /> Legs</label>
+                    <label><input type="checkbox" value="feet" /> Feet</label>
+                    <label><input type="checkbox" value="accessory" /> Accessory</label>
+                  </div>
+                </div>
+                <div class="inventory-form-actions inventory-field-full">
+                  <button id="saveItemBtn" class="meta-toggle-btn" type="button">Save Item</button>
+                  <button id="cancelEditItemBtn" class="inventory-secondary-btn" type="button"
+                    style="display:none;">Cancel Edit</button>
+                </div>
+                <div id="itemFormError" class="inventory-error" aria-live="polite"></div>
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      <div class="divider"></div>
-
-      <!-- Main body -->
-      <div class="main-body">
-
-        <!-- Vitals column -->
-        <div class="vitals-col">
-
-          <!-- Health -->
-          <div class="vital-box" id="hpVitalBox">
-            <span class="vital-label">Health</span>
-            <div class="hp-row">
-              <input class="hp-input" id="hpCurrent" placeholder="0" type="number" min="0" />
-              <span class="hp-sep">/</span>
-              <input class="hp-input" id="hpMax" placeholder="0" type="number" min="0" onchange="syncHP()" />
-            </div>
-          </div>
-
-          <!-- Cursed Energy -->
-          <div class="vital-box" id="ceVitalBox">
-            <span class="vital-label">Cursed Energy</span>
-            <div class="hp-row">
-              <input class="hp-input" id="ceCurrent" placeholder="0" type="number" min="0" />
-              <span class="hp-sep">/</span>
-              <input class="hp-input" id="ceMax" placeholder="0" type="number" min="0" />
-            </div>
-          </div>
-
-          <!-- Armor Class -->
-          <div class="vital-box" id="acVitalBox">
-            <div class="shield-wrap">
-              <svg viewBox="0 0 60 68" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M30 4L5 13V36C5 50 17 62 30 66C43 62 55 50 55 36V13L30 4Z"
-                      stroke="#1a1410" stroke-width="1.8" fill="#e2d9c8"/>
-                <path d="M30 9L9 17V36C9 48 19 58 30 62C41 58 51 48 51 36V17L30 9Z"
-                      stroke="#1a1410" stroke-width="0.8" fill="none" stroke-dasharray="2 2"/>
-                <foreignObject x="11" y="22" width="38" height="28">
-                  <div xmlns="http://www.w3.org/1999/xhtml"
-                       style="display:flex;align-items:center;justify-content:center;height:100%">
-                    <input id="acInput" class="ac-inside" placeholder="—" />
-                  </div>
-                </foreignObject>
-              </svg>
-            </div>
-            <div class="vital-label" style="text-align:center;margin-top:2px;margin-bottom:0;">Armor Class</div>
-          </div>
-
-          <!-- Movement -->
-          <div class="vital-box" id="movementVitalBox">
-            <span class="vital-label">Movement</span>
-            <div class="move-row">
-              <input class="move-input" id="moveInput" placeholder="—" />
-              <span class="move-unit">ft</span>
-            </div>
-          </div>
-
-          <div class="vital-box black-flash-box">
-            <span class="vital-label black-flash-label">Black Flash Range</span>
-            <div class="black-flash-value" id="blackFlashRangeValue">—</div>
-            <div class="black-flash-note" id="blackFlashRangeNote">Requires Technique 2+</div>
-          </div>
-
-        </div><!-- /vitals -->
-
-        <!-- Center stats: Power, Speed, Technique -->
-        <div class="stats-col" id="centerStats"></div>
-
-        <!-- Right stats: Intelligence, Cooperation -->
-        <div class="intel-col" id="rightStats"></div>
-
-      </div><!-- /main-body -->
-    </div><!-- /character panel -->
-
-    <!-- ══ PLACEHOLDER TABS ══ -->
-    <div class="tab-panel" id="panel-inventory">
-      <div class="inventory-layout">
-        <div class="inventory-main-col">
-          <div class="inventory-card inventory-wallet-card">
-            <div class="inventory-card-title">Wallet</div>
-            <label class="inventory-yen-row" for="yenInput">
-              <span class="field-label">Yen</span>
-              <div class="inventory-yen-input-wrap">
-                <span class="inventory-yen-symbol" aria-hidden="true">¥</span>
-                <input id="yenInput" class="meta-input inventory-yen-input" type="text" inputmode="numeric" placeholder="0" />
-                <button type="button" class="inventory-mini-btn inventory-yen-adjust-btn" data-yen-adjust="add" aria-label="Add yen" title="Add yen">
-                  <svg class="inventory-yen-adjust-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                    <path fill="currentColor" d="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6V5z"/>
-                  </svg>
-                </button>
-                <button type="button" class="inventory-mini-btn inventory-yen-adjust-btn" data-yen-adjust="subtract" aria-label="Deduct yen" title="Deduct yen">
-                  <svg class="inventory-yen-adjust-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                    <path fill="currentColor" d="M5 11h14v2H5z"/>
-                  </svg>
-                </button>
-              </div>
-              <div id="yenAdjustPopover" class="inventory-yen-popover" hidden>
-                <div id="yenAdjustTitle" class="inventory-yen-popover-title">Adjust Yen</div>
-                <div class="inventory-yen-popover-row">
-                  <span class="inventory-yen-symbol" aria-hidden="true">¥</span>
-                  <input id="yenAdjustAmountInput" class="meta-input inventory-yen-adjust-input" type="text" inputmode="numeric" placeholder="0" />
-                  <button id="yenAdjustApplyBtn" type="button" class="inventory-mini-btn">Apply</button>
-                  <button id="yenAdjustCancelBtn" type="button" class="inventory-mini-btn">Cancel</button>
+      <div class="tab-panel" id="panel-archetype">
+        <div class="archetype-shell">
+          <div class="archetype-layout">
+            <section class="archetype-card archetype-card-wide">
+              <div class="archetype-card-title">Archetype Selection</div>
+              <div class="meta-grid archetype-picker-grid">
+                <div class="meta-field">
+                  <div class="field-label">Archetype</div>
+                  <select class="meta-select" id="archetypeSelect" onchange="onArchetypeChange()">
+                    <option value="">— Select —</option>
+                    <option value="acrobat">Acrobat</option>
+                    <option value="brawler">Brawler</option>
+                    <option value="brutalizer">Brutalizer</option>
+                    <option value="caster">Caster</option>
+                    <option value="unbreakable">Unbreakable</option>
+                    <option value="speedster">Speedster</option>
+                    <option value="mastermind">Mastermind</option>
+                    <option value="swordsman">Swordsman</option>
+                    <option value="shaman">Shaman</option>
+                    <option value="prodigy">Prodigy</option>
+                    <option value="rebel">Rebel</option>
+                    <option value="confidant">Confidant</option>
+                    <option value="thrill_seeker">Thrill Seeker</option>
+                    <option value="tinkerer">Tinkerer</option>
+                    <option value="toxicologist">Toxicologist</option>
+                    <option value="custom">Custom</option>
+                  </select>
+                </div>
+                <div class="meta-field">
+                  <div class="field-label">Sub-Archetype</div>
+                  <select class="meta-select" id="subArchetypeSelect" disabled>
+                    <option value="">— Pick archetype first —</option>
+                  </select>
+                </div>
+                <div class="meta-field" style="grid-column:1/-1;">
+                  <button class="meta-toggle-btn" id="addSecondArchetypeBtn" type="button">Add Second Archetype</button>
+                </div>
+                <div class="meta-field multi-class-field hidden" id="multiClassArchetypeField">
+                  <div class="field-label">Second Archetype</div>
+                  <select class="meta-select" id="archetypeSelect2" onchange="onArchetypeChange2()">
+                    <option value="">— Select —</option>
+                    <option value="acrobat">Acrobat</option>
+                    <option value="brawler">Brawler</option>
+                    <option value="brutalizer">Brutalizer</option>
+                    <option value="caster">Caster</option>
+                    <option value="unbreakable">Unbreakable</option>
+                    <option value="speedster">Speedster</option>
+                    <option value="mastermind">Mastermind</option>
+                    <option value="swordsman">Swordsman</option>
+                    <option value="shaman">Shaman</option>
+                    <option value="prodigy">Prodigy</option>
+                    <option value="rebel">Rebel</option>
+                    <option value="confidant">Confidant</option>
+                    <option value="thrill_seeker">Thrill Seeker</option>
+                    <option value="tinkerer">Tinkerer</option>
+                    <option value="toxicologist">Toxicologist</option>
+                    <option value="custom">Custom</option>
+                  </select>
+                </div>
+                <div class="meta-field multi-class-field hidden" id="multiClassSubArchetypeField">
+                  <div class="field-label">Second Sub-Archetype</div>
+                  <select class="meta-select" id="subArchetypeSelect2" disabled>
+                    <option value="">— Pick archetype first —</option>
+                  </select>
+                </div>
+                <div class="meta-field multi-class-field hidden" id="removeSecondArchetypeField"
+                  style="grid-column:1/-1;">
+                  <button class="meta-toggle-btn" id="removeSecondArchetypeBtn" type="button">Remove Second
+                    Archetype</button>
                 </div>
               </div>
-            </label>
-          </div>
+            </section>
 
-          <div class="inventory-card inventory-active-card">
-            <div class="inventory-card-title">Inventory</div>
-            <div id="inventorySlotsList" class="inventory-slot-list" data-drop-zone="inventory-list"></div>
-          </div>
+            <section class="archetype-card">
+              <button type="button" class="archetype-card-title archetype-collapse-btn" id="archetypeBenefitsToggleBtn"
+                aria-expanded="true" aria-controls="archetypeBenefitsPanel">Archetype Benefits</button>
+              <div class="archetype-collapse-panel" id="archetypeBenefitsPanel">
+                <div class="archetype-benefits-list" id="archetypeBenefitsList"></div>
+              </div>
+            </section>
 
-          <div class="inventory-card">
-            <button id="dormToggleBtn" class="inventory-collapse-btn" type="button" aria-expanded="false">Storage</button>
-            <div id="dormPanel" class="inventory-collapsible">
-              <div id="dormInventoryList" class="inventory-slot-list" data-drop-zone="dorm-list"></div>
-            </div>
+            <section class="archetype-card archetype-card-wide" id="customArchetypeBuilder" style="display:none;">
+              <div class="archetype-card-title">Custom Archetype Builder</div>
+              <div class="archetype-benefits-list" id="customArchetypeBuilderBody"></div>
+            </section>
+
+            <section class="archetype-card archetype-card-wide">
+              <div class="archetype-card-title">Current Abilities</div>
+              <div class="techniques-muted">Add abilities from your trees below. Remove them from these slots when
+                needed.</div>
+              <div class="archetype-slot-grid" id="archetypeAbilitySlots"></div>
+            </section>
+
+            <section class="archetype-card archetype-card-wide">
+              <div class="archetype-card-title">Archetype Abilities</div>
+              <div class="techniques-muted">Abilities unlock in order. You must meet stat requirements and have an open
+                ability slot.</div>
+              <div class="archetype-ability-list" id="archetypeAbilityTreeList"></div>
+            </section>
           </div>
         </div>
+      </div>
+      <!-- Combat Panel -->
+      <div class="tab-panel" id="panel-combat">
+        <div class="combat-shell">
 
-        <div class="inventory-body-col">
-          <div class="inventory-card inventory-body-card">
-            <div class="inventory-card-title">Equipment</div>
-            <div id="equippedSlotsGrid" class="equipped-slots-grid"></div>
-          </div>
-
-          <div id="itemEditorToolbar" class="inventory-creator-wrap">
-            <div id="itemTypeField" class="inventory-type-toolbar" aria-hidden="true">
-              <div class="inventory-type-tabs" role="tablist" aria-label="Item group">
-                <button type="button" class="inventory-type-tab active" data-item-type="clothing" role="tab" aria-selected="true">Clothing / Accessory</button>
-                <button type="button" class="inventory-type-tab" data-item-type="weapon" role="tab" aria-selected="false">Weapon</button>
-                <button type="button" class="inventory-type-tab" data-item-type="item" role="tab" aria-selected="false">Item</button>
-              </div>
-              <input id="itemTypeSelect" type="hidden" value="clothing" />
+          <div class="combat-header-grid" style="grid-template-columns: 1fr 1fr 1fr auto;">
+            <div class="vital-box black-flash-box">
+              <span class="vital-label black-flash-label" style="display:block;">Black Flash</span>
+              <div class="black-flash-value" id="combatBlackFlashValue">—</div>
+              <span class="vital-label black-flash-label" style="display:block; margin-top:2px;">Range</span>
             </div>
-            <button id="toggleItemEditorBtn" class="inventory-plus-btn" type="button" aria-expanded="false" aria-controls="itemEditorPanel" aria-label="Create item" title="Create item">
-              <svg class="inventory-plus-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                <path class="inventory-plus-icon-line inventory-plus-icon-line-horizontal" fill="currentColor" d="M5 11h14v2H5z"/>
-                <path class="inventory-plus-icon-line inventory-plus-icon-line-vertical" fill="currentColor" d="M11 5h2v14h-2z"/>
-              </svg>
-            </button>
+            <div class="combat-header-field">
+              <span class="combat-label">Initiative</span>
+              <div class="combat-value" id="combatInitiativeValue">—</div>
+            </div>
+            <div class="vital-box combat-imbue-field">
+              <div class="combat-imbue-split">
+                <div class="combat-imbue-left">
+                  <span class="vital-label">Imbue</span>
+                  <input type="number" id="combatImbueInput" class="combat-imbue-input" min="1" max="3" value="1" />
+                </div>
+                <div class="combat-imbue-right">
+                  <div class="combat-imbue-die" id="combatImbueDie">1d4</div>
+                </div>
+              </div>
+            </div>
           </div>
 
-          <div id="itemEditorPanel" class="inventory-card inventory-editor-panel collapsed">
-            <div class="inventory-card-title" id="itemEditorTitle">Create Item</div>
-            <div class="inventory-form-grid">
-              <label class="inventory-field">
-                <span class="field-label">Item Name</span>
-                <input id="itemNameInput" class="meta-input" maxlength="60" placeholder="Kimono, Headphones, Bandages..." />
-              </label>
-              <div class="inventory-field inventory-field-full" id="itemModifiersField">
-                <div class="inventory-modifiers-header-row">
-                  <span class="field-label">Modifiers</span>
-                  <button id="itemEditModifiersBtn" class="inventory-mini-btn" type="button">Edit</button>
+          <div class="combat-divider"></div>
+
+          <div class="combat-actions-shell">
+
+            <!-- Actions collapsible box -->
+            <div class="vital-box combat-collapsible-box">
+              <button type="button" class="combat-collapse-btn" id="combatActionsCollapseBtn" aria-expanded="true">
+                <span class="combat-section-title" style="margin-bottom:0;border-bottom:none;">
+                  Actions &nbsp;·&nbsp; <span class="combat-actions-count-label">Number of Actions:</span> <span
+                    id="combatActionsValue">—</span>
+                </span>
+              </button>
+
+              <div id="combatActionsPanel" class="combat-collapse-panel">
+
+                <!-- Attacks collapsible -->
+                <div class="combat-sub-collapse">
+                  <button type="button" class="combat-sub-collapse-btn" id="combatAttacksCollapseBtn"
+                    aria-expanded="true">
+                    Attacks
+                  </button>
+                  <div id="combatAttacksPanel" class="combat-sub-collapse-panel">
+                    <div class="combat-attack-header-row">
+                      <span>Name</span>
+                      <span>Type</span>
+                      <span>Range</span>
+                      <span>To Hit</span>
+                      <span>Damage</span>
+                    </div>
+                    <div class="combat-attack-subheader">Strikes</div>
+                    <div id="combatStrikesList" class="combat-attacks-list"></div>
+                    <div class="combat-attack-subheader" style="margin-top:8px;">Weapons</div>
+                    <div id="combatAttacksList" class="combat-attacks-list">
+                      <span class="combat-empty">No weapons equipped.</span>
+                    </div>
+                  </div>
                 </div>
-                <div id="itemModifiersSummary" class="inventory-modifiers-summary">No modifiers added.</div>
-                <div id="itemModifiersEditor" class="inventory-modifiers-editor" hidden>
-                  <div id="itemModifiersList" class="inventory-modifiers-list"></div>
-                  <button id="itemAddModifierBtn" class="inventory-mini-btn" type="button">Add Modifier</button>
-                  <div id="itemModifierForm" class="inventory-modifier-form" hidden>
-                    <label class="inventory-field">
-                      <span class="field-label">Type</span>
-                      <select id="itemModifierKindSelect" class="meta-select">
-                        <option value="stat">Stat</option>
-                        <option value="rolls">Stat Rolls</option>
-                        <option value="skill">Substat</option>
-                        <option value="ac">Armor Class</option>
-                        <option value="movement">Movement</option>
-                        <option value="storage">Storage Slots</option>
-                      </select>
-                    </label>
-                    <label id="itemModifierStatField" class="inventory-field">
-                      <span class="field-label">Stat</span>
-                      <select id="itemModifierStatSelect" class="meta-select"></select>
-                    </label>
-                    <label id="itemModifierSkillField" class="inventory-field" hidden>
-                      <span class="field-label">Substat</span>
-                      <select id="itemModifierSkillSelect" class="meta-select"></select>
-                    </label>
-                    <label class="inventory-field">
-                      <span class="field-label">Value</span>
-                      <input id="itemModifierValueInput" class="meta-input" type="number" step="1" value="1" />
-                    </label>
-                    <div class="inventory-form-actions inventory-field-full">
-                      <button id="itemModifierSaveBtn" class="meta-toggle-btn" type="button">Save Modifier</button>
-                      <button id="itemModifierCancelBtn" class="inventory-secondary-btn" type="button">Cancel</button>
+
+                <!-- Arts sub-collapse -->
+                <div class="combat-sub-collapse">
+                  <button type="button" class="combat-sub-collapse-btn" id="combatArtsCollapseBtn" aria-expanded="true">
+                    Arts
+                  </button>
+                  <div id="combatArtsPanel" class="combat-sub-collapse-panel">
+                    <div class="combat-arts-tab-bar">
+                      <button type="button" class="combat-arts-tab active" id="combatArtsTabMartial"
+                        data-arts-tab="martial">Martial Arts</button>
+                      <button type="button" class="combat-arts-tab" id="combatArtsTabWeapon"
+                        data-arts-tab="weapon">Weapon Arts</button>
+                    </div>
+                    <div id="combatArtsTabPanelMartial" class="combat-arts-tab-panel">
+                      <input type="text" class="combat-arts-search" id="combatMartialArtsSearch"
+                        placeholder="Search martial arts..." />
+                      <div id="combatMartialArtsList" class="combat-arts-list">
+                        <span class="combat-empty">No martial arts available.</span>
+                      </div>
+                    </div>
+                    <div id="combatArtsTabPanelWeapon" class="combat-arts-tab-panel" hidden>
+                      <input type="text" class="combat-arts-search" id="combatWeaponArtsSearch"
+                        placeholder="Search weapon arts..." />
+                      <div id="combatWeaponArtsList" class="combat-arts-list">
+                        <span class="combat-empty">No weapon arts available.</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Basic Actions collapsible -->
+                <div class="combat-sub-collapse">
+                  <button type="button" class="combat-sub-collapse-btn" id="combatBasicActionsCollapseBtn"
+                    aria-expanded="true">
+                    Basic Actions
+                  </button>
+                  <div id="combatBasicActionsPanel" class="combat-sub-collapse-panel">
+                    <div class="combat-basic-action-item">
+                      <div class="combat-basic-action-header">
+                        <span class="combat-basic-action-name">Stealth</span>
+                        <span class="combat-basic-action-cost">Action <span class="combat-basic-action-alt">/ Bonus
+                            Action*</span></span>
+                      </div>
+                      <div class="combat-basic-action-desc">Roll Stealth to hide from sight. If already outside the
+                        opponent's line of sight, this can be performed as a Bonus Action instead.</div>
+                    </div>
+                    <div class="combat-basic-action-item">
+                      <div class="combat-basic-action-header">
+                        <span class="combat-basic-action-name">Dash</span>
+                        <span class="combat-basic-action-cost">Action</span>
+                      </div>
+                      <div class="combat-basic-action-desc">Double your movement speed for the turn.</div>
+                    </div>
+                    <div class="combat-basic-action-item">
+                      <div class="combat-basic-action-header">
+                        <span class="combat-basic-action-name">Press</span>
+                        <span class="combat-basic-action-cost">Bonus Action</span>
+                      </div>
+                      <div class="combat-basic-action-desc">When ending your turn adjacent to a target, press them.
+                        Their next attack suffers a penalty equal to your highest stat to damage and −2 to hit anyone
+                        other than you, but deals +2 damage and +1 to hit you. Only one person may press a single
+                        target. Effect ends if the target moves more than 50 ft. away.</div>
                     </div>
                   </div>
                 </div>
               </div>
-              <label class="inventory-field" id="itemStackableField" hidden>
-                <span class="field-label">Stackable</span>
-                <input id="itemStackableToggle" class="inventory-stackable-toggle" type="checkbox" />
-              </label>
-              <label class="inventory-field" id="itemQuantityField" hidden>
-                <span class="field-label">Amount</span>
-                <input id="itemQuantityInput" class="meta-input" type="number" min="1" step="1" value="1" />
-              </label>
-              <label class="inventory-field inventory-field-full">
-                <span class="field-label">Description</span>
-                <textarea id="itemDescriptionInput" class="inventory-textarea" rows="3" maxlength="280" placeholder="Short details, uses, limitations..."></textarea>
-              </label>
-              <label class="inventory-field" id="itemWeaponGripField" hidden>
-                <span class="field-label">Weapon Grip</span>
-                <select id="itemWeaponGripSelect" class="meta-select">
-                  <option value="oneHanded">One-Handed</option>
-                  <option value="twoHanded">Two-Handed</option>
-                </select>
-              </label>
-              <label class="inventory-field" id="itemSlotsNeededField">
-                <span class="field-label" id="itemSlotsNeededLabel">Body Slots Needed</span>
-                <select id="itemSlotsNeededSelect" class="meta-select">
-                  <option value="1">1 slot</option>
-                  <option value="2">2 slots</option>
-                  <option value="3">3 slots</option>
-                </select>
-              </label>
-              <label class="inventory-field">
-                <span class="field-label">Preferred Location</span>
-                <select id="itemPreferredLocation" class="meta-select">
-                  <option value="inventory">Active Inventory</option>
-                  <option value="dorm">Storage</option>
-                  <option value="equipped">Equip Now</option>
-                </select>
-              </label>
-              <div class="inventory-field inventory-field-full" id="itemAllowedSlotsField">
-                <span class="field-label">Can Equip To</span>
-                <div id="itemAllowedSlots" class="slot-option-grid">
-                  <label><input type="checkbox" value="head" /> Head</label>
-                  <label><input type="checkbox" value="body" /> Body</label>
-                  <label><input type="checkbox" value="legs" /> Legs</label>
-                  <label><input type="checkbox" value="feet" /> Feet</label>
-                  <label><input type="checkbox" value="accessory" /> Accessory</label>
-                </div>
-              </div>
-              <div class="inventory-form-actions inventory-field-full">
-                <button id="saveItemBtn" class="meta-toggle-btn" type="button">Save Item</button>
-                <button id="cancelEditItemBtn" class="inventory-secondary-btn" type="button" style="display:none;">Cancel Edit</button>
-              </div>
-              <div id="itemFormError" class="inventory-error" aria-live="polite"></div>
             </div>
-          </div>
-        </div>
-      </div>
-    </div>
 
-    <div class="tab-panel" id="panel-archetype">
-      <div class="archetype-shell">
-        <div class="archetype-layout">
-          <section class="archetype-card archetype-card-wide">
-            <div class="archetype-card-title">Archetype Selection</div>
-            <div class="meta-grid archetype-picker-grid">
-              <div class="meta-field">
-                <div class="field-label">Archetype</div>
-                <select class="meta-select" id="archetypeSelect" onchange="onArchetypeChange()">
-                  <option value="">— Select —</option>
-                  <option value="acrobat">Acrobat</option>
-                  <option value="brawler">Brawler</option>
-                  <option value="brutalizer">Brutalizer</option>
-                  <option value="caster">Caster</option>
-                  <option value="unbreakable">Unbreakable</option>
-                  <option value="speedster">Speedster</option>
-                  <option value="mastermind">Mastermind</option>
-                  <option value="swordsman">Swordsman</option>
-                  <option value="shaman">Shaman</option>
-                  <option value="prodigy">Prodigy</option>
-                  <option value="rebel">Rebel</option>
-                  <option value="confidant">Confidant</option>
-                  <option value="thrill_seeker">Thrill Seeker</option>
-                  <option value="tinkerer">Tinkerer</option>
-                  <option value="toxicologist">Toxicologist</option>
-                  <option value="custom">Custom</option>
-                </select>
-              </div>
-              <div class="meta-field">
-                <div class="field-label">Sub-Archetype</div>
-                <select class="meta-select" id="subArchetypeSelect" disabled>
-                  <option value="">— Pick archetype first —</option>
-                </select>
-              </div>
-              <div class="meta-field" style="grid-column:1/-1;">
-                <button class="meta-toggle-btn" id="addSecondArchetypeBtn" type="button">Add Second Archetype</button>
-              </div>
-              <div class="meta-field multi-class-field hidden" id="multiClassArchetypeField">
-                <div class="field-label">Second Archetype</div>
-                <select class="meta-select" id="archetypeSelect2" onchange="onArchetypeChange2()">
-                  <option value="">— Select —</option>
-                  <option value="acrobat">Acrobat</option>
-                  <option value="brawler">Brawler</option>
-                  <option value="brutalizer">Brutalizer</option>
-                  <option value="caster">Caster</option>
-                  <option value="unbreakable">Unbreakable</option>
-                  <option value="speedster">Speedster</option>
-                  <option value="mastermind">Mastermind</option>
-                  <option value="swordsman">Swordsman</option>
-                  <option value="shaman">Shaman</option>
-                  <option value="prodigy">Prodigy</option>
-                  <option value="rebel">Rebel</option>
-                  <option value="confidant">Confidant</option>
-                  <option value="thrill_seeker">Thrill Seeker</option>
-                  <option value="tinkerer">Tinkerer</option>
-                  <option value="toxicologist">Toxicologist</option>
-                  <option value="custom">Custom</option>
-                </select>
-              </div>
-              <div class="meta-field multi-class-field hidden" id="multiClassSubArchetypeField">
-                <div class="field-label">Second Sub-Archetype</div>
-                <select class="meta-select" id="subArchetypeSelect2" disabled>
-                  <option value="">— Pick archetype first —</option>
-                </select>
-              </div>
-              <div class="meta-field multi-class-field hidden" id="removeSecondArchetypeField" style="grid-column:1/-1;">
-                <button class="meta-toggle-btn" id="removeSecondArchetypeBtn" type="button">Remove Second Archetype</button>
-              </div>
-            </div>
-          </section>
-
-          <section class="archetype-card">
-            <button type="button" class="archetype-card-title archetype-collapse-btn" id="archetypeBenefitsToggleBtn" aria-expanded="true" aria-controls="archetypeBenefitsPanel">Archetype Benefits</button>
-            <div class="archetype-collapse-panel" id="archetypeBenefitsPanel">
-              <div class="archetype-benefits-list" id="archetypeBenefitsList"></div>
-            </div>
-          </section>
-
-          <section class="archetype-card archetype-card-wide" id="customArchetypeBuilder" style="display:none;">
-            <div class="archetype-card-title">Custom Archetype Builder</div>
-            <div class="archetype-benefits-list" id="customArchetypeBuilderBody"></div>
-          </section>
-
-          <section class="archetype-card archetype-card-wide">
-            <div class="archetype-card-title">Current Abilities</div>
-            <div class="techniques-muted">Add abilities from your trees below. Remove them from these slots when needed.</div>
-            <div class="archetype-slot-grid" id="archetypeAbilitySlots"></div>
-          </section>
-
-          <section class="archetype-card archetype-card-wide">
-            <div class="archetype-card-title">Archetype Abilities</div>
-            <div class="techniques-muted">Abilities unlock in order. You must meet stat requirements and have an open ability slot.</div>
-            <div class="archetype-ability-list" id="archetypeAbilityTreeList"></div>
-          </section>
-        </div>
-      </div>
-    </div>
-    <!-- Combat Panel -->
-    <div class="tab-panel" id="panel-combat">
-      <div class="combat-shell">
-
-        <div class="combat-header-grid" style="grid-template-columns: 1fr 1fr 1fr auto;">
-          <div class="combat-header-field">
-            <span class="combat-label">Black Flash Range</span>
-            <div class="combat-value" id="combatBlackFlashValue">—</div>
-          </div>
-          <div class="combat-header-field">
-            <span class="combat-label">Initiative</span>
-            <div class="combat-value" id="combatInitiativeValue">—</div>
-          </div>
-          <div class="vital-box combat-imbue-field">
-            <div class="combat-imbue-split">
-              <div class="combat-imbue-left">
-                <span class="vital-label">Imbue</span>
-                <input type="number" id="combatImbueInput" class="combat-imbue-input" min="1" max="3" value="1" />
-              </div>
-              <div class="combat-imbue-right">
-                <div class="combat-imbue-die" id="combatImbueDie">1d4</div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="combat-divider"></div>
-
-        <div class="combat-actions-shell">
-
-          <!-- Actions collapsible box -->
-          <div class="vital-box combat-collapsible-box">
-            <button type="button" class="combat-collapse-btn" id="combatActionsCollapseBtn" aria-expanded="true">
-              <span class="combat-section-title" style="margin-bottom:0;border-bottom:none;">
-                Actions &nbsp;·&nbsp; <span class="combat-actions-count-label">Number of Actions:</span> <span id="combatActionsValue">—</span>
-              </span>
-            </button>
-
-            <div id="combatActionsPanel" class="combat-collapse-panel">
-
-            <!-- Attacks collapsible -->
-            <div class="combat-sub-collapse">
-              <button type="button" class="combat-sub-collapse-btn" id="combatAttacksCollapseBtn" aria-expanded="true">
-                Attacks
+            <!-- Reactions Panel -->
+            <div class="vital-box combat-collapsible-box" style="margin-top: 10px;">
+              <button type="button" class="combat-collapse-btn" id="combatReactionsCollapseBtn" aria-expanded="true">
+                <span class="combat-section-title" style="margin-bottom:0;border-bottom:none;">
+                  Reactions &nbsp;·&nbsp; <span class="combat-actions-count-label">Reactions Available:</span> <span
+                    id="combatReactionsValue">—</span>
+                </span>
               </button>
-              <div id="combatAttacksPanel" class="combat-sub-collapse-panel">
-                <div class="combat-attack-header-row">
-                  <span>Name</span>
-                  <span>Type</span>
-                  <span>Range</span>
-                  <span>To Hit</span>
-                  <span>Damage</span>
+
+              <div id="combatReactionsPanel" class="combat-collapse-panel">
+
+                <div class="combat-sub-collapse">
+                  <button type="button" class="combat-sub-collapse-btn" id="combatBasicReactionsCollapseBtn"
+                    aria-expanded="true">
+                    Basic Reactions
+                  </button>
+                  <div id="combatBasicReactionsPanel" class="combat-sub-collapse-panel">
+
+                    <div class="combat-basic-action-item">
+                      <div class="combat-basic-action-header">
+                        <span class="combat-basic-action-name">Block</span>
+                        <span class="combat-basic-action-cost">Reaction &nbsp;·&nbsp; <span
+                            style="color:var(--ink-faint);">Power</span></span>
+                      </div>
+                      <div class="combat-basic-action-desc">Roll your raw Power stat against the incoming roll to hit.
+                        Meet or beat it to halve the damage. On failure, take full damage.</div>
+                    </div>
+
+                    <div class="combat-basic-action-item">
+                      <div class="combat-basic-action-header">
+                        <span class="combat-basic-action-name">Dodge</span>
+                        <span class="combat-basic-action-cost">Reaction &nbsp;·&nbsp; <span
+                            style="color:var(--ink-faint);">Speed</span></span>
+                      </div>
+                      <div class="combat-basic-action-desc">Roll your raw Speed stat and beat the incoming roll to hit
+                        to avoid completely — negating all damage and side effects. On success you may also move up to 5
+                        ft. in any direction. On failure, take 1.5× damage.</div>
+                    </div>
+
+                    <div class="combat-basic-action-item">
+                      <div class="combat-basic-action-header">
+                        <span class="combat-basic-action-name">Leap</span>
+                        <span class="combat-basic-action-cost">Reaction &nbsp;·&nbsp; <span
+                            style="color:var(--ink-faint);">Reflexes</span></span>
+                      </div>
+                      <div class="combat-basic-action-desc">For attacks within 15 ft., roll your Reflexes substat
+                        against the attack's roll to hit minus your highest of PL or SL. Meet or beat it to leap in
+                        front of the attack and shield an ally, taking the damage yourself. You may still react to the
+                        attack but cannot Dodge it. Once per turn.</div>
+                    </div>
+
+                    <div class="combat-basic-action-item">
+                      <div class="combat-basic-action-header">
+                        <span class="combat-basic-action-name">Cursed Energy Coating</span>
+                        <span class="combat-basic-action-cost">Reaction &nbsp;·&nbsp; <span
+                            style="color:var(--ink-faint);">Technique</span></span>
+                      </div>
+                      <div class="combat-basic-action-desc">Coat yourself in cursed energy to reduce incoming damage.
+                        Roll a Talent check against a DC equal to your Technique Level x 2. On success, reduce damage by
+                        your base Imbue or Output value (whichever is higher). You can spend additional CE to stack the
+                        coating for greater reduction — each stack costs 3 CE and raises the DC by 2, adding 1d4 extra
+                        reduction per stack. Max stacks scale with Technique Level: TL 1–2 = 1 stack, TL 3–4 = 2 stacks,
+                        TL 5–6 = 3 stacks.</div>
+                    </div>
+
+                  </div>
                 </div>
-                <div class="combat-attack-subheader">Strikes</div>
-                <div id="combatStrikesList" class="combat-attacks-list"></div>
-                <div class="combat-attack-subheader" style="margin-top:8px;">Weapons</div>
-                <div id="combatAttacksList" class="combat-attacks-list">
-                  <span class="combat-empty">No weapons equipped.</span>
-                </div>
+
               </div>
             </div>
 
-            <!-- Arts sub-collapse -->
-            <div class="combat-sub-collapse">
-              <button type="button" class="combat-sub-collapse-btn" id="combatArtsCollapseBtn" aria-expanded="true">
-                Arts
-              </button>
-              <div id="combatArtsPanel" class="combat-sub-collapse-panel">
-                <div class="combat-arts-tab-bar">
-                  <button type="button" class="combat-arts-tab active" id="combatArtsTabMartial" data-arts-tab="martial">Martial Arts</button>
-                  <button type="button" class="combat-arts-tab" id="combatArtsTabWeapon" data-arts-tab="weapon">Weapon Arts</button>
-                </div>
-                <div id="combatArtsTabPanelMartial" class="combat-arts-tab-panel">
-                  <input type="text" class="combat-arts-search" id="combatMartialArtsSearch" placeholder="Search martial arts..." />
-                  <div id="combatMartialArtsList" class="combat-arts-list">
-                    <span class="combat-empty">No martial arts available.</span>
-                  </div>
-                </div>
-                <div id="combatArtsTabPanelWeapon" class="combat-arts-tab-panel" hidden>
-                  <input type="text" class="combat-arts-search" id="combatWeaponArtsSearch" placeholder="Search weapon arts..." />
-                  <div id="combatWeaponArtsList" class="combat-arts-list">
-                    <span class="combat-empty">No weapon arts available.</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <!-- Basic Actions collapsible -->
-            <div class="combat-sub-collapse">
-              <button type="button" class="combat-sub-collapse-btn" id="combatBasicActionsCollapseBtn" aria-expanded="true">
-                Basic Actions
-              </button>
-              <div id="combatBasicActionsPanel" class="combat-sub-collapse-panel">
-                <div class="combat-basic-action-item">
-                  <div class="combat-basic-action-header">
-                    <span class="combat-basic-action-name">Stealth</span>
-                    <span class="combat-basic-action-cost">Action <span class="combat-basic-action-alt">/ Bonus Action*</span></span>
-                  </div>
-                  <div class="combat-basic-action-desc">Roll Stealth to hide from sight. If already outside the opponent's line of sight, this can be performed as a Bonus Action instead.</div>
-                </div>
-                <div class="combat-basic-action-item">
-                  <div class="combat-basic-action-header">
-                    <span class="combat-basic-action-name">Dash</span>
-                    <span class="combat-basic-action-cost">Action</span>
-                  </div>
-                  <div class="combat-basic-action-desc">Double your movement speed for the turn.</div>
-                </div>
-                <div class="combat-basic-action-item">
-                  <div class="combat-basic-action-header">
-                    <span class="combat-basic-action-name">Press</span>
-                    <span class="combat-basic-action-cost">Bonus Action</span>
-                  </div>
-                  <div class="combat-basic-action-desc">When ending your turn adjacent to a target, press them. Their next attack suffers a penalty equal to your highest stat to damage and −2 to hit anyone other than you, but deals +2 damage and +1 to hit you. Only one person may press a single target. Effect ends if the target moves more than 50 ft. away.</div>
-                </div>
-              </div>
-            </div>
+            <!-- Archetype Features -->
           </div>
-        </div>
-
-        <!-- Reactions Panel -->
-        <div class="vital-box combat-collapsible-box" style="margin-top: 10px;">
-          <button type="button" class="combat-collapse-btn" id="combatReactionsCollapseBtn" aria-expanded="true">
-            <span class="combat-section-title" style="margin-bottom:0;border-bottom:none;">
-              Reactions &nbsp;·&nbsp; <span class="combat-actions-count-label">Reactions Available:</span> <span id="combatReactionsValue">—</span>
-            </span>
-          </button>
-
-          <div id="combatReactionsPanel" class="combat-collapse-panel">
-
-            <div class="combat-sub-collapse">
-              <button type="button" class="combat-sub-collapse-btn" id="combatBasicReactionsCollapseBtn" aria-expanded="true">
-                Basic Reactions
-              </button>
-              <div id="combatBasicReactionsPanel" class="combat-sub-collapse-panel">
-
-                <div class="combat-basic-action-item">
-                  <div class="combat-basic-action-header">
-                    <span class="combat-basic-action-name">Block</span>
-                    <span class="combat-basic-action-cost">Reaction &nbsp;·&nbsp; <span style="color:var(--ink-faint);">Power</span></span>
-                  </div>
-                  <div class="combat-basic-action-desc">Roll your raw Power stat against the incoming roll to hit. Meet or beat it to halve the damage. On failure, take full damage.</div>
-                </div>
-
-                <div class="combat-basic-action-item">
-                  <div class="combat-basic-action-header">
-                    <span class="combat-basic-action-name">Dodge</span>
-                    <span class="combat-basic-action-cost">Reaction &nbsp;·&nbsp; <span style="color:var(--ink-faint);">Speed</span></span>
-                  </div>
-                  <div class="combat-basic-action-desc">Roll your raw Speed stat and beat the incoming roll to hit to avoid completely — negating all damage and side effects. On success you may also move up to 5 ft. in any direction. On failure, take 1.5× damage.</div>
-                </div>
-
-                <div class="combat-basic-action-item">
-                  <div class="combat-basic-action-header">
-                    <span class="combat-basic-action-name">Leap</span>
-                    <span class="combat-basic-action-cost">Reaction &nbsp;·&nbsp; <span style="color:var(--ink-faint);">Reflexes</span></span>
-                  </div>
-                  <div class="combat-basic-action-desc">For attacks within 15 ft., roll your Reflexes substat against the attack's roll to hit minus your highest of PL or SL. Meet or beat it to leap in front of the attack and shield an ally, taking the damage yourself. You may still react to the attack but cannot Dodge it. Once per turn.</div>
-                </div>
-
-                <div class="combat-basic-action-item">
-                  <div class="combat-basic-action-header">
-                    <span class="combat-basic-action-name">CE Coating</span>
-                    <span class="combat-basic-action-cost">Reaction &nbsp;·&nbsp; <span style="color:var(--ink-faint);">Technique</span></span>
-                  </div>
-                  <div class="combat-basic-action-desc">Coat yourself in cursed energy to reduce incoming damage. Roll a Talent check against a DC equal to your Technique Level x 2. On success, reduce damage by your base Imbue or Output value (whichever is higher). You can spend additional CE to stack the coating for greater reduction — each stack costs 3 CE and raises the DC by 2, adding 1d4 extra reduction per stack. Max stacks scale with Technique Level: TL 1–2 = 1 stack, TL 3–4 = 2 stacks, TL 5–6 = 3 stacks.</div>
-                </div>
-
-              </div>
-            </div>
-
-          </div>
-        </div>
-
-        <!-- Archetype Features -->
-        </div>
           <section class="combat-actions-section">
             <div class="combat-section-title">Archetype Features</div>
             <div id="combatArchetypeFeaturesList" class="combat-arts-list">
@@ -622,281 +675,303 @@
         </div>
       </div>
 
-    <!-- Jujutsu Panel -->
-    <div class="tab-panel" id="panel-jujutsu">
-      <div class="jujutsu-shell">
-        <div class="jujutsu-subtab-bar" role="tablist" aria-label="Jujutsu sections">
-          <button class="jujutsu-subtab active" type="button" role="tab" data-subtab="technique" aria-controls="jujutsuSubpanelTechnique" aria-selected="true">Technique</button>
-          <button class="jujutsu-subtab" type="button" role="tab" data-subtab="vows" aria-controls="jujutsuSubpanelVows" aria-selected="false">Binding Vows</button>
-          <button class="jujutsu-subtab" type="button" role="tab" data-subtab="training" aria-controls="jujutsuSubpanelTraining" aria-selected="false">Training</button>
-          <button class="jujutsu-subtab" type="button" role="tab" data-subtab="skills" aria-controls="jujutsuSubpanelSkills" aria-selected="false">Skills</button>
-        </div>
-
-        <div class="jujutsu-subpanel active" id="jujutsuSubpanelTechnique" data-subpanel="technique" role="tabpanel">
-          <div id="techniqueSummaryCard">
-            <div class="technique-summary-header">
-              <div>
-                <div class="technique-summary-text" id="techniqueSummaryText">No technique.</div>
-                <div class="technique-type-summary" id="techniqueTypeSummary"><em>No Cursed Technique</em></div>
-              </div>
-              <button class="technique-edit-icon-btn" id="techniqueEditBtn" type="button" aria-label="Edit Technique" title="Edit Technique">&#9998;</button>
-            </div>
-            <div class="technique-xp-threshold" id="techniqueXpThreshold" style="display:none;"></div>
-            <div class="techniques-app-card-grid" id="techniqueApplicationsSummary"></div>
-            <div class="technique-summary-footer" id="techniqueSummaryFooter" style="display:none;">
-              <button class="inventory-mini-btn inventory-yen-adjust-btn" id="techniqueAddAppSummaryBtn" type="button" aria-label="Add Application" title="Add Application">
-                <svg class="inventory-yen-adjust-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                  <path fill="currentColor" d="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6V5z"/>
-                </svg>
-              </button>
-              <span class="field-label">Notes</span>
-              <textarea id="techniqueInlineNotesInput" class="inventory-textarea technique-inline-notes" rows="3" maxlength="500" placeholder="Technique notes / DM rulings..."></textarea>
-            </div>
+      <!-- Jujutsu Panel -->
+      <div class="tab-panel" id="panel-jujutsu">
+        <div class="jujutsu-shell">
+          <div class="jujutsu-subtab-bar" role="tablist" aria-label="Jujutsu sections">
+            <button class="jujutsu-subtab active" type="button" role="tab" data-subtab="technique"
+              aria-controls="jujutsuSubpanelTechnique" aria-selected="true">Technique</button>
+            <button class="jujutsu-subtab" type="button" role="tab" data-subtab="vows"
+              aria-controls="jujutsuSubpanelVows" aria-selected="false">Binding Vows</button>
+            <button class="jujutsu-subtab" type="button" role="tab" data-subtab="training"
+              aria-controls="jujutsuSubpanelTraining" aria-selected="false">Training</button>
+            <button class="jujutsu-subtab" type="button" role="tab" data-subtab="skills"
+              aria-controls="jujutsuSubpanelSkills" aria-selected="false">Skills</button>
           </div>
 
-          <div id="techniqueEditor" style="display:none;">
-            <div class="techniques-card" id="techniqueEditorStepMode">
-              <div class="techniques-card-title">Technique Type</div>
-              <div class="techniques-muted">Choose your technique type first.</div>
-              <div class="techniques-mode-grid" role="radiogroup" aria-label="Technique mode">
-                <label class="techniques-mode-option">
-                  <input type="radio" name="techniqueMode" id="techniqueModeCt" value="ct" />
-                  <span>Cursed Technique</span>
-                </label>
-                <label class="techniques-mode-option">
-                  <input type="radio" name="techniqueMode" id="techniqueModeDomain" value="domain" />
-                  <span>Domain-Based Cursed Technique</span>
-                </label>
-                <label class="techniques-mode-option">
-                  <input type="radio" name="techniqueMode" id="techniqueModeNone" value="none" />
-                  <span>No Cursed Technique</span>
-                </label>
+          <div class="jujutsu-subpanel active" id="jujutsuSubpanelTechnique" data-subpanel="technique" role="tabpanel">
+            <div id="techniqueSummaryCard">
+              <div class="technique-summary-header">
+                <div>
+                  <div class="technique-summary-text" id="techniqueSummaryText">No technique.</div>
+                  <div class="technique-type-summary" id="techniqueTypeSummary"><em>No Cursed Technique</em></div>
+                </div>
+                <button class="technique-edit-icon-btn" id="techniqueEditBtn" type="button" aria-label="Edit Technique"
+                  title="Edit Technique">&#9998;</button>
               </div>
-              <div class="techniques-actions-row">
-                <button class="meta-toggle-btn" id="techniqueModeContinueBtn" type="button">Continue</button>
-                <button class="inventory-secondary-btn" id="techniqueEditCancelBtn" type="button">Cancel</button>
+              <div class="technique-xp-threshold" id="techniqueXpThreshold" style="display:none;"></div>
+              <div class="techniques-app-card-grid" id="techniqueApplicationsSummary"></div>
+              <div class="technique-summary-footer" id="techniqueSummaryFooter" style="display:none;">
+                <button class="inventory-mini-btn inventory-yen-adjust-btn" id="techniqueAddAppSummaryBtn" type="button"
+                  aria-label="Add Application" title="Add Application">
+                  <svg class="inventory-yen-adjust-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                    <path fill="currentColor" d="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6V5z" />
+                  </svg>
+                </button>
+                <span class="field-label">Notes</span>
+                <textarea id="techniqueInlineNotesInput" class="inventory-textarea technique-inline-notes" rows="3"
+                  maxlength="500" placeholder="Technique notes / DM rulings..."></textarea>
               </div>
             </div>
 
-            <div class="techniques-layout" id="techniqueEditorStepDetails" style="display:none;">
-              <div class="techniques-card" id="techniquesDetailsCard">
-                <div class="techniques-card-title">Technique Details</div>
-                <label class="techniques-field" id="techniquesNameField" for="techniqueNameInput">
-                  <span class="field-label">Technique Name</span>
-                  <input id="techniqueNameInput" class="meta-input" placeholder="Limitless, Boogie Woogie, Blood Manipulation..." />
-                </label>
-
-                <div class="techniques-field" id="techniquesNoCtSection" style="display:none;">
-                  <span class="field-label">Starting Benefit</span>
-                  <select id="noCtPathSelect" class="meta-select">
-                    <option value="">- Choose a path -</option>
-                    <option value="extra-skills">Two extra grade 4-3 jujutsu skills (non Black Flash/NSS)</option>
-                    <option value="unique-tool">Unique cursed tool equal to your grade</option>
-                    <option value="ce-trait">Natural CE trait</option>
-                    <option value="cursed-corpse">Start with a cursed corpse and taught commands</option>
-                    <option value="nss-batto">Start with NSS Batto Sword Draw and Instant Draw</option>
-                  </select>
+            <div id="techniqueEditor" style="display:none;">
+              <div class="techniques-card" id="techniqueEditorStepMode">
+                <div class="techniques-card-title">Technique Type</div>
+                <div class="techniques-muted">Choose your technique type first.</div>
+                <div class="techniques-mode-grid" role="radiogroup" aria-label="Technique mode">
+                  <label class="techniques-mode-option">
+                    <input type="radio" name="techniqueMode" id="techniqueModeCt" value="ct" />
+                    <span>Cursed Technique</span>
+                  </label>
+                  <label class="techniques-mode-option">
+                    <input type="radio" name="techniqueMode" id="techniqueModeDomain" value="domain" />
+                    <span>Domain-Based Cursed Technique</span>
+                  </label>
+                  <label class="techniques-mode-option">
+                    <input type="radio" name="techniqueMode" id="techniqueModeNone" value="none" />
+                    <span>No Cursed Technique</span>
+                  </label>
                 </div>
-
-                <div class="techniques-field" id="techniquesApplicationsSection" style="display:none;">
-                  <div class="techniques-app-editor-header">
-                    <span class="field-label">Applications</span>
-                    <button class="inventory-mini-btn" id="addTechniqueApplicationBtn" type="button">Add Application</button>
-                  </div>
-                  <div class="techniques-app-editor-list" id="techniqueApplicationsList"></div>
-                </div>
-
-                <div class="techniques-muted">Applications are shown as title + description cards in the summary view.</div>
-              </div>
-
-              <div class="techniques-card" id="techniquesNoCtInfoCard" style="display:none;">
-                <div class="techniques-card-title">No Cursed Technique Path</div>
-                <div class="techniques-muted">When this mode is selected, choose one starting benefit for your sheet.</div>
-              </div>
-
-              <div class="techniques-card">
-                <label class="techniques-field" for="techniqueNotesInput">
-                  <span class="field-label">Technique Notes / DM Rulings</span>
-                  <textarea id="techniqueNotesInput" class="inventory-textarea" rows="4" maxlength="500" placeholder="Record limits, edge cases, and rulings after playtesting your technique."></textarea>
-                </label>
                 <div class="techniques-actions-row">
-                  <button class="inventory-secondary-btn" id="techniqueBackToModeBtn" type="button">Back</button>
-                  <button class="meta-toggle-btn" id="techniqueSaveBtn" type="button">Save Technique</button>
+                  <button class="meta-toggle-btn" id="techniqueModeContinueBtn" type="button">Continue</button>
+                  <button class="inventory-secondary-btn" id="techniqueEditCancelBtn" type="button">Cancel</button>
+                </div>
+              </div>
+
+              <div class="techniques-layout" id="techniqueEditorStepDetails" style="display:none;">
+                <div class="techniques-card" id="techniquesDetailsCard">
+                  <div class="techniques-card-title">Technique Details</div>
+                  <label class="techniques-field" id="techniquesNameField" for="techniqueNameInput">
+                    <span class="field-label">Technique Name</span>
+                    <input id="techniqueNameInput" class="meta-input"
+                      placeholder="Limitless, Boogie Woogie, Blood Manipulation..." />
+                  </label>
+
+                  <div class="techniques-field" id="techniquesNoCtSection" style="display:none;">
+                    <span class="field-label">Starting Benefit</span>
+                    <select id="noCtPathSelect" class="meta-select">
+                      <option value="">- Choose a path -</option>
+                      <option value="extra-skills">Two extra grade 4-3 jujutsu skills (non Black Flash/NSS)</option>
+                      <option value="unique-tool">Unique cursed tool equal to your grade</option>
+                      <option value="ce-trait">Natural CE trait</option>
+                      <option value="cursed-corpse">Start with a cursed corpse and taught commands</option>
+                      <option value="nss-batto">Start with NSS Batto Sword Draw and Instant Draw</option>
+                    </select>
+                  </div>
+
+                  <div class="techniques-field" id="techniquesApplicationsSection" style="display:none;">
+                    <div class="techniques-app-editor-header">
+                      <span class="field-label">Applications</span>
+                      <button class="inventory-mini-btn" id="addTechniqueApplicationBtn" type="button">Add
+                        Application</button>
+                    </div>
+                    <div class="techniques-app-editor-list" id="techniqueApplicationsList"></div>
+                  </div>
+
+                  <div class="techniques-muted">Applications are shown as title + description cards in the summary view.
+                  </div>
+                </div>
+
+                <div class="techniques-card" id="techniquesNoCtInfoCard" style="display:none;">
+                  <div class="techniques-card-title">No Cursed Technique Path</div>
+                  <div class="techniques-muted">When this mode is selected, choose one starting benefit for your sheet.
+                  </div>
+                </div>
+
+                <div class="techniques-card">
+                  <label class="techniques-field" for="techniqueNotesInput">
+                    <span class="field-label">Technique Notes / DM Rulings</span>
+                    <textarea id="techniqueNotesInput" class="inventory-textarea" rows="4" maxlength="500"
+                      placeholder="Record limits, edge cases, and rulings after playtesting your technique."></textarea>
+                  </label>
+                  <div class="techniques-actions-row">
+                    <button class="inventory-secondary-btn" id="techniqueBackToModeBtn" type="button">Back</button>
+                    <button class="meta-toggle-btn" id="techniqueSaveBtn" type="button">Save Technique</button>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
-        </div>
 
-        <div class="jujutsu-subpanel" id="jujutsuSubpanelTraining" data-subpanel="training" role="tabpanel">
-          <div class="techniques-card">
-            <div class="techniques-card-title">Training</div>
-            <div class="techniques-muted">Training progression and practice tracking will go here next.</div>
-          </div>
-        </div>
-
-        <div class="jujutsu-subpanel" id="jujutsuSubpanelSkills" data-subpanel="skills" role="tabpanel">
-          <div class="techniques-card">
-            <div class="techniques-card-title">Skills</div>
-            <div class="techniques-muted">Track learned Jujutsu and XP skills.</div>
-          </div>
-        </div>
-
-        <div class="jujutsu-subpanel" id="jujutsuSubpanelVows" data-subpanel="vows" role="tabpanel">
-          <div class="binding-vows-shell">
-            <div class="techniques-app-editor-header binding-vows-header">
-              <span class="techniques-card-title">Binding Vows</span>
-              <button class="inventory-mini-btn" id="addBindingVowBtn" type="button">Make a Vow</button>
+          <div class="jujutsu-subpanel" id="jujutsuSubpanelTraining" data-subpanel="training" role="tabpanel">
+            <div class="techniques-card">
+              <div class="techniques-card-title">Training</div>
+              <div class="techniques-muted">Training progression and practice tracking will go here next.</div>
             </div>
-            <div class="techniques-app-editor-list" id="bindingVowsList"></div>
-            <div class="techniques-muted">Track what is sacrificed and what benefit is gained for each vow.</div>
+          </div>
+
+          <div class="jujutsu-subpanel" id="jujutsuSubpanelSkills" data-subpanel="skills" role="tabpanel">
+            <div class="techniques-card">
+              <div class="techniques-card-title">Skills</div>
+              <div class="techniques-muted">Track learned Jujutsu and XP skills.</div>
+            </div>
+          </div>
+
+          <div class="jujutsu-subpanel" id="jujutsuSubpanelVows" data-subpanel="vows" role="tabpanel">
+            <div class="binding-vows-shell">
+              <div class="techniques-app-editor-header binding-vows-header">
+                <span class="techniques-card-title">Binding Vows</span>
+                <button class="inventory-mini-btn" id="addBindingVowBtn" type="button">Make a Vow</button>
+              </div>
+              <div class="techniques-app-editor-list" id="bindingVowsList"></div>
+              <div class="techniques-muted">Track what is sacrificed and what benefit is gained for each vow.</div>
+            </div>
           </div>
         </div>
       </div>
-    </div>
-    <div class="tab-panel" id="panel-party">
-      <div class="party-panel">
-        <div class="party-header">
-          <div class="party-title">Party Roster</div>
-          <div class="party-note">Live list of your sheet and other players currently sharing data.</div>
+      <div class="tab-panel" id="panel-party">
+        <div class="party-panel">
+          <div class="party-header">
+            <div class="party-title">Party Roster</div>
+            <div class="party-note">Live list of your sheet and other players currently sharing data.</div>
+          </div>
+          <div id="partyList" class="party-list"></div>
         </div>
-        <div id="partyList" class="party-list"></div>
       </div>
-    </div>
 
-    <div class="tab-panel" id="panel-notes">
-      <div class="notes-panel">
-        <div class="notes-header">
-          <div class="notes-title">NOTEPAD</div>
-          <button id="addNoteBtn" class="inventory-mini-btn" type="button">New Note</button>
-        </div>
+      <div class="tab-panel" id="panel-notes">
+        <div class="notes-panel">
+          <div class="notes-header">
+            <div class="notes-title">NOTEPAD</div>
+            <button id="addNoteBtn" class="inventory-mini-btn" type="button">New Note</button>
+          </div>
           <div class="notes-search-row">
-            <input id="notesSearchInput" class="meta-input notes-search-input" type="text" placeholder="Search notes..." autocomplete="off" />
+            <input id="notesSearchInput" class="meta-input notes-search-input" type="text" placeholder="Search notes..."
+              autocomplete="off" />
           </div>
           <div id="notesList" class="notes-list"></div>
+        </div>
+      </div>
+
+    </div><!-- /tab-content -->
+  </div><!-- /sheet-wrapper -->
+
+  <div id="saveStatusBadge" class="save-status-badge" role="status" aria-live="polite" title="No save yet.">
+    <span class="save-status-flame" aria-hidden="true">
+      <svg viewBox="0 0 24 24" focusable="false">
+        <path
+          d="M13.8 2.6c.4 2-.2 3.4-1.1 4.7-.8 1.1-1.8 2.2-1.9 3.7-.1 1.5.8 2.7 2.1 3.2-.4-1.2 0-2.2.8-3 .8-.9 1.8-1.6 2.1-2.8.8 1 1.4 2.2 1.4 3.7 0 3-2.3 5.4-5.3 5.4-3.2 0-5.7-2.5-5.7-5.8 0-3.8 2.7-6.2 5.4-8.9.6-.7 1.5-1.6 2.2-2.8z"
+          fill="currentColor" />
+      </svg>
+    </span>
+    <span id="saveStatusLabel">Saving</span>
+  </div>
+
+  <div id="rollToastContainer" class="roll-toast-container"></div>
+  <div class="quick-shortcuts">
+    <div class="rest-control-wrap rest-quick-wrap">
+      <button id="restBtn" class="roll-history-btn rest-quick-btn" type="button" aria-haspopup="true"
+        aria-expanded="false" aria-controls="restOptionsPopover">Rest</button>
+      <div id="restOptionsPopover" class="rest-options-popover rest-options-popover--quick" hidden>
+        <div class="rest-options-title">Choose Rest Type</div>
+        <button class="inventory-mini-btn" id="quickRestBtn" type="button">Quick Rest (25%)</button>
+        <button class="inventory-mini-btn" id="shortRestBtn" type="button">Short Rest (50%)</button>
+        <button class="inventory-mini-btn" id="fullRestBtn" type="button">Full Rest (100%)</button>
+      </div>
+    </div>
+    <button id="partyQuickBtn" class="roll-history-btn party-quick-btn" type="button">Party</button>
+    <button id="rollHistoryBtn" class="roll-history-btn" type="button">Roll Log</button>
+  </div>
+  <div id="rollHistoryPanel" class="roll-history-panel">
+    <div class="roll-history-header">
+      <div class="roll-log-tabs">
+        <button id="rollLogTabMine" class="roll-log-tab active" type="button">Mine</button>
+        <button id="rollLogTabGroup" class="roll-log-tab" type="button">Everyone</button>
+      </div>
+      <div class="roll-history-actions">
+        <button id="clearRollHistoryBtn" class="roll-history-action" type="button">Clear</button>
+        <button id="closeRollHistoryBtn" class="roll-history-action" type="button">Close</button>
+      </div>
+    </div>
+    <div id="rollHistoryList" class="roll-history-list"></div>
+    <div id="groupRollHistoryList" class="roll-history-list" style="display:none;"></div>
+  </div>
+
+  <div id="sheetModifierContextMenu" class="sheet-modifier-context-menu" hidden>
+    <button id="sheetModifierContextAdjustBtn" type="button" class="sheet-modifier-context-item">Adjust
+      Modifiers</button>
+  </div>
+
+  <aside id="sheetModifierPanel" class="sheet-modifier-panel" hidden>
+    <div class="sheet-modifier-panel-header">
+      <div>
+        <div class="sheet-modifier-panel-title">Adjust Modifiers</div>
+        <div id="sheetModifierTargetLabel" class="sheet-modifier-panel-target">Target</div>
+        <label id="sheetModifierStatTargetModeWrap" class="sheet-modifier-mode" hidden>
+          <span class="field-label">Applies To</span>
+          <select id="sheetModifierStatTargetMode" class="meta-select">
+            <option value="stat">Stat Level</option>
+            <option value="statRoll">Stat Rolls</option>
+          </select>
+        </label>
+      </div>
+      <button id="sheetModifierCloseBtn" type="button" class="inventory-mini-btn">Close</button>
+    </div>
+
+    <div class="sheet-modifier-totals">
+      <div class="sheet-modifier-total-row">
+        <span class="sheet-modifier-total-label">Base</span>
+        <span id="sheetModifierBaseValue" class="sheet-modifier-total-value">0</span>
+      </div>
+      <div class="sheet-modifier-total-row">
+        <span class="sheet-modifier-total-label">Direct Modifiers</span>
+        <span id="sheetModifierDeltaValue" class="sheet-modifier-total-value">+0</span>
+      </div>
+      <div class="sheet-modifier-total-row emphasized">
+        <span class="sheet-modifier-total-label">Total</span>
+        <span id="sheetModifierTotalValue" class="sheet-modifier-total-value">0</span>
       </div>
     </div>
 
-  </div><!-- /tab-content -->
-</div><!-- /sheet-wrapper -->
-
-<div id="saveStatusBadge" class="save-status-badge" role="status" aria-live="polite" title="No save yet.">
-  <span class="save-status-flame" aria-hidden="true">
-    <svg viewBox="0 0 24 24" focusable="false">
-      <path d="M13.8 2.6c.4 2-.2 3.4-1.1 4.7-.8 1.1-1.8 2.2-1.9 3.7-.1 1.5.8 2.7 2.1 3.2-.4-1.2 0-2.2.8-3 .8-.9 1.8-1.6 2.1-2.8.8 1 1.4 2.2 1.4 3.7 0 3-2.3 5.4-5.3 5.4-3.2 0-5.7-2.5-5.7-5.8 0-3.8 2.7-6.2 5.4-8.9.6-.7 1.5-1.6 2.2-2.8z" fill="currentColor"/>
-    </svg>
-  </span>
-  <span id="saveStatusLabel">Saving</span>
-</div>
-
-<div id="rollToastContainer" class="roll-toast-container"></div>
-<div class="quick-shortcuts">
-  <div class="rest-control-wrap rest-quick-wrap">
-    <button id="restBtn" class="roll-history-btn rest-quick-btn" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="restOptionsPopover">Rest</button>
-    <div id="restOptionsPopover" class="rest-options-popover rest-options-popover--quick" hidden>
-      <div class="rest-options-title">Choose Rest Type</div>
-      <button class="inventory-mini-btn" id="quickRestBtn" type="button">Quick Rest (25%)</button>
-      <button class="inventory-mini-btn" id="shortRestBtn" type="button">Short Rest (50%)</button>
-      <button class="inventory-mini-btn" id="fullRestBtn" type="button">Full Rest (100%)</button>
+    <div class="sheet-modifier-list-wrap">
+      <div id="sheetModifierList" class="sheet-modifier-list"></div>
     </div>
-  </div>
-  <button id="partyQuickBtn" class="roll-history-btn party-quick-btn" type="button">Party</button>
-  <button id="rollHistoryBtn" class="roll-history-btn" type="button">Roll Log</button>
-</div>
-<div id="rollHistoryPanel" class="roll-history-panel">
-  <div class="roll-history-header">
-    <div class="roll-log-tabs">
-      <button id="rollLogTabMine" class="roll-log-tab active" type="button">Mine</button>
-      <button id="rollLogTabGroup" class="roll-log-tab" type="button">Everyone</button>
-    </div>
-    <div class="roll-history-actions">
-      <button id="clearRollHistoryBtn" class="roll-history-action" type="button">Clear</button>
-      <button id="closeRollHistoryBtn" class="roll-history-action" type="button">Close</button>
-    </div>
-  </div>
-  <div id="rollHistoryList" class="roll-history-list"></div>
-  <div id="groupRollHistoryList" class="roll-history-list" style="display:none;"></div>
-</div>
 
-<div id="sheetModifierContextMenu" class="sheet-modifier-context-menu" hidden>
-  <button id="sheetModifierContextAdjustBtn" type="button" class="sheet-modifier-context-item">Adjust Modifiers</button>
-</div>
-
-<aside id="sheetModifierPanel" class="sheet-modifier-panel" hidden>
-  <div class="sheet-modifier-panel-header">
-    <div>
-      <div class="sheet-modifier-panel-title">Adjust Modifiers</div>
-      <div id="sheetModifierTargetLabel" class="sheet-modifier-panel-target">Target</div>
-      <label id="sheetModifierStatTargetModeWrap" class="sheet-modifier-mode" hidden>
-        <span class="field-label">Applies To</span>
-        <select id="sheetModifierStatTargetMode" class="meta-select">
-          <option value="stat">Stat Level</option>
-          <option value="statRoll">Stat Rolls</option>
+    <div id="sheetModifierForm" class="sheet-modifier-form" hidden>
+      <label class="inventory-field">
+        <span class="field-label">Operation</span>
+        <select id="sheetModifierOperationInput" class="meta-select">
+          <option value="add">Add / Subtract</option>
+          <option value="multiply">Multiply</option>
+          <option value="divide">Divide</option>
         </select>
       </label>
+      <label class="inventory-field">
+        <span class="field-label">Value</span>
+        <input id="sheetModifierValueInput" class="meta-input" type="number" step="1" placeholder="5" />
+      </label>
+      <label class="inventory-field">
+        <span class="field-label">Source</span>
+        <input id="sheetModifierSourceInput" class="meta-input" maxlength="120" placeholder="Grit" />
+      </label>
+      <div class="inventory-form-actions inventory-field-full">
+        <button id="sheetModifierSaveBtn" type="button" class="meta-toggle-btn">Save</button>
+        <button id="sheetModifierCancelBtn" type="button" class="inventory-secondary-btn">Cancel</button>
+      </div>
     </div>
-    <button id="sheetModifierCloseBtn" type="button" class="inventory-mini-btn">Close</button>
-  </div>
+  </aside>
 
-  <div class="sheet-modifier-totals">
-    <div class="sheet-modifier-total-row">
-      <span class="sheet-modifier-total-label">Base</span>
-      <span id="sheetModifierBaseValue" class="sheet-modifier-total-value">0</span>
-    </div>
-    <div class="sheet-modifier-total-row">
-      <span class="sheet-modifier-total-label">Direct Modifiers</span>
-      <span id="sheetModifierDeltaValue" class="sheet-modifier-total-value">+0</span>
-    </div>
-    <div class="sheet-modifier-total-row emphasized">
-      <span class="sheet-modifier-total-label">Total</span>
-      <span id="sheetModifierTotalValue" class="sheet-modifier-total-value">0</span>
-    </div>
-  </div>
+  <script type="module" src="./src/main.js"></script>
 
-  <div class="sheet-modifier-list-wrap">
-    <div id="sheetModifierList" class="sheet-modifier-list"></div>
-  </div>
-
-  <div id="sheetModifierForm" class="sheet-modifier-form" hidden>
-    <label class="inventory-field">
-      <span class="field-label">Operation</span>
-      <select id="sheetModifierOperationInput" class="meta-select">
-        <option value="add">Add / Subtract</option>
-        <option value="multiply">Multiply</option>
-        <option value="divide">Divide</option>
-      </select>
-    </label>
-    <label class="inventory-field">
-      <span class="field-label">Value</span>
-      <input id="sheetModifierValueInput" class="meta-input" type="number" step="1" placeholder="5" />
-    </label>
-    <label class="inventory-field">
-      <span class="field-label">Source</span>
-      <input id="sheetModifierSourceInput" class="meta-input" maxlength="120" placeholder="Grit" />
-    </label>
-    <div class="inventory-form-actions inventory-field-full">
-      <button id="sheetModifierSaveBtn" type="button" class="meta-toggle-btn">Save</button>
-      <button id="sheetModifierCancelBtn" type="button" class="inventory-secondary-btn">Cancel</button>
+  <!-- Info Modal -->
+  <div class="info-overlay" id="infoOverlay" role="dialog" aria-modal="true" aria-labelledby="infoModalTitle">
+    <div class="info-modal">
+      <button class="info-close-btn" id="infoCloseBtn" aria-label="Close">&times;</button>
+      <div class="info-modal-title" id="infoModalTitle">JJK Character Sheet</div>
+      <div class="info-modal-sub">呪術廻戦 · Owlbear Rodeo Extension</div>
+      <p>A character sheet extension for Owlbear Rodeo built around the <em>Will of the Cursed,</em> a JJK TTRPG system.
+        Designed to keep your cursed energy, stats, and techniques at a glance during play.</p>
+      <p>Created by <strong>SabreDorko</strong>. If you enjoy the extension and want to support further development,
+        consider buying me a byte!</p>
+      <a class="bmac-link" href="https://buymeacoffee.com/sabredorko" target="_blank" rel="noopener noreferrer">
+        👾 Buy Me a Byte ♥
+      </a>
+      <p class="disclaimer">Character data is saved directly to your Owlbear Rodeo room. It persists across sessions as
+        long as the room exists. Clearing your browser's site data or cache will not affect it — but deleting the room
+        will.</p>
     </div>
   </div>
-</aside>
-
-<script type="module" src="./src/main.js"></script>
-
-<!-- Info Modal -->
-<div class="info-overlay" id="infoOverlay" role="dialog" aria-modal="true" aria-labelledby="infoModalTitle">
-  <div class="info-modal">
-    <button class="info-close-btn" id="infoCloseBtn" aria-label="Close">&times;</button>
-    <div class="info-modal-title" id="infoModalTitle">JJK Character Sheet</div>
-    <div class="info-modal-sub">呪術廻戦 · Owlbear Rodeo Extension</div>
-    <p>A character sheet extension for Owlbear Rodeo built around the <em>Will of the Cursed,</em> a JJK TTRPG system. Designed to keep your cursed energy, stats, and techniques at a glance during play.</p>
-    <p>Created by <strong>SabreDorko</strong>. If you enjoy the extension and want to support further development, consider buying me a byte!</p>
-    <a class="bmac-link" href="https://buymeacoffee.com/sabredorko" target="_blank" rel="noopener noreferrer">
-      👾 Buy Me a Byte ♥
-    </a>
-    <p class="disclaimer">Character data is saved directly to your Owlbear Rodeo room. It persists across sessions as long as the room exists. Clearing your browser's site data or cache will not affect it — but deleting the room will.</p>
-  </div>
-</div>
 
 </body>
+
 </html>
