@@ -457,7 +457,7 @@ function rollHit(weapon, data) {
     rolls,
     total,
     critStatus,
-    `${weapon.name} — ${skillLabel} — Roll to Hit`,
+    `${weapon.name} — ${skillLabel}`,
     { skillModifier: bonus },
     null,
   );
@@ -513,7 +513,7 @@ function rollUnarmedHit(attack, data) {
     rolls,
     total,
     critStatus,
-    `${attack.name} — Roll to Hit`,
+    `${attack.name} — Combat`,
     { skillModifier: attack.bonus },
     null,
   );

@@ -107,7 +107,7 @@
   {
     "id": "perfect-shot",
     "title": "Perfect Shot",
-    "description": "Spend Two Actions preparing a Ranged Attack. You must not receive damage or take any other actions during this time. If you successfully prepare this attack, the next Ranged Attack you make deals double damage and becomes undodgeable. (Black Flash overrides this attack's damage multiplier.)",
+    "description": "Spend Two Actions preparing to make a Ranged Attack. You must not receive damage or take any other actions during this time. If you successfully prepare this attack, the next Ranged Attack you make deals double damage and becomes undodgeable. (Black Flash overrides this attack's damage multiplier.)",
     "statRequirement": { "stat": "speed", "value": 5 },
     "weaponTypeRequirement": "ranged",
     "usesPerEncounter": 1
