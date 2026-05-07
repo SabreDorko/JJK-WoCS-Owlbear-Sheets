@@ -65,23 +65,70 @@ function formatSignedValue(value) {
 function formatRollFormula(entry, forcedRolls, forcedTotal) {
   const rolls = Array.isArray(forcedRolls) ? forcedRolls : entry.rolls;
   const total = Number.isFinite(forcedTotal) ? forcedTotal : entry.total;
-  const die = entry.die || "d6";
-  const base = `${entry.diceCount}${die}: [${rolls.join(", ")}]`;
   const breakdown = entry.breakdown;
-  if (!breakdown) return `${base} = <strong>${total}</strong>`;
 
-  let formula = base;
-  if (Number.isFinite(breakdown.skillModifier)) {
-    formula += ` + ${breakdown.skillModifier}`;
+  // Multi-die group display
+  if (Array.isArray(breakdown?.dieGroups) && breakdown.dieGroups.length > 0) {
+
+    const summaryLines = [];
+    const rollLines = [];
+
+    for (const g of breakdown.dieGroups) {
+
+      // Header / summary lines
+      if (g.summary) {
+        summaryLines.push(g.label);
+        continue;
+      }
+
+      // Skip malformed groups
+      if (!Array.isArray(g.rolls) || !g.rolls.length) continue;
+
+      rollLines.push(
+        `${g.label}: [${g.rolls.join(", ")}] = ${g.total}`
+      );
+    }
+
+    const lines = [];
+
+    // Render summaries first
+    if (summaryLines.length) {
+      lines.push(
+        `<div class="roll-summary-line">${summaryLines.join(" + ")}</div>`
+      );
+    }
+
+    // Then actual rolls
+    lines.push(...rollLines);
+
+    if (Number.isFinite(breakdown?.skillModifier) && breakdown.skillModifier !== 0) {
+      lines.push(`Bonus: +${breakdown.skillModifier}`);
+    }
+
+    if (breakdown?.multiplier) {
+      lines.push(`× ${breakdown.multiplier} (Black Flash)`);
+    }
+
+    lines.push(`<strong>Total: ${total}</strong>`);
+
+    return lines.join("<br/>");
   }
 
-  const bonuses = Array.isArray(breakdown.equipmentBonuses) ? breakdown.equipmentBonuses : [];
+  // Original single-die format
+  const die = entry.die || breakdown?.die || "d6";
+  const base = entry.diceCount > 0
+    ? `${entry.diceCount}${die}: [${rolls.join(", ")}]`
+    : "";
+  let formula = base;
+  if (Number.isFinite(breakdown?.skillModifier) && breakdown.skillModifier !== 0) {
+    formula += ` + ${breakdown.skillModifier}`;
+  }
+  const bonuses = Array.isArray(breakdown?.equipmentBonuses) ? breakdown.equipmentBonuses : [];
   bonuses.forEach(part => {
     if (!part || !Number.isFinite(part.value)) return;
     formula += ` + ${part.label} (${formatSignedValue(part.value)})`;
   });
-
-  return `${formula} = <strong>${total}</strong>`;
+  return `${formula}${formula ? " = " : ""}<strong>${total}</strong>`;
 }
 
 function rollModeLabel(rollMode) {
@@ -204,24 +251,82 @@ export function showRollToast(statLabel, diceCount, rolls, total, critStatus, sk
   const label = skillName ? `${statLabel} › ${skillName}` : statLabel;
   const modeLabel = rollModeLabel(rollMode || breakdown?.rollMode);
   const modeSuffix = modeLabel ? ` (${modeLabel})` : "";
-  let critLine = "";
-  if (critStatus === "success")
-    critLine = `<div style="font-family:'Cinzel',serif;font-size:10px;letter-spacing:1px;color:#2a6e2a;margin-top:3px;">✦ CRITICAL SUCCESS</div>`;
-  if (critStatus === "fail")
-    critLine = `<div style="font-family:'Cinzel',serif;font-size:10px;letter-spacing:1px;color:#8b1a1a;margin-top:3px;">✦ CRITICAL FAIL</div>`;
-  if (critStatus === "miss")
-    critLine = `<div style="font-family:'Cinzel',serif;font-size:10px;letter-spacing:1px;color:#8b1a1a;margin-top:3px;">FAIL</div>`;
-  if (critStatus === "pass")
-    critLine = `<div style="font-family:'Cinzel',serif;font-size:10px;letter-spacing:1px;color:#2a6e2a;margin-top:3px;">✦ PASS</div>`;
+
+  const die = breakdown?.die || "d6";
+
+  // ── SINGLE SOURCE OF TRUTH FOR BADGE (NO DUPLICATES) ─────
+  let badgeHTML = "";
+  if (critStatus === "success") {
+    badgeHTML = `<div style="color:#2a6e2a;font-family:'Cinzel',serif;font-size:10px;margin-top:3px;">✦ CRITICAL SUCCESS</div>`;
+  } else if (critStatus === "fail") {
+    badgeHTML = `<div style="color:#8b1a1a;font-family:'Cinzel',serif;font-size:10px;margin-top:3px;">✦ CRITICAL FAIL</div>`;
+  } else if (critStatus === "pass") {
+    badgeHTML = `<div style="color:#2a6e2a;font-family:'Cinzel',serif;font-size:10px;margin-top:3px;">✦ PASS</div>`;
+  } else if (critStatus === "miss") {
+    badgeHTML = `<div style="color:#8b1a1a;font-family:'Cinzel',serif;font-size:10px;margin-top:3px;">FAIL</div>`;
+  }
+
+  // ── FORMAT BODY INTO CLEAN LINES (NO EMPTY SPACING) ───────
+  const rawBody = formatRollBody({
+    diceCount,
+    rolls,
+    total,
+    breakdown,
+    rollMode,
+    die
+  });
+
+
+  const lines = [];
+  // split safely, remove empties
+  const parts = rawBody.split("<br/>").map(l => l.trim()).filter(Boolean);
+
+  let bonusLine = "";
+  let effectLine = "";
+  let totalLine = "";
+  const rollLines = [];
+
+  for (const line of parts) {
+    const lower = line.toLowerCase();
+    if (lower.startsWith("bonus")) {
+      bonusLine = line;
+    } else if (lower.includes("×")) {
+      effectLine = line;
+    } else if (lower.includes("total:")) {
+      totalLine = line;
+    } else {
+      rollLines.push(line);
+    }
+  }
+
+  // ── STRICT ORDERING ───────────────────────────────────────
+  lines.push(...rollLines);
+  if (badgeHTML) lines.push(badgeHTML); // Crit only ONCE here
+  if (bonusLine) lines.push(bonusLine);
+  // Place effect and total together, no blank line between
+  if (effectLine && totalLine) {
+    lines.push(`${effectLine} <span style=\"margin-left:8px;\"></span> ${totalLine}`);
+  } else {
+    if (effectLine) lines.push(effectLine);
+    if (totalLine) lines.push(totalLine);
+  }
 
   const toast = document.createElement("div");
-  toast.className = "roll-toast" + (critStatus === "success" ? " crit-success" : critStatus === "fail" ? " crit-fail" : critStatus === "pass" ? " pass" : critStatus === "miss" ? " fail" : "");
-  // Accept die type in breakdown or as breakdown.die, fallback to d6
-  const die = breakdown?.die || "d6";
+  toast.className =
+    "roll-toast" +
+    (critStatus === "success"
+      ? " crit-success"
+      : critStatus === "fail"
+      ? " crit-fail"
+      : critStatus === "pass"
+      ? " pass"
+      : critStatus === "miss"
+      ? " fail"
+      : "");
+
   toast.innerHTML = `
     <div class="roll-toast-title">${label} Roll${modeSuffix}</div>
-    <div class="roll-toast-body">${formatRollBody({ diceCount, rolls, total, breakdown, rollMode, die })}</div>
-    ${critLine}
+    <div class="roll-toast-body">${lines.join("<br/>")}</div>
   `;
 
   container.appendChild(toast);
@@ -233,6 +338,6 @@ export function showRollToast(statLabel, diceCount, rolls, total, critStatus, sk
 
   setTimeout(() => {
     toast.classList.remove("show");
-    setTimeout(() => { if (toast.parentNode) toast.parentNode.removeChild(toast); }, 220);
+    setTimeout(() => toast.remove(), 220);
   }, 4200);
 }
