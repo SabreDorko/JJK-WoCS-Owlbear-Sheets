@@ -1,5 +1,41 @@
 [
-  
+  {
+    "id": "disarm",
+    "title": "Disarm",
+    "description": "Roll an attack. On a win (Tech vs. Tech or Power), you disarm your opponent, sending their weapon flying (20 + TL × 5) ft. away.",
+    "unlockType": "any_weapon",
+    "statRequirement": { "stat": "power", "value": 0 },
+    "weaponTypeRequirement": null,
+    "usesPerEncounter": 3
+  },
+  {
+    "id": "hidden-weapon",
+    "title": "Hidden Weapon",
+    "description": "Requires at least 2 weapons. The first time you swap weapons in an encounter, you gain an opportunity to make a sneak attack.",
+    "unlockType": "any_weapon",
+    "statRequirement": { "stat": "power", "value": 0 },
+    "weaponTypeRequirement": null,
+    "usesPerEncounter": 1
+  },
+  {
+    "id": "trip-attack",
+    "title": "Trip Attack",
+    "description": "Roll an attack. On a win (Weapon Stat vs. Tech or Power), you knock your opponent prone.",
+    "unlockType": "any_weapon",
+    "statRequirement": { "stat": "power", "value": 0 },
+    "weaponTypeRequirement": null,
+    "usesPerEncounter": 1
+  },
+  {
+    "id": "graze",
+    "title": "Graze",
+    "description": "Reaction. If you fail to hit an opponent — whether by missing their AC or them dodging — your mastery of your weapon lets you deal partial damage anyway: the highest damage die of your weapon + your Weapon Stat modifier. Cannot be imbued and is unaffected by the dodge damage multiplier.",
+    "unlockType": "weapon_stat_threshold",
+    "weaponStatThreshold": 4,
+    "statRequirement": { "stat": "power", "value": 4 },
+    "weaponTypeRequirement": null,
+    "usesPerEncounter": 2
+  },
   {
     "id": "spinning-swing",
     "title": "Spinning Swing",
@@ -11,7 +47,7 @@
   {
     "id": "impact",
     "title": "Impact",
-    "description": "A powerful blow with the user’s full weight behind it. When hit, the opponent must make a strength contest against the user. If they lose, they get knocked back (PL*5) ft.",
+    "description": "Roll a Bludgeoning Attack. If you hit, the opponent must make a strength contest against the user. If they lose, they get knocked back (PL*5) ft.",
     "statRequirement": { "stat": "power", "value": 3 },
     "weaponTypeRequirement": "bludgeoning",
     "usesPerEncounter": 3
@@ -19,7 +55,7 @@
   {
     "id": "heavy-blow",
     "title": "Heavy Blow",
-    "description": "On hit, the opponent has to make a fortitude check with a DC of your (PL*3), or lose one reaction for the rest of the round.",
+    "description": "Roll a Bludgeoning Attack. If you hit, the opponent has to make a fortitude check with a DC of your (PL*3), or lose one reaction for the rest of the round.",
     "statRequirement": { "stat": "power", "value": 3 },
     "weaponTypeRequirement": "bludgeoning",
     "usesPerEncounter": 2
@@ -27,7 +63,7 @@
   {
     "id": "bone-breaker",
     "title": "Bone Breaker",
-    "description": "A strike that sends shockwaves through your opponent’s body. On hit, they must make a fortitude check with a DC of your (PL*3). If they fail, their movement is halved for 2 turns.",
+    "description": "Roll a Bludgeoning Attack. On hit, they must make a fortitude check with a DC of your (PL*3). If they fail, their movement is halved for 2 turns.",
     "statRequirement": { "stat": "power", "value": 4 },
     "weaponTypeRequirement": "bludgeoning",
     "usesPerEncounter": 2
@@ -35,7 +71,7 @@
   {
     "id": "shatter",
     "title": "Shatter",
-    "description": "A powerful hit with large wind up and centrifugal force. If blocked, the opponent must make a fortitude check with a DC of your (PL*3+3). If failed, their block only lessens 25% of the damage for 2 turns.",
+    "description": "Roll a Bludgeoning Attack. A powerful hit with large wind up and centrifugal force. If blocked, the opponent must make a fortitude check with a DC of your (PL*3+3). If failed, their block only lessens 25% of the damage for 2 turns.",
     "statRequirement": { "stat": "power", "value": 5 },
     "weaponTypeRequirement": "bludgeoning",
     "usesPerEncounter": 1
@@ -43,7 +79,7 @@
   {
     "id": "artery-knick",
     "title": "Artery Knick",
-    "description": "Perform a slashing attack attempting to target an opponent’s vitals. If you hit, the target must roll a Fortitude check against a DC equal to your Technique Level * 3. If they fail, they suffer from the Bleed condition.",
+    "description": "Roll a Slashing Attack attempting to target an opponent’s vitals. If you hit, the target must roll a Fortitude check against a DC equal to your Technique Level * 3. If they fail, they suffer from the Bleed condition.",
     "statRequirement": { "stat": "technique", "value": 3 },
     "weaponTypeRequirement": "slashing",
     "usesPerEncounter": 2
@@ -51,7 +87,7 @@
   {
     "id": "descending-slash",
     "title": "Descending Slash",
-    "description": "A downward slashing attack performed from high up, dealing an additional 1d4 for every 10 ft. fallen. At a base, jump up 10 ft. to perform this technique. After 20 ft. fallen, take 1d4 (unmitigatable and unreactable) recoil damage for every 10 ft. fallen.",
+    "description": "A downward Slashing Attack performed from high up, dealing an additional 1d4 for every 10 ft. fallen. At a base, jump up 10 ft. to perform this technique. After 20 ft. fallen, take 1d4 (unmitigatable and unreactable) recoil damage for every 10 ft. fallen.",
     "statRequirement": { "stat": "technique", "value": 3 },
     "weaponTypeRequirement": "slashing",
     "usesPerEncounter": 4
@@ -59,7 +95,7 @@
   {
     "id": "sword-dance",
     "title": "Sword Dance",
-    "description": "Perform a slashing attack. You may then move up to 10ft. freely without consuming movement speed.",
+    "description": "Roll a Slashing Attack. You may then move up to 10ft. freely without consuming movement speed.",
     "statRequirement": { "stat": "technique", "value": 3 },
     "weaponTypeRequirement": "slashing",
     "usesPerEncounter": 3
@@ -67,7 +103,7 @@
   {
     "id": "disarming-shot",
     "title": "Disarming Shot",
-    "description": "Make a Ranged attack that deals half damage. If you hit, the target must make a Fortitude or Acrobatics check against a DC equal to your Speed Level * 3. If they fair, an item they are currently holding is sent 15ft. away from the target in a random direction.",
+    "description": "Roll a Ranged Attack that deals half damage. If you hit, the target must make a Fortitude or Acrobatics check against a DC equal to your Speed Level * 3. If they fair, an item they are currently holding is sent 15ft. away from the target in a random direction.",
     "statRequirement": { "stat": "speed", "value": 3 },
     "weaponTypeRequirement": "ranged",
     "usesPerEncounter": 3
@@ -83,7 +119,7 @@
   {
     "id": "unloading-shot",
     "title": "Unloading Shot",
-    "description": "You may make two Ranged attacks with your weapon of choice in a single Action. Each shot knocks the opponent back 5ft if they are within 15ft. of you. However, you have a -2 to all Speed Rolls until the end of your next turn.",
+    "description": "Roll two Ranged attacks with your weapon of choice in a single Action. Each shot knocks the opponent back 5ft if they are within 15ft. of you. However, you have a -2 to all Speed Rolls until the end of your next turn.",
     "statRequirement": { "stat": "speed", "value": 4 },
     "weaponTypeRequirement": "ranged",
     "usesPerEncounter": 1
@@ -99,7 +135,7 @@
   {
     "id": "debilitating-shot",
     "title": "Debilitating Shot",
-    "description": "Make a Ranged Attack against a target, aiming for either one of their hands or one of their legs. If you hit, the target receives a debuff for 1d4 turns (this debuff may be healed through RCT). If you hit their hand, the target suffers a penalty on rolls to hit and Domain Expansions equal to your Speed Level/2 rounded down. If you hit their leg, the target's move speed is reduced by 20ft.",
+    "description": "Roll a Ranged Attack against a target, aiming for either one of their hands or one of their legs. If you hit, the target receives a debuff for 1d4 turns (this debuff may be healed through RCT). If you hit their hand, the target suffers a penalty on rolls to hit and Domain Expansions equal to your Speed Level/2 rounded down. If you hit their leg, the target's move speed is reduced by 20ft.",
     "statRequirement": { "stat": "speed", "value": 5 },
     "weaponTypeRequirement": "ranged",
     "usesPerEncounter": 1
@@ -110,6 +146,46 @@
     "description": "Spend Two Actions preparing to make a Ranged Attack. You must not receive damage or take any other actions during this time. If you successfully prepare this attack, the next Ranged Attack you make deals double damage and becomes undodgeable. (Black Flash overrides this attack's damage multiplier.)",
     "statRequirement": { "stat": "speed", "value": 5 },
     "weaponTypeRequirement": "ranged",
+    "usesPerEncounter": 1
+  },
+  {
+    "id": "shove",
+    "title": "Shove",
+    "description": "On Block. You may add a +3 to block with your polearm. If you successfully block the attack, you may attempt to shove your opponent 10ft. away from you with a Contested Strength check.",
+    "statRequirement": { "stat": "power", "value": 2 },
+    "weaponTypeRequirement": "polearm",
+    "usesPerEncounter": 3
+  },
+  {
+    "id": "centrifugal-strike",
+    "title": "Centrifugal Strike",
+    "description": "Roll a Polearm Attack. If you hit, your weapon applies a different effect depending on whether it is sharp or blunt. If your weapon is sharp, the target must roll a Fortitude check against a DC equal to your Combat * 3. If it is blunt, the target is knocked prone.",
+    "statRequirement": { "stat": "power", "value": 3 },
+    "weaponTypeRequirement": "polearm",
+    "usesPerEncounter": 2
+  },
+  {
+    "id": "acrobatic-spin",
+    "title": "Acrobatic Spin",
+    "description": "Bonus Action. Roll Precision based Polearm Attack at Disadvantage against the target's AC, feinting your attack. If you fail, stick your polearm into the ground. This converts your next Polearm Attack into a sneak attack.",
+    "statRequirement": { "stat": "power", "value": 3 },
+    "weaponTypeRequirement": "polearm",
+    "usesPerEncounter": 1
+  },
+  {
+    "id": "rapid-thrust",
+    "title": "Rapid Thrust",
+    "description": "Roll two Polearm Attacks in a single Action. However, you then suffer a -2 penalty to all Power rolls until the end of your next turn.",
+    "statRequirement": { "stat": "power", "value": 4 },
+    "weaponTypeRequirement": "polearm",
+    "usesPerEncounter": 1
+  },
+  {
+    "id": "rotating-spear-parry",
+    "title": "Rotating Spear Parry",
+    "description": "Take a Defensive Stance to intercept the next melee attack against you. If you are attacked, roll a contested Technique check and add your Power stat. If you win, nullify the attack, disarm the opponent, and immediately perform a Polearm Attack. Otherwise, you block the attack.",
+    "statRequirement": { "stat": "power", "value": 5 },
+    "weaponTypeRequirement": "polearm",
     "usesPerEncounter": 1
   }
 ]

@@ -68,6 +68,7 @@ export function computeCombatTabData(state) {
   const powerLevel = getEffectiveStatLevel(state, effects, "power");
   const speedLevel = getEffectiveStatLevel(state, effects, "speed");
   const imbue = getImbueDisplay(state?.imbueLevel ?? 1);
+  const reactions = speedLevel;
 
   // Default unarmed attacks
     const unarmedAttacks = [
@@ -130,6 +131,31 @@ export function computeCombatTabData(state) {
   const martialArts = martialArtsData.filter(art => checkStatRequirement(art.statRequirement));
 
   const weaponArts = weaponArtsData.filter(art => {
+    const unlockType = art.unlockType || "standard";
+    const hasAnyWeapon = equippedWeapons.length > 0;
+
+    if (unlockType === "any_weapon") return hasAnyWeapon;
+
+    if (unlockType === "weapon_stat_threshold") {
+      const threshold = art.weaponStatThreshold ?? 4;
+      return hasAnyWeapon && equippedWeapons.some(w => {
+        const isRanged = normalizeWeaponType(w.weaponType) === "ranged";
+        const weaponStat = isRanged ? "speed" : (w.weaponStat || "power");
+        return getEffectiveStatLevel(state, effects, weaponStat) >= threshold;
+      });
+    }
+
+    if (unlockType === "polearm_weapon_stat") {
+      const threshold = art.statRequirement?.value ?? 1;
+      return equippedWeapons.some(w => {
+        if (normalizeWeaponType(w.weaponType) !== "polearm") return false;
+        const isRanged = normalizeWeaponType(w.weaponType) === "ranged";
+        const weaponStat = isRanged ? "speed" : (w.weaponStat || "power");
+        return getEffectiveStatLevel(state, effects, weaponStat) >= threshold;
+      });
+    }
+
+    // Standard
     const stat = art.statRequirement?.stat;
     const value = art.statRequirement?.value;
     const weaponType = art.weaponTypeRequirement;
@@ -141,6 +167,7 @@ export function computeCombatTabData(state) {
 
   return {
     actions,
+    reactions,
     blackFlashRange: blackFlashRange ?? '—',
     tempoBonus,
     combatBonus,
@@ -165,6 +192,7 @@ export function renderCombatTabData(data) {
   };
 
   set("combatActionsValue", data.actions);
+  set("combatReactionsValue", data.reactions);
   set("combatBlackFlashValue", data.blackFlashRange);
 
   const initiativeStr = data.tempoBonus !== 0
@@ -237,16 +265,37 @@ function renderMartialArt(art) {
 }
 
 function renderWeaponArt(art) {
-  const usesText = `Uses: ${art.usesPerEncounter}`;
-  const reqText = (art.statRequirement.value && art.statRequirement.value !== 0)
-    ? `Req: ${art.statRequirement.stat} ${art.statRequirement.value}, ${art.weaponTypeRequirement}`
-    : `Req: ${art.weaponTypeRequirement}`;
-  const cooldownText = art.cooldown === 0 ? 'No Cooldown' : (art.cooldown ? `Cooldown: ${art.cooldown} turn${art.cooldown === 1 ? '' : 's'}` : '');
+  const unlockType = art.unlockType || "standard";
+
+  let reqText = "";
+  if (unlockType === "any_weapon") {
+    reqText = "Any weapon";
+  } else if (unlockType === "weapon_stat_threshold") {
+    reqText = `Any weapon, WS Lvl ${art.weaponStatThreshold ?? 4}+`;
+  } else if (unlockType === "polearm_weapon_stat") {
+    reqText = `Polearm, WS Lvl ${art.statRequirement?.value ?? 1}+`;
+  } else {
+    const statReq = art.statRequirement?.value
+      ? `${art.statRequirement.stat} ${art.statRequirement.value}`
+      : "";
+    const weaponReq = art.weaponTypeRequirement || "";
+    reqText = [statReq, weaponReq].filter(Boolean).join(", ");
+  }
+
+  const usesText = art.usesPerEncounter != null ? `Uses: ${art.usesPerEncounter}` : "";
+  const cooldownText = art.cooldown === 0
+    ? "No Cooldown"
+    : art.cooldown
+    ? `Cooldown: ${art.cooldown} turn${art.cooldown === 1 ? "" : "s"}`
+    : "";
+
+  const metaParts = [usesText, reqText ? `Req: ${reqText}` : "", cooldownText].filter(Boolean);
+
   return `
     <div class="combat-art-item">
       <strong>${escapeHtml(art.title)}</strong>
       <span>${escapeHtml(art.description)}</span>
-      <em>${usesText} &nbsp;·&nbsp; ${reqText}${cooldownText ? ' &nbsp;·&nbsp; ' + cooldownText : ''}</em>
+      <em>${metaParts.join(" &nbsp;·&nbsp; ")}</em>
     </div>`;
 }
 
@@ -400,7 +449,8 @@ export function initCombat({ getState, scheduleSave, showRollToast }) {
   }
   
   // Sub-collapse buttons
-  ["combatAttacksCollapseBtn", "combatBasicActionsCollapseBtn"].forEach(btnId => {
+  ["combatAttacksCollapseBtn", "combatArtsCollapseBtn", "combatBasicActionsCollapseBtn", 
+  "combatReactionsCollapseBtn", "combatBasicReactionsCollapseBtn"].forEach(btnId => {
     const btn = document.getElementById(btnId);
     const panelId = btnId.replace("CollapseBtn", "Panel");
     const panel = document.getElementById(panelId);
@@ -412,6 +462,7 @@ export function initCombat({ getState, scheduleSave, showRollToast }) {
     });
   });
 }
+
 function rollDice(count, sides) {
   return Array.from({ length: count }, () => Math.floor(Math.random() * sides) + 1);
 }

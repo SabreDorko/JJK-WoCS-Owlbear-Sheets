@@ -477,84 +477,141 @@
 
             <div id="combatActionsPanel" class="combat-collapse-panel">
 
-              <!-- Attacks collapsible -->
-              <div class="combat-sub-collapse">
-                <button type="button" class="combat-sub-collapse-btn" id="combatAttacksCollapseBtn" aria-expanded="true">
-                  Attacks
-                </button>
-                <div id="combatAttacksPanel" class="combat-sub-collapse-panel">
-                  <div class="combat-attack-header-row">
-                    <span>Name</span>
-                    <span>Type</span>
-                    <span>Range</span>
-                    <span>To Hit</span>
-                    <span>Damage</span>
+            <!-- Attacks collapsible -->
+            <div class="combat-sub-collapse">
+              <button type="button" class="combat-sub-collapse-btn" id="combatAttacksCollapseBtn" aria-expanded="true">
+                Attacks
+              </button>
+              <div id="combatAttacksPanel" class="combat-sub-collapse-panel">
+                <div class="combat-attack-header-row">
+                  <span>Name</span>
+                  <span>Type</span>
+                  <span>Range</span>
+                  <span>To Hit</span>
+                  <span>Damage</span>
+                </div>
+                <div class="combat-attack-subheader">Strikes</div>
+                <div id="combatStrikesList" class="combat-attacks-list"></div>
+                <div class="combat-attack-subheader" style="margin-top:8px;">Weapons</div>
+                <div id="combatAttacksList" class="combat-attacks-list">
+                  <span class="combat-empty">No weapons equipped.</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Arts sub-collapse -->
+            <div class="combat-sub-collapse">
+              <button type="button" class="combat-sub-collapse-btn" id="combatArtsCollapseBtn" aria-expanded="true">
+                Arts
+              </button>
+              <div id="combatArtsPanel" class="combat-sub-collapse-panel">
+                <div class="combat-arts-tab-bar">
+                  <button type="button" class="combat-arts-tab active" id="combatArtsTabMartial" data-arts-tab="martial">Martial Arts</button>
+                  <button type="button" class="combat-arts-tab" id="combatArtsTabWeapon" data-arts-tab="weapon">Weapon Arts</button>
+                </div>
+                <div id="combatArtsTabPanelMartial" class="combat-arts-tab-panel">
+                  <input type="text" class="combat-arts-search" id="combatMartialArtsSearch" placeholder="Search martial arts..." />
+                  <div id="combatMartialArtsList" class="combat-arts-list">
+                    <span class="combat-empty">No martial arts available.</span>
                   </div>
-                  <div class="combat-attack-subheader">Strikes</div>
-                  <div id="combatStrikesList" class="combat-attacks-list"></div>
-                  <div class="combat-attack-subheader" style="margin-top:8px;">Weapons</div>
-                  <div id="combatAttacksList" class="combat-attacks-list">
-                    <span class="combat-empty">No weapons equipped.</span>
+                </div>
+                <div id="combatArtsTabPanelWeapon" class="combat-arts-tab-panel" hidden>
+                  <input type="text" class="combat-arts-search" id="combatWeaponArtsSearch" placeholder="Search weapon arts..." />
+                  <div id="combatWeaponArtsList" class="combat-arts-list">
+                    <span class="combat-empty">No weapon arts available.</span>
                   </div>
                 </div>
               </div>
+            </div>
 
-              <!-- Basic Actions collapsible -->
-              <div class="combat-sub-collapse">
-                <button type="button" class="combat-sub-collapse-btn" id="combatBasicActionsCollapseBtn" aria-expanded="true">
-                  Basic Actions
-                </button>
-                <div id="combatBasicActionsPanel" class="combat-sub-collapse-panel">
-                  <div class="combat-basic-action-item">
-                    <div class="combat-basic-action-header">
-                      <span class="combat-basic-action-name">Stealth</span>
-                      <span class="combat-basic-action-cost">Action <span class="combat-basic-action-alt">/ Bonus Action*</span></span>
-                    </div>
-                    <div class="combat-basic-action-desc">Roll Stealth to hide from sight. If already outside the opponent's line of sight, this can be performed as a Bonus Action instead.</div>
+            <!-- Basic Actions collapsible -->
+            <div class="combat-sub-collapse">
+              <button type="button" class="combat-sub-collapse-btn" id="combatBasicActionsCollapseBtn" aria-expanded="true">
+                Basic Actions
+              </button>
+              <div id="combatBasicActionsPanel" class="combat-sub-collapse-panel">
+                <div class="combat-basic-action-item">
+                  <div class="combat-basic-action-header">
+                    <span class="combat-basic-action-name">Stealth</span>
+                    <span class="combat-basic-action-cost">Action <span class="combat-basic-action-alt">/ Bonus Action*</span></span>
                   </div>
-                  <div class="combat-basic-action-item">
-                    <div class="combat-basic-action-header">
-                      <span class="combat-basic-action-name">Dash</span>
-                      <span class="combat-basic-action-cost">Action</span>
-                    </div>
-                    <div class="combat-basic-action-desc">Double your movement speed for the turn.</div>
+                  <div class="combat-basic-action-desc">Roll Stealth to hide from sight. If already outside the opponent's line of sight, this can be performed as a Bonus Action instead.</div>
+                </div>
+                <div class="combat-basic-action-item">
+                  <div class="combat-basic-action-header">
+                    <span class="combat-basic-action-name">Dash</span>
+                    <span class="combat-basic-action-cost">Action</span>
                   </div>
-                  <div class="combat-basic-action-item">
-                    <div class="combat-basic-action-header">
-                      <span class="combat-basic-action-name">Press</span>
-                      <span class="combat-basic-action-cost">Bonus Action</span>
-                    </div>
-                    <div class="combat-basic-action-desc">When ending your turn adjacent to a target, press them. Their next attack suffers a penalty equal to your highest stat to damage and −2 to hit anyone other than you, but deals +2 damage and +1 to hit you. Only one person may press a single target. Effect ends if the target moves more than 50 ft. away.</div>
+                  <div class="combat-basic-action-desc">Double your movement speed for the turn.</div>
+                </div>
+                <div class="combat-basic-action-item">
+                  <div class="combat-basic-action-header">
+                    <span class="combat-basic-action-name">Press</span>
+                    <span class="combat-basic-action-cost">Bonus Action</span>
                   </div>
+                  <div class="combat-basic-action-desc">When ending your turn adjacent to a target, press them. Their next attack suffers a penalty equal to your highest stat to damage and −2 to hit anyone other than you, but deals +2 damage and +1 to hit you. Only one person may press a single target. Effect ends if the target moves more than 50 ft. away.</div>
                 </div>
               </div>
-
             </div>
           </div>
+        </div>
 
-          <!-- Arts box with tabs -->
-          <div class="vital-box combat-collapsible-box">
-            <div class="combat-arts-tab-bar">
-              <button type="button" class="combat-arts-tab active" id="combatArtsTabMartial" data-arts-tab="martial">Martial Arts</button>
-              <button type="button" class="combat-arts-tab" id="combatArtsTabWeapon" data-arts-tab="weapon">Weapon Arts</button>
-            </div>
+        <!-- Reactions Panel -->
+        <div class="vital-box combat-collapsible-box" style="margin-top: 10px;">
+          <button type="button" class="combat-collapse-btn" id="combatReactionsCollapseBtn" aria-expanded="true">
+            <span class="combat-section-title" style="margin-bottom:0;border-bottom:none;">
+              Reactions &nbsp;·&nbsp; <span class="combat-actions-count-label">Reactions Available:</span> <span id="combatReactionsValue">—</span>
+            </span>
+          </button>
 
-            <div id="combatArtsTabPanelMartial" class="combat-arts-tab-panel">
-              <input type="text" class="combat-arts-search" id="combatMartialArtsSearch" placeholder="Search martial arts..." />
-              <div id="combatMartialArtsList" class="combat-arts-list">
-                <span class="combat-empty">No martial arts available.</span>
+          <div id="combatReactionsPanel" class="combat-collapse-panel">
+
+            <div class="combat-sub-collapse">
+              <button type="button" class="combat-sub-collapse-btn" id="combatBasicReactionsCollapseBtn" aria-expanded="true">
+                Basic Reactions
+              </button>
+              <div id="combatBasicReactionsPanel" class="combat-sub-collapse-panel">
+
+                <div class="combat-basic-action-item">
+                  <div class="combat-basic-action-header">
+                    <span class="combat-basic-action-name">Block</span>
+                    <span class="combat-basic-action-cost">Reaction &nbsp;·&nbsp; <span style="color:var(--ink-faint);">Power</span></span>
+                  </div>
+                  <div class="combat-basic-action-desc">Roll your raw Power stat against the incoming roll to hit. Meet or beat it to halve the damage. On failure, take full damage.</div>
+                </div>
+
+                <div class="combat-basic-action-item">
+                  <div class="combat-basic-action-header">
+                    <span class="combat-basic-action-name">Dodge</span>
+                    <span class="combat-basic-action-cost">Reaction &nbsp;·&nbsp; <span style="color:var(--ink-faint);">Speed</span></span>
+                  </div>
+                  <div class="combat-basic-action-desc">Roll your raw Speed stat and beat the incoming roll to hit to avoid completely — negating all damage and side effects. On success you may also move up to 5 ft. in any direction. On failure, take 1.5× damage.</div>
+                </div>
+
+                <div class="combat-basic-action-item">
+                  <div class="combat-basic-action-header">
+                    <span class="combat-basic-action-name">Leap</span>
+                    <span class="combat-basic-action-cost">Reaction &nbsp;·&nbsp; <span style="color:var(--ink-faint);">Reflexes</span></span>
+                  </div>
+                  <div class="combat-basic-action-desc">For attacks within 15 ft., roll your Reflexes substat against the attack's roll to hit minus your highest of PL or SL. Meet or beat it to leap in front of the attack and shield an ally, taking the damage yourself. You may still react to the attack but cannot Dodge it. Once per turn.</div>
+                </div>
+
+                <div class="combat-basic-action-item">
+                  <div class="combat-basic-action-header">
+                    <span class="combat-basic-action-name">CE Coating</span>
+                    <span class="combat-basic-action-cost">Reaction &nbsp;·&nbsp; <span style="color:var(--ink-faint);">Technique</span></span>
+                  </div>
+                  <div class="combat-basic-action-desc">Coat yourself in cursed energy to reduce incoming damage. Roll a Talent check against a DC equal to your Technique Level x 2. On success, reduce damage by your base Imbue or Output value (whichever is higher). You can spend additional CE to stack the coating for greater reduction — each stack costs 3 CE and raises the DC by 2, adding 1d4 extra reduction per stack. Max stacks scale with Technique Level: TL 1–2 = 1 stack, TL 3–4 = 2 stacks, TL 5–6 = 3 stacks.</div>
+                </div>
+
               </div>
             </div>
 
-            <div id="combatArtsTabPanelWeapon" class="combat-arts-tab-panel" hidden>
-              <input type="text" class="combat-arts-search" id="combatWeaponArtsSearch" placeholder="Search weapon arts..." />
-              <div id="combatWeaponArtsList" class="combat-arts-list">
-                <span class="combat-empty">No weapon arts available.</span>
-              </div>
-            </div>
-
           </div>
+        </div>
 
+        <!-- Archetype Features -->
+        </div>
           <section class="combat-actions-section">
             <div class="combat-section-title">Archetype Features</div>
             <div id="combatArchetypeFeaturesList" class="combat-arts-list">
@@ -565,6 +622,7 @@
         </div>
       </div>
     </div>
+
     <!-- Jujutsu Panel -->
     <div class="tab-panel" id="panel-jujutsu">
       <div class="jujutsu-shell">
