@@ -1315,7 +1315,7 @@ function updateSecondArchetypeUI() {
   const show = !!state.hasSecondArchetype;
   const className = "meta-field multi-class-field" + (show ? "" : " hidden");
   document.getElementById("multiClassArchetypeField").className = className;
-  document.getElementById("multiClassSubArchetypeField").className = className;
+  // document.getElementById("multiClassSubArchetypeField").className = className;
   document.getElementById("removeSecondArchetypeField").className = className + " grid-col-full";
   document.getElementById("addSecondArchetypeBtn").style.display = show ? "none" : "";
 }
@@ -1462,8 +1462,6 @@ export function applyCharacterStateToUI() {
 
   const arcSel2 = document.getElementById("archetypeSelect2");
   arcSel2.value = state.archetype2 || "";
-  updateSubSelect("subArchetypeSelect2", state.archetype2 || "", state.subArchetype2 || "");
-  if (state.subArchetype2) document.getElementById("subArchetypeSelect2").value = state.subArchetype2;
 
   updateSecondArchetypeUI();
   document.getElementById("gradeSelect").value = state.grade || "";
@@ -1516,7 +1514,6 @@ export function initCharacter({ getState: getStateFn, scheduleSave: scheduleSave
   bindField("ceCurrent", "ceCurrent");
   bindField("ceNote", "ceNote");
   bindField("subArchetypeSelect", "subArchetype");
-  bindField("subArchetypeSelect2", "subArchetype2");
 
   const ceCurrentInput = document.getElementById("ceCurrent");
   if (ceCurrentInput) {

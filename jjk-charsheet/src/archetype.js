@@ -772,7 +772,8 @@ function getAllowedAbilityIdsForCurrentSelections(state) {
   const allowed = new Set();
   selectedArchetypeEntries(state).forEach(entry => {
     const selectedSub = entry.type === "primary" ? state.subArchetype : state.subArchetype2;
-    getTieredAbilities(entry.key, selectedSub, state).forEach(ability => {
+    const isSecondary = entry.type === "secondary";
+    getTieredAbilities(entry.key, selectedSub, state, isSecondary).forEach(ability => {
       if (ability?.id) allowed.add(abilityGlobalId(entry.key, ability.id));
     });
   });
@@ -843,7 +844,7 @@ function hasHigherTierInSlots(unlockedSet, archetypeKey, tier) {
   });
 }
 
-function getTieredAbilities(archetypeKey, selectedSub, state = getState()) {
+function getTieredAbilities(archetypeKey, selectedSub, state = getState(), isSecondary = false) {
   const rule = getArchetypeRule(state, archetypeKey);
   if (!rule) return [];
 
@@ -852,29 +853,43 @@ function getTieredAbilities(archetypeKey, selectedSub, state = getState()) {
     byTier.set(ability.tier, { ...ability, subLocked: false, tier: ability.tier });
   });
 
-  const subRule = resolveSubclassRule(rule, selectedSub);
-  byTier.set(1, subRule ? { ...subRule.tier1, tier: 1, subLocked: false } : {
-    id: "",
-    name: "Subclass Tier 1 Ability",
-    minStat: 1,
-    notes: "Choose a sub-archetype to unlock this tier.",
-    tier: 1,
-    subLocked: true,
-  });
-  byTier.set(5, subRule ? { ...subRule.tier5, tier: 5, subLocked: false } : {
-    id: "",
-    name: "Subclass Tier 5 Ability",
-    minStat: 5,
-    notes: "Choose a sub-archetype to unlock this tier.",
-    tier: 5,
-    subLocked: true,
-  });
+  if (isSecondary) {
+    // Secondary archetypes only gain shared abilities.
+    // They do NOT gain subclass-specific Tier 1 or Tier 5 abilities.
+    byTier.delete(1);
+    byTier.delete(5);
+  } else {
+    const subRule = resolveSubclassRule(rule, selectedSub);
 
-  return [1, 2, 3, 4, 5].map(tier => byTier.get(tier)).filter(Boolean);
+    byTier.set(1, subRule
+      ? { ...subRule.tier1, tier: 1, subLocked: false }
+      : {
+          id: "",
+          name: "Subclass Tier 1 Ability",
+          minStat: 1,
+          notes: "Choose a sub-archetype to unlock this tier.",
+          tier: 1,
+          subLocked: true,
+        });
+
+    byTier.set(5, subRule
+      ? { ...subRule.tier5, tier: 5, subLocked: false }
+      : {
+          id: "",
+          name: "Subclass Tier 5 Ability",
+          minStat: 5,
+          notes: "Choose a sub-archetype to unlock this tier.",
+          tier: 5,
+          subLocked: true,
+        });
+  }
+
+  const tiers = isSecondary ? [2, 3, 4] : [1, 2, 3, 4, 5];
+  return tiers.map(tier => byTier.get(tier)).filter(Boolean);
 }
 
-function hasHigherTierUnlocked(state, archetypeKey, selectedSub, tier) {
-  const abilities = getTieredAbilities(archetypeKey, selectedSub);
+function hasHigherTierUnlocked(state, archetypeKey, selectedSub, tier, isSecondary = false) {
+  const abilities = getTieredAbilities(archetypeKey, selectedSub, state, isSecondary);
   return abilities.some(ability => {
     if (ability.tier <= tier || !ability.id) return false;
     return hasUnlocked(state, abilityGlobalId(archetypeKey, ability.id));
@@ -1286,9 +1301,19 @@ function renderAbilityTree(state) {
       `;
     }
 
-    const selectedSub = entry.type === "primary" ? state.subArchetype : state.subArchetype2;
+    const selectedSub = entry.type === "primary"
+      ? state.subArchetype
+      : state.subArchetype2;
+
     const currentStat = statScore(state, rule.scaleStat);
-    const abilities = getTieredAbilities(entry.key, selectedSub, state);
+    const isSecondary = entry.type === "secondary";
+
+    const abilities = getTieredAbilities(
+      entry.key,
+      selectedSub,
+      state,
+      isSecondary
+    );
 
     const rows = abilities.map((ability, idx) => {
       const globalId = ability.id ? abilityGlobalId(entry.key, ability.id) : "";
@@ -1375,7 +1400,8 @@ function addAbilityToSlots(globalId) {
   if (!entry) return;
 
   const selectedSub = entry.type === "primary" ? state.subArchetype : state.subArchetype2;
-  const abilities = getTieredAbilities(archetypeKey, selectedSub, state);
+  const isSecondary = entry.type === "secondary";
+  const abilities = getTieredAbilities(archetypeKey, selectedSub, state, isSecondary);
   const ability = abilities.find(item => item.id === abilityId);
   if (!ability) return;
 
@@ -1747,7 +1773,6 @@ export function initArchetype({ getState: getStateFn, scheduleSave: scheduleSave
     "archetypeSelect",
     "subArchetypeSelect",
     "archetypeSelect2",
-    "subArchetypeSelect2",
     "addSecondArchetypeBtn",
     "removeSecondArchetypeBtn",
     "gradeSelect",
