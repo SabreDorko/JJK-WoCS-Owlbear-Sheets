@@ -1,5 +1,5 @@
 import { computeActiveModifierEffects, getRollModifierSources, normalizeDirectModifierList, applyDirectModifiers, getTechniqueAppModifiers, getTechniqueAppModifierBySource, hasTechniqueAppModifiers, getEffectiveXpThreshold } from "./modifiers.js";
-import { openModifierContextMenu, openRollModeMenu } from "./character.js";
+import { openRollModeMenu } from "./character.js";
 
 let _getState = null;
 let _scheduleSave = null;
@@ -65,32 +65,39 @@ function syncTechniqueThresholdLine(state) {
 
 // ─── App modifier reading helpers ──────────────────────────────────────────────
 
+// Source is stored as "typeTag" or "typeTag — user note".
+// These helpers match by prefix so both formats work.
+function appModsBySourceType(state, appIndex, typeTag) {
+  return getTechniqueAppModifiers(state, appIndex)
+    .filter(e => e.source === typeTag || e.source.startsWith(typeTag + " — "));
+}
+
 function getAppRollMode(state, appIndex) {
-  const hasAdvantage    = Boolean(getTechniqueAppModifierBySource(state, appIndex, "advantage"));
-  const hasDisadvantage = Boolean(getTechniqueAppModifierBySource(state, appIndex, "disadvantage"));
+  const hasAdvantage    = appModsBySourceType(state, appIndex, "advantage").length > 0;
+  const hasDisadvantage = appModsBySourceType(state, appIndex, "disadvantage").length > 0;
   if (hasAdvantage)    return "advantage";
   if (hasDisadvantage) return "disadvantage";
   return "normal";
 }
 
 function getAppCeCostOverride(state, appIndex, scaledCost) {
-  const mod = getTechniqueAppModifierBySource(state, appIndex, "ceCost");
-  if (!mod) return scaledCost;
-  return Math.max(0, Math.round(applyDirectModifiers(scaledCost, [mod])));
+  const mods = appModsBySourceType(state, appIndex, "ceCost");
+  if (!mods.length) return scaledCost;
+  return Math.max(0, Math.round(applyDirectModifiers(scaledCost, mods)));
 }
 
 function getAppDcOverride(state, appIndex, scaledDc) {
-  const mod = getTechniqueAppModifierBySource(state, appIndex, "dc");
-  if (!mod) return scaledDc;
-  return Math.max(0, Math.round(applyDirectModifiers(scaledDc, [mod])));
+  const mods = appModsBySourceType(state, appIndex, "dc");
+  if (!mods.length) return scaledDc;
+  return Math.max(0, Math.round(applyDirectModifiers(scaledDc, mods)));
 }
 
 function getAppRollBonusOverride(state, appIndex) {
-  const mods = getTechniqueAppModifiers(state, appIndex)
-    .filter(e => e.source === "rollBonus");
+  const mods = appModsBySourceType(state, appIndex, "rollBonus");
   if (!mods.length) return 0;
   return Math.round(applyDirectModifiers(0, mods));
 }
+
 
 // Sets advantage/disadvantage/normal in state.directModifiers for an app,
 // then immediately fires the cast. "normal" clears both flags without persisting one.
@@ -101,7 +108,8 @@ function castWithRollMode(state, appIndex, rollMode) {
   state.directModifiers = (state.directModifiers || []).filter(e =>
     !(e.targetType === "techniqueApp" &&
       e.targetKey  === String(appIndex) &&
-      (e.source === "advantage" || e.source === "disadvantage"))
+      (e.source === "advantage" || e.source.startsWith("advantage — ") ||
+       e.source === "disadvantage" || e.source.startsWith("disadvantage — ")))
   );
 
   // Add the new flag (unless normal — normal just clears both)
@@ -1118,31 +1126,23 @@ export function initTechniques({ getState: getStateFn, scheduleSave: scheduleSav
   const summaryGrid = document.getElementById("techniqueApplicationsSummary");
   if (summaryGrid) {
 
-    // RIGHT-CLICK → open existing sheetModifierPanel for this application
+    // RIGHT-CLICK on Use button → roll mode menu (advantage / disadvantage / normal)
     summaryGrid.addEventListener("contextmenu", e => {
       const card = e.target?.closest?.("[data-app-idx]");
       if (!card || card.classList.contains("techniques-app-card--editing")) return;
       const idx = parseNonNegativeInt(card.dataset.appIdx);
 
-      // Right-click on the Use/cast button → roll mode menu (advantage / disadvantage / normal)
       const castBtn = e.target?.closest?.("[data-app-cast]");
-      if (castBtn) {
-        const state = getState();
-        if (!state) return;
-        openRollModeMenu(e,
-          selectedMode => {
-            castWithRollMode(state, idx, selectedMode);
-            scheduleSave();
-          },
-          {
-            onAddModifier: () => openModifierContextMenu(e, "techniqueApp", String(idx)),
-          }
-        );
-        return;
-      }
+      if (!castBtn) return; // ignore right-clicks anywhere else on the card
 
-      // Right-click anywhere else on the card → modifier panel
-      openModifierContextMenu(e, "techniqueApp", String(idx));
+      const state = getState();
+      if (!state) return;
+      openRollModeMenu(e,
+        selectedMode => {
+          castWithRollMode(state, idx, selectedMode);
+          scheduleSave();
+        }
+      );
     });
 
     summaryGrid.addEventListener("click", e => {

@@ -1,7 +1,7 @@
 // Returns the fully computed value for a subskill (statKey, skillIndex) using the current state
 // This is the value that should be used for combat, initiative, etc.
 import { ARCHETYPES, CENTER_STATS, RIGHT_STATS } from "./state/store.js";
-import { computeActiveModifierEffects, applyDirectModifiers, normalizeDirectModifierList, getRollModifierSources, getEffectiveXpThreshold, hasTechniqueAppModifiers } from "./modifiers.js";
+import { computeActiveModifierEffects, applyDirectModifiers, normalizeDirectModifierList, getRollModifierSources, getEffectiveXpThreshold, getEffectiveTechniqueRollBonus } from "./modifiers.js";
 import { updateTechniquesDerivedUI } from "./techniques.js";
 
 let _getState = null;
@@ -22,7 +22,8 @@ const DIRECT_DERIVED_LABELS = {
   ac:            "Armor Class",
   movement:      "Movement",
   aptitudeBonus: "Aptitude Bonus",
-  xpThreshold:   "Sorcerer XP Threshold",
+  xpThreshold:        "Sorcerer XP Threshold",
+  techniqueRollBonus: "CT Application Roll Bonus",
 };
 
 function getState() {
@@ -98,12 +99,7 @@ function getDirectModifierTargetLabel(targetType, targetKey) {
     return `${parsed.skillName} (${parsed.statLabel})`;
   }
   if (targetType === "derived")      return DIRECT_DERIVED_LABELS[targetKey] || "Derived Field";
-  if (targetType === "techniqueApp") {
-    const state = getState();
-    const idx = parseInt(targetKey, 10);
-    const appTitle = state?.techniques?.applications?.[idx]?.title;
-    return appTitle ? `${appTitle}` : `Application ${idx + 1}`;
-  }
+
   return "Modifier Target";
 }
 
@@ -149,7 +145,8 @@ function updateDerivedModifierBadges(state) {
     ["acVitalBox",           "derived", "ac"],
     ["movementVitalBox",     "derived", "movement"],
     ["aptitudeBonusVitalBox","derived", "aptitudeBonus"],
-    ["xpThresholdVitalBox",  "derived", "xpThreshold"],
+    ["xpThresholdVitalBox",        "derived", "xpThreshold"],
+    ["techniqueRollBonusVitalBox", "derived", "techniqueRollBonus"],
   ];
 
   configs.forEach(([containerId, targetType, targetKey]) => {
@@ -416,6 +413,12 @@ function getDirectModifierTargetValues(state, targetType, targetKey, effects) {
       return getDirectModifierSummaryDelta(state, targetType, targetKey, baseValue);
     }
 
+    // techniqueRollBonus: flat bonus applied to all CT application talent rolls
+    if (targetKey === "techniqueRollBonus") {
+      const baseValue = 0;
+      return getDirectModifierSummaryDelta(state, targetType, targetKey, baseValue);
+    }
+
     let baseValue = 0;
     if (targetKey === "hpMax") {
       const powerLevel = getEffectiveStatLevel(state, effects, "power");
@@ -437,18 +440,6 @@ function getDirectModifierTargetValues(state, targetType, targetKey, effects) {
       baseValue = Math.max(0, getDerivedOverride(state, "movement") ?? baseValue);
     }
     return getDirectModifierSummaryDelta(state, targetType, targetKey, baseValue);
-  }
-
-  // techniqueApp: show numeric modifiers only (advantage/disadvantage are flags, not deltas)
-  if (targetType === "techniqueApp") {
-    const idx  = parseInt(targetKey, 10);
-    const app  = state?.techniques?.applications?.[idx];
-    if (!app) return { baseValue: 0, totalValue: 0, deltaValue: 0 };
-
-    // Base is the raw app values; show each overrideable field as separate entries
-    // in the panel.  For the summary row we just report 0 base/delta since these
-    // are independent field overrides, not a single numeric stack.
-    return { baseValue: 0, totalValue: 0, deltaValue: 0 };
   }
 
   return { baseValue: 0, totalValue: 0, deltaValue: 0 };
@@ -506,17 +497,9 @@ function renderDirectModifierPanel() {
 
   if (headingEl) headingEl.textContent = label || getDirectModifierTargetLabel(targetType, targetKey);
 
-  // For techniqueApp the base/delta/total summary isn't meaningful as a single
-  // number, so hide the summary row.
-  const isTechApp = targetType === "techniqueApp";
-  const summaryRow = document.getElementById("sheetModifierSummaryRow");
-  if (summaryRow) summaryRow.hidden = isTechApp;
-
-  if (!isTechApp) {
-    if (baseEl)  baseEl.textContent  = `${Math.round(totals.baseValue  * 1000) / 1000}`;
-    if (deltaEl) deltaEl.textContent = formatSignedValue(Math.round(totals.deltaValue * 1000) / 1000);
-    if (totalEl) totalEl.textContent = `${Math.round(totals.totalValue * 1000) / 1000}`;
-  }
+  if (baseEl)  baseEl.textContent  = `${Math.round(totals.baseValue  * 1000) / 1000}`;
+  if (deltaEl) deltaEl.textContent = formatSignedValue(Math.round(totals.deltaValue * 1000) / 1000);
+  if (totalEl) totalEl.textContent = `${Math.round(totals.totalValue * 1000) / 1000}`;
 
   if (!listEl) return;
 
@@ -531,7 +514,7 @@ function renderDirectModifierPanel() {
     const sourceText    = entry.source ? escapeHtml(entry.source) : "No source";
     const modifierLabel = getDirectModifierOperationLabel(entry.operation, entry.value);
     // For boolean flags (advantage/disadvantage) show a friendlier label
-    const displayLabel  = (entry.source === "advantage" || entry.source === "disadvantage")
+    const displayLabel = (entry.source === "advantage" || entry.source === "disadvantage")
       ? `${entry.source.charAt(0).toUpperCase() + entry.source.slice(1)} (active)`
       : modifierLabel;
     return `
@@ -561,6 +544,7 @@ function openDirectModifierPanel(targetType, targetKey) {
     targetKey,
     label: getDirectModifierTargetLabel(resolvedType, targetKey),
   };
+
 
   const isStatTarget = resolvedType === "stat" || resolvedType === "statRoll";
   if (statModeWrap)   statModeWrap.hidden    = !isStatTarget;

@@ -4,7 +4,7 @@ const STAT_DEFS = [...CENTER_STATS, ...RIGHT_STATS];
 const STAT_KEYS = new Set(STAT_DEFS.map(def => def.key));
 const STAT_LABELS = Object.fromEntries(STAT_DEFS.map(def => [def.key, def.label.charAt(0) + def.label.slice(1).toLowerCase()]));
 const SKILLS_BY_STAT = Object.fromEntries(STAT_DEFS.map(def => [def.key, [...def.skills]]));
-const DIRECT_DERIVED_KEYS = new Set(["hpMax", "ceMax", "ac", "movement", "aptitudeBonus", "xpThreshold"]);
+const DIRECT_DERIVED_KEYS = new Set(["hpMax", "ceMax", "ac", "movement", "aptitudeBonus", "xpThreshold", "techniqueRollBonus"]);
 const DIRECT_OPERATIONS = new Set(["add", "multiply", "divide"]);
 
 // Valid source tags for techniqueApp modifiers.
@@ -247,26 +247,46 @@ export function getRollModifierSources(state, statKey) {
 
 // ── Technique App modifier helpers ────────────────────────────────────────────
 
-// All persisted direct modifiers for a specific technique application index
+/**
+ * All persisted direct modifiers for a specific technique application index.
+ */
 export function getTechniqueAppModifiers(state, appIndex) {
   return normalizeDirectModifierList(state?.directModifiers || [])
     .filter(e => e.targetType === "techniqueApp" && e.targetKey === String(appIndex));
 }
 
-// First modifier matching a source tag for an application, or null
+/**
+ * First modifier matching a source tag for an application, or null.
+ */
 export function getTechniqueAppModifierBySource(state, appIndex, source) {
   return getTechniqueAppModifiers(state, appIndex).find(e => e.source === source) || null;
 }
 
-// True if the application has any active direct modifiers (used for badge display).
+/**
+ * True if the application has any active direct modifiers (used for badge display).
+ */
 export function hasTechniqueAppModifiers(state, appIndex) {
   return getTechniqueAppModifiers(state, appIndex).length > 0;
 }
 
-// Computes the effective XP threshold incorporating derived/xpThreshold direct modifiers on top of the base techScore × 2.
+/**
+ * Computes the effective XP threshold incorporating derived/xpThreshold
+ * direct modifiers on top of the base techScore × 2.
+ */
 export function getEffectiveXpThreshold(state, techScore) {
   const base = Math.max(0, techScore * 2);
   const mods = normalizeDirectModifierList(state?.directModifiers || [])
     .filter(e => e.targetType === "derived" && e.targetKey === "xpThreshold");
   return Math.max(0, Math.round(applyDirectModifiers(base, mods)));
+}
+
+/**
+ * Computes the effective flat roll bonus that applies to ALL CT application
+ * talent checks, incorporating derived/techniqueRollBonus direct modifiers.
+ * This is separate from statRoll/technique so it only affects CT casts.
+ */
+export function getEffectiveTechniqueRollBonus(state) {
+  const mods = normalizeDirectModifierList(state?.directModifiers || [])
+    .filter(e => e.targetType === "derived" && e.targetKey === "techniqueRollBonus");
+  return Math.round(applyDirectModifiers(0, mods));
 }
