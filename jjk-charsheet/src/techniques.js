@@ -1,4 +1,4 @@
-import { computeActiveModifierEffects, getRollModifierSources, normalizeDirectModifierList, applyDirectModifiers, getTechniqueAppModifiers, getTechniqueAppModifierBySource, hasTechniqueAppModifiers, getEffectiveXpThreshold } from "./modifiers.js";
+import { computeActiveModifierEffects, getRollModifierSources, normalizeDirectModifierList, applyDirectModifiers, getTechniqueAppModifiers, getTechniqueAppModifierBySource, getEffectiveXpThreshold, getEffectiveTechniqueRollBonus } from "./modifiers.js";
 import { openRollModeMenu } from "./character.js";
 
 let _getState = null;
@@ -323,20 +323,6 @@ function syncApplicationButtonStates(state) {
       button.textContent = `${star}${adv}Use`;
     }
 
-    // Sync override badge
-    const hasOverride = hasTechniqueAppModifiers(state, idx);
-    card.classList.toggle("has-app-modifier", hasOverride);
-    let badge = card.querySelector(".app-modifier-badge");
-    if (hasOverride && !badge) {
-      badge = document.createElement("span");
-      badge.className = "app-modifier-badge";
-      badge.title     = "Modifiers active – right-click to edit";
-      badge.textContent = "⚙";
-      const titleEl = card.querySelector(".techniques-app-card-title");
-      if (titleEl) titleEl.after(badge);
-    } else if (!hasOverride && badge) {
-      badge.remove();
-    }
   });
 }
 
@@ -618,8 +604,6 @@ function renderViewCard(state, app, idx) {
   const effectText   = normalized.effect      || "No effect listed.";
   const description  = normalized.description || "No description yet.";
   const btnState     = getApplicationButtonState(state, idx);
-  const hasModifier  = hasTechniqueAppModifiers(state, idx);
-
   const btnClasses = [
     "techniques-app-cast-btn",
     btnState.isAutoPass                    ? "techniques-app-cast-btn--auto-pass"    : "",
@@ -632,10 +616,9 @@ function renderViewCard(state, app, idx) {
                btnState.rollMode === "disadvantage" ? "⬇ " : "";
 
   return `
-    <article class="techniques-app-card${hasModifier ? " has-app-modifier" : ""}" data-app-idx="${idx}">
+    <article class="techniques-app-card" data-app-idx="${idx}">
       <button type="button" class="techniques-app-card-edit-btn" data-app-edit-toggle="${idx}" aria-label="Edit application" title="Edit">&#9998;</button>
       <h4 class="techniques-app-card-title">${normalized.title}</h4>
-      ${hasModifier ? `<span class="app-modifier-badge" title="Modifiers active – right-click to edit">⚙</span>` : ""}
       <div class="techniques-app-metrics">
         <span class="techniques-app-metric"><strong>CE Cost:</strong> <span data-app-metric-cost-value="${idx}">${costText}</span></span>
         <span class="techniques-app-metric"><strong>DC:</strong> <span data-app-metric-dc-value="${idx}">${dcText}</span></span>
