@@ -1,4 +1,5 @@
-import { computeActiveModifierEffects, getRollModifierSources } from "./modifiers.js";
+import { computeActiveModifierEffects, getRollModifierSources, normalizeDirectModifierList, applyDirectModifiers, getTechniqueAppModifiers, getTechniqueAppModifierBySource, hasTechniqueAppModifiers, getEffectiveXpThreshold } from "./modifiers.js";
+import { openModifierContextMenu, openRollModeMenu } from "./character.js";
 
 let _getState = null;
 let _scheduleSave = null;
@@ -14,13 +15,15 @@ let _pendingNewVowIndex = null;
 let _pendingInlineApplicationDeleteIndex = null;
 let _pendingEditorApplicationDeleteIndex = null;
 let _pendingVowDeleteIndex = null;
-let _pendingInlineApplicationDeleteAnchor = null; // { idx, x, y }
-let _pendingEditorApplicationDeleteAnchor = null; // { idx, x, y }
-let _pendingVowDeleteAnchor = null; // { idx, x, y }
+let _pendingInlineApplicationDeleteAnchor = null;
+let _pendingEditorApplicationDeleteAnchor = null;
+let _pendingVowDeleteAnchor = null;
 
 const JUJUTSU_SUBTABS = new Set(["technique", "vows", "training", "skills"]);
 const APPLICATION_RANGE_TYPES = new Set(["self", "melee", "range", "aoe"]);
 const APPLICATION_AOE_SHAPES = ["cone", "cube", "sphere", "cylinder", "line"];
+
+// ─── State / save helpers ──────────────────────────────────────────────────────
 
 function getState() {
   return _getState ? _getState() : null;
@@ -49,20 +52,82 @@ function syncTechniqueThresholdLine(state) {
     return;
   }
 
-  const techScore = parseNonNegativeInt(state?.stats?.technique?.score);
-  const xpThreshold = techScore * 2;
-  const ceCurrent = parseNonNegativeInt(state.ceCurrent);
-  const ceMax = parseNonNegativeInt(state.ceMax);
-  thresholdEl.textContent = `Sorcerer Experience Threshold: ${xpThreshold} • CE: ${ceCurrent}/${ceMax}`;
+  const techScore    = parseNonNegativeInt(state?.stats?.technique?.score);
+  const xpThreshold  = getEffectiveXpThreshold(state, techScore);
+  const ceCurrent    = parseNonNegativeInt(state.ceCurrent);
+  const ceMax        = parseNonNegativeInt(state.ceMax);
+  const hasModifiers = normalizeDirectModifierList(state?.directModifiers || [])
+    .some(e => e.targetType === "derived" && e.targetKey === "xpThreshold");
+
+  thresholdEl.textContent = `Sorcerer Experience Threshold: ${xpThreshold}${hasModifiers ? " ✦" : ""} • CE: ${ceCurrent}/${ceMax}`;
   thresholdEl.style.display = "";
 }
+
+// ─── App modifier reading helpers ──────────────────────────────────────────────
+
+function getAppRollMode(state, appIndex) {
+  const hasAdvantage    = Boolean(getTechniqueAppModifierBySource(state, appIndex, "advantage"));
+  const hasDisadvantage = Boolean(getTechniqueAppModifierBySource(state, appIndex, "disadvantage"));
+  if (hasAdvantage)    return "advantage";
+  if (hasDisadvantage) return "disadvantage";
+  return "normal";
+}
+
+function getAppCeCostOverride(state, appIndex, scaledCost) {
+  const mod = getTechniqueAppModifierBySource(state, appIndex, "ceCost");
+  if (!mod) return scaledCost;
+  return Math.max(0, Math.round(applyDirectModifiers(scaledCost, [mod])));
+}
+
+function getAppDcOverride(state, appIndex, scaledDc) {
+  const mod = getTechniqueAppModifierBySource(state, appIndex, "dc");
+  if (!mod) return scaledDc;
+  return Math.max(0, Math.round(applyDirectModifiers(scaledDc, [mod])));
+}
+
+function getAppRollBonusOverride(state, appIndex) {
+  const mods = getTechniqueAppModifiers(state, appIndex)
+    .filter(e => e.source === "rollBonus");
+  if (!mods.length) return 0;
+  return Math.round(applyDirectModifiers(0, mods));
+}
+
+// Sets advantage/disadvantage/normal in state.directModifiers for an app,
+// then immediately fires the cast. "normal" clears both flags without persisting one.
+function castWithRollMode(state, appIndex, rollMode) {
+  if (!state) return;
+
+  // Remove any existing advantage/disadvantage flags for this app
+  state.directModifiers = (state.directModifiers || []).filter(e =>
+    !(e.targetType === "techniqueApp" &&
+      e.targetKey  === String(appIndex) &&
+      (e.source === "advantage" || e.source === "disadvantage"))
+  );
+
+  // Add the new flag (unless normal — normal just clears both)
+  if (rollMode === "advantage" || rollMode === "disadvantage") {
+    state.directModifiers.push({
+      id:         `direct_mod_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      targetType: "techniqueApp",
+      targetKey:  String(appIndex),
+      operation:  "add",
+      value:      1,
+      source:     rollMode,
+    });
+  }
+
+  performApplicationCast(state, 0, appIndex);
+  syncApplicationButtonStates(state);
+}
+
+// ─── Application value helpers ─────────────────────────────────────────────────
 
 function getScaledApplicationValues(app) {
   const currentStep = app.scalingEnabled ? parseNonNegativeInt(app.currentStep) : 0;
   return {
     currentStep,
     ceCost: app.ceCost + (app.scalingEnabled ? app.scalingCeStep * currentStep : 0),
-    dc: app.dc + (app.scalingEnabled ? app.scalingDcStep * currentStep : 0),
+    dc:     app.dc     + (app.scalingEnabled ? app.scalingDcStep * currentStep  : 0),
   };
 }
 
@@ -71,108 +136,143 @@ function getScalingSummary(app) {
   return `+${app.scalingCeStep} CE / +${app.scalingDcStep} DC per step`;
 }
 
-function performApplicationCast(state, techniqueIndex, applicationIndex) {
+// ─── Cast logic ────────────────────────────────────────────────────────────────
+
+function performApplicationCast(state, _techniqueIndex, applicationIndex) {
   if (!state) return;
   ensureTechniquesState(state);
-  
-  const app = state.techniques.applications[applicationIndex];
+
+  const app           = state.techniques.applications[applicationIndex];
   const techniqueName = state.ct || "Technique";
   if (!app) return;
-  
-  const normalized = normalizeApplication(app, applicationIndex);
-  const scaled = getScaledApplicationValues(normalized);
-  const dc = scaled.dc;
-  const ceCost = scaled.ceCost;
-  const techScore = parseNonNegativeInt(state?.stats?.technique?.score);
-  const xpThreshold = techScore * 2;
-  const ceCurrent = parseNonNegativeInt(state.ceCurrent);
+
+  const normalized  = normalizeApplication(app, applicationIndex);
+  const scaled      = getScaledApplicationValues(normalized);
+  const techScore   = parseNonNegativeInt(state?.stats?.technique?.score);
+  const ceCurrent   = parseNonNegativeInt(state.ceCurrent);
+
+  // Effective values after modifiers
+  const xpThreshold = getEffectiveXpThreshold(state, techScore);
+  const ceCost      = getAppCeCostOverride(state, applicationIndex, scaled.ceCost);
+  const dc          = getAppDcOverride(state, applicationIndex, scaled.dc);
+  const rollMode    = getAppRollMode(state, applicationIndex);
+
   const label = `${techniqueName} › ${normalized.title}${scaled.currentStep > 0 ? ` (Step ${scaled.currentStep})` : ""}`;
 
-  // Check if auto-pass (DC < XP Threshold = technique score × 2)
+  // Auto-pass: DC < XP Threshold
   if (xpThreshold > 0 && dc < xpThreshold) {
-    // Deduct CE
     state.ceCurrent = String(Math.max(0, ceCurrent - ceCost));
-    if (normalized.scalingEnabled && normalized.currentStep > 0) state.techniques.applications[applicationIndex].currentStep = 0;
+    if (normalized.scalingEnabled && normalized.currentStep > 0) {
+      state.techniques.applications[applicationIndex].currentStep = 0;
+    }
     syncCeCurrentField(state.ceCurrent);
     syncTechniqueThresholdLine(state);
     scheduleSave();
     return;
   }
-  
-  // Normal roll: talent check (Technique skill)
-  const talentSkillIndex = 3; // Talent is the 4th skill in Technique (index 3)
-  const talentAptitude = state?.stats?.technique?.skills?.[talentSkillIndex]?.aptitude || 0;
-  const diceCount = Math.max(1, techScore);
-  const talentBonus = talentAptitude > 0 ? 2 : 0;
-  const effects = computeActiveModifierEffects(state);
-  const rollBonus = effects?.rollBonuses?.technique || 0;
 
-  const rolls = Array.from({ length: diceCount }, () => Math.floor(Math.random() * 6) + 1);
-  const rawTotal = rolls.reduce((a, b) => a + b, 0);
-  const total = rawTotal + talentBonus + rollBonus;
-  const maxPossible = diceCount * 6 + talentBonus + rollBonus;
-  const allOnes = rolls.every(r => r === 1);
+  // Talent roll
+  const talentSkillIndex = 3;
+  const talentAptitude   = state?.stats?.technique?.skills?.[talentSkillIndex]?.aptitude || 0;
+  const diceCount        = Math.max(1, techScore);
+  const talentBonus      = talentAptitude > 0 ? 2 : 0;
+  const effects          = computeActiveModifierEffects(state);
+  const baseRollBonus    = effects?.rollBonuses?.technique || 0;
+  const extraRollBonus   = getAppRollBonusOverride(state, applicationIndex);
+  const totalRollBonus   = baseRollBonus + extraRollBonus;
 
-  let rollStatus = null;
+  function computeTotal(rolls) {
+    return rolls.reduce((a, b) => a + b, 0) + talentBonus + totalRollBonus;
+  }
 
+  const firstRolls  = Array.from({ length: diceCount }, () => Math.floor(Math.random() * 6) + 1);
+  const firstTotal  = computeTotal(firstRolls);
+
+  let rolls, total, selectedRollIndex, secondRolls = null, secondTotal = null;
+
+  if (rollMode === "advantage" || rollMode === "disadvantage") {
+    secondRolls        = Array.from({ length: diceCount }, () => Math.floor(Math.random() * 6) + 1);
+    secondTotal        = computeTotal(secondRolls);
+    selectedRollIndex  = rollMode === "advantage"
+      ? (firstTotal >= secondTotal ? 0 : 1)
+      : (firstTotal <= secondTotal ? 0 : 1);
+    rolls = selectedRollIndex === 0 ? firstRolls : secondRolls;
+    total = selectedRollIndex === 0 ? firstTotal : secondTotal;
+  } else {
+    rolls             = firstRolls;
+    total             = firstTotal;
+    selectedRollIndex = 0;
+  }
+
+  const maxPossible = diceCount * 6 + talentBonus + totalRollBonus;
+  const allOnes     = rolls.every(r => r === 1);
+
+  let rollStatus;
   if (allOnes) {
     rollStatus = "fail";
   } else if (total >= dc) {
-    if (total >= maxPossible) {
-      rollStatus = "success";
-    } else {
-      rollStatus = "pass";
-    }
+    rollStatus = total >= maxPossible ? "success" : "pass";
   } else {
-    // Missed DC, but not a critical failure.
     rollStatus = "miss";
   }
 
-  const breakdown = {
-    skillModifier: talentBonus,
+  // Build breakdown for the toast (mirrors character.js buildComparedBreakdown shape)
+  const baseBreakdown = {
+    skillModifier:   talentBonus,
     equipmentBonuses: getRollModifierSources(state, "technique"),
-    die: "d6",
+    die:             "d6",
+    ...(extraRollBonus !== 0 ? { overrideBonus: extraRollBonus } : {}),
   };
 
-  // Show the toast and log the roll
+  const breakdown = (rollMode === "advantage" || rollMode === "disadvantage")
+    ? {
+        ...baseBreakdown,
+        rollMode,
+        comparedRolls:     [firstRolls, secondRolls],
+        comparedTotals:    [firstTotal, secondTotal],
+        selectedRollIndex,
+      }
+    : baseBreakdown;
+
   if (_showRollToast) {
-    _showRollToast(label, diceCount, rolls, total, rollStatus, "Talent", breakdown);
+    _showRollToast(label, diceCount, rolls, total, rollStatus, "Talent", breakdown, rollMode === "normal" ? null : rollMode);
   }
-  
-  // Deduct CE
+
+  // Deduct CE and reset step
   state.ceCurrent = String(Math.max(0, ceCurrent - ceCost));
-  if (normalized.scalingEnabled && normalized.currentStep > 0) state.techniques.applications[applicationIndex].currentStep = 0;
+  if (normalized.scalingEnabled && normalized.currentStep > 0) {
+    state.techniques.applications[applicationIndex].currentStep = 0;
+  }
   syncCeCurrentField(state.ceCurrent);
   syncTechniqueThresholdLine(state);
   scheduleSave();
 }
 
 function getApplicationButtonState(state, applicationIndex) {
-  if (!state) return { disabled: false, isAutoPass: false, tooltip: "Cast" };
+  if (!state) return { disabled: false, isAutoPass: false, rollMode: "normal", tooltip: "Cast" };
   ensureTechniquesState(state);
-  
+
   const app = state.techniques.applications[applicationIndex];
-  if (!app) return { disabled: false, isAutoPass: false, tooltip: "Cast" };
-  
-  const normalized = normalizeApplication(app, applicationIndex);
-  const scaled = getScaledApplicationValues(normalized);
-  const dc = scaled.dc;
-  const ceCost = scaled.ceCost;
-  const ceCurrent = parseNonNegativeInt(state.ceCurrent);
-  const techScore = parseNonNegativeInt(state?.stats?.technique?.score);
-  const xpThreshold = techScore * 2;
+  if (!app) return { disabled: false, isAutoPass: false, rollMode: "normal", tooltip: "Cast" };
 
-  // Check if insufficient CE
+  const normalized  = normalizeApplication(app, applicationIndex);
+  const scaled      = getScaledApplicationValues(normalized);
+  const techScore   = parseNonNegativeInt(state?.stats?.technique?.score);
+  const xpThreshold = getEffectiveXpThreshold(state, techScore);
+  const ceCost      = getAppCeCostOverride(state, applicationIndex, scaled.ceCost);
+  const dc          = getAppDcOverride(state, applicationIndex, scaled.dc);
+  const rollMode    = getAppRollMode(state, applicationIndex);
+  const ceCurrent   = parseNonNegativeInt(state.ceCurrent);
+
   if (ceCurrent < ceCost) {
-    return { disabled: true, isAutoPass: false, tooltip: `Insufficient CE (need ${ceCost})` };
+    return { disabled: true, isAutoPass: false, rollMode, tooltip: `Insufficient CE (need ${ceCost})` };
+  }
+  if (xpThreshold > 0 && dc < xpThreshold) {
+    return { disabled: false, isAutoPass: true, rollMode, tooltip: `Auto-pass (DC ${dc} < threshold ${xpThreshold})` };
   }
 
-  // Check if auto-pass (DC < XP Threshold = technique score × 2)
-  if (xpThreshold > 0 && dc < xpThreshold) {
-    return { disabled: false, isAutoPass: true, tooltip: `Auto-pass (DC ${dc} < threshold ${xpThreshold})` };
-  }
-  
-  return { disabled: false, isAutoPass: false, tooltip: "Roll talent check" };
+  const modeLabel = rollMode === "advantage" ? " [ADV]" : rollMode === "disadvantage" ? " [DIS]" : "";
+  return { disabled: false, isAutoPass: false, rollMode, tooltip: `Roll talent check${modeLabel}` };
 }
 
 function syncApplicationButtonStates(state) {
@@ -185,28 +285,54 @@ function syncApplicationButtonStates(state) {
     if (!card || card.classList.contains("techniques-app-card--editing")) return;
 
     const normalized = normalizeApplication(app, idx);
-    const scaled = getScaledApplicationValues(normalized);
-    const button = card.querySelector(`[data-app-cast="${idx}"]`);
-    const costValue = card.querySelector(`[data-app-metric-cost-value="${idx}"]`);
-    const dcValue = card.querySelector(`[data-app-metric-dc-value="${idx}"]`);
+    const scaled     = getScaledApplicationValues(normalized);
+    const button     = card.querySelector(`[data-app-cast="${idx}"]`);
+    const costValue  = card.querySelector(`[data-app-metric-cost-value="${idx}"]`);
+    const dcValue    = card.querySelector(`[data-app-metric-dc-value="${idx}"]`);
     const scalingValue = card.querySelector(`[data-app-scaling-summary="${idx}"]`);
-    const stepLabel = card.querySelector(`[data-app-step-label="${idx}"]`);
-    const stepDown = card.querySelector(`[data-app-step-down="${idx}"]`);
+    const stepLabel  = card.querySelector(`[data-app-step-label="${idx}"]`);
+    const stepDown   = card.querySelector(`[data-app-step-down="${idx}"]`);
 
-    const btnState = getApplicationButtonState(state, idx);
-    if (costValue) costValue.textContent = scaled.ceCost > 0 ? String(scaled.ceCost) : "-";
-    if (dcValue) dcValue.textContent = scaled.dc > 0 ? String(scaled.dc) : "-";
-    if (scalingValue) scalingValue.textContent = getScalingSummary(normalized);
-    if (stepLabel) stepLabel.textContent = `Step ${scaled.currentStep}`;
-    if (stepDown) stepDown.disabled = scaled.currentStep <= 0;
+    const displayCost = getAppCeCostOverride(state, idx, scaled.ceCost);
+    const displayDc   = getAppDcOverride(state, idx, scaled.dc);
+    const btnState    = getApplicationButtonState(state, idx);
+
+    if (costValue)   costValue.textContent   = displayCost > 0 ? String(displayCost) : "-";
+    if (dcValue)     dcValue.textContent     = displayDc   > 0 ? String(displayDc)   : "-";
+    if (scalingValue)scalingValue.textContent= getScalingSummary(normalized);
+    if (stepLabel)   stepLabel.textContent   = `Step ${scaled.currentStep}`;
+    if (stepDown)    stepDown.disabled       = scaled.currentStep <= 0;
+
     if (button) {
-      button.classList.toggle("techniques-app-cast-btn--auto-pass", btnState.isAutoPass);
+      button.classList.toggle("techniques-app-cast-btn--auto-pass",   btnState.isAutoPass);
+      button.classList.toggle("techniques-app-cast-btn--advantage",   btnState.rollMode === "advantage");
+      button.classList.toggle("techniques-app-cast-btn--disadvantage",btnState.rollMode === "disadvantage");
       button.disabled = btnState.disabled;
-      button.title = btnState.tooltip;
-      button.textContent = `${btnState.isAutoPass ? "✦ " : ""}Use`;
+      button.title    = btnState.tooltip;
+      const star = btnState.isAutoPass              ? "✦ " : "";
+      const adv  = btnState.rollMode === "advantage"    ? "⬆ " :
+                   btnState.rollMode === "disadvantage" ? "⬇ " : "";
+      button.textContent = `${star}${adv}Use`;
+    }
+
+    // Sync override badge
+    const hasOverride = hasTechniqueAppModifiers(state, idx);
+    card.classList.toggle("has-app-modifier", hasOverride);
+    let badge = card.querySelector(".app-modifier-badge");
+    if (hasOverride && !badge) {
+      badge = document.createElement("span");
+      badge.className = "app-modifier-badge";
+      badge.title     = "Modifiers active – right-click to edit";
+      badge.textContent = "⚙";
+      const titleEl = card.querySelector(".techniques-app-card-title");
+      if (titleEl) titleEl.after(badge);
+    } else if (!hasOverride && badge) {
+      badge.remove();
     }
   });
 }
+
+// ─── Utility ───────────────────────────────────────────────────────────────────
 
 function parseNonNegativeInt(rawValue) {
   const parsed = parseInt(rawValue, 10);
@@ -237,82 +363,51 @@ function createDefaultApplication(index) {
 }
 
 function createDefaultBindingVow(index) {
-  return {
-    title: `Vow ${index + 1}`,
-    benefits: "",
-    conditions: "",
-  };
+  return { title: `Vow ${index + 1}`, benefits: "", conditions: "" };
 }
 
 function normalizeApplication(raw, index) {
-  const fallbackTitle = `Application ${index + 1}`;
-  const title = String(raw?.title || "").trim();
-  const description = String(raw?.description || "").trim();
-  const effect = String(raw?.effect || "").trim();
-  const ceCost = parseNonNegativeInt(raw?.ceCost);
-  const dc = parseNonNegativeInt(raw?.dc);
-  const rangeTypeRaw = String(raw?.rangeType || "").trim().toLowerCase();
-  const rangeType = APPLICATION_RANGE_TYPES.has(rangeTypeRaw) ? rangeTypeRaw : "self";
-  const rangeValue = String(raw?.rangeValue || "").trim();
-  const aoeShapeRaw = String(raw?.aoeShape || "").trim().toLowerCase();
-  const aoeShape = APPLICATION_AOE_SHAPES.includes(aoeShapeRaw) ? aoeShapeRaw : "cone";
-  const aoeSize = String(raw?.aoeSize || "").trim();
+  const fallbackTitle  = `Application ${index + 1}`;
+  const title          = String(raw?.title || "").trim();
+  const description    = String(raw?.description || "").trim();
+  const effect         = String(raw?.effect || "").trim();
+  const ceCost         = parseNonNegativeInt(raw?.ceCost);
+  const dc             = parseNonNegativeInt(raw?.dc);
+  const rangeTypeRaw   = String(raw?.rangeType || "").trim().toLowerCase();
+  const rangeType      = APPLICATION_RANGE_TYPES.has(rangeTypeRaw) ? rangeTypeRaw : "self";
+  const rangeValue     = String(raw?.rangeValue || "").trim();
+  const aoeShapeRaw    = String(raw?.aoeShape || "").trim().toLowerCase();
+  const aoeShape       = APPLICATION_AOE_SHAPES.includes(aoeShapeRaw) ? aoeShapeRaw : "cone";
+  const aoeSize        = String(raw?.aoeSize || "").trim();
   const scalingEnabled = Boolean(raw?.scalingEnabled);
-  const scalingCeStep = parseNonNegativeInt(raw?.scalingCeStep);
-  const scalingDcStep = parseNonNegativeInt(raw?.scalingDcStep);
-  const currentStep = scalingEnabled ? parseNonNegativeInt(raw?.currentStep) : 0;
-  return {
-    title: title || fallbackTitle,
-    description,
-    effect,
-    ceCost,
-    dc,
-    rangeType,
-    rangeValue,
-    aoeShape,
-    aoeSize,
-    scalingEnabled,
-    scalingCeStep,
-    scalingDcStep,
-    currentStep,
-  };
+  const scalingCeStep  = parseNonNegativeInt(raw?.scalingCeStep);
+  const scalingDcStep  = parseNonNegativeInt(raw?.scalingDcStep);
+  const currentStep    = scalingEnabled ? parseNonNegativeInt(raw?.currentStep) : 0;
+  return { title: title || fallbackTitle, description, effect, ceCost, dc, rangeType, rangeValue, aoeShape, aoeSize, scalingEnabled, scalingCeStep, scalingDcStep, currentStep };
 }
 
 function getAoeShapeLabel(shape) {
-  if (shape === "cube") return "Cube";
-  if (shape === "sphere") return "Sphere";
+  if (shape === "cube")     return "Cube";
+  if (shape === "sphere")   return "Sphere";
   if (shape === "cylinder") return "Cylinder";
-  if (shape === "line") return "Line";
+  if (shape === "line")     return "Line";
   return "Cone";
 }
 
 function getRangeSummary(app) {
-  if (app.rangeType === "melee") {
-    return "Range: Melee";
-  }
-  if (app.rangeType === "range") {
-    return app.rangeValue ? `Range: ${app.rangeValue}` : "Range: -";
-  }
-  if (app.rangeType === "aoe") {
-    const shapeLabel = getAoeShapeLabel(app.aoeShape);
-    const sizeLabel = app.aoeSize || "-";
-    return `AOE: ${shapeLabel} (${sizeLabel})`;
-  }
+  if (app.rangeType === "melee") return "Range: Melee";
+  if (app.rangeType === "range") return app.rangeValue ? `Range: ${app.rangeValue}` : "Range: -";
+  if (app.rangeType === "aoe")   return `AOE: ${getAoeShapeLabel(app.aoeShape)} (${app.aoeSize || "-"})`;
   return "Range: Self";
 }
 
 function normalizeBindingVow(raw, index) {
   const fallbackTitle = `Vow ${index + 1}`;
-  const title = String(raw?.title || "").trim();
-  // Migrate legacy `details` field into `benefits`
+  const title         = String(raw?.title || "").trim();
   const legacyDetails = String(raw?.details || "").trim();
-  const benefits = String(raw?.benefits || legacyDetails || "").trim();
-  const conditions = String(raw?.conditions || "").trim();
-  return {
-    title: title || fallbackTitle,
-    benefits,
-    conditions,
-  };
+  const benefits      = String(raw?.benefits || legacyDetails || "").trim();
+  const conditions    = String(raw?.conditions || "").trim();
+  return { title: title || fallbackTitle, benefits, conditions };
 }
 
 function ensureTechniquesState(state) {
@@ -323,36 +418,30 @@ function ensureTechniquesState(state) {
   if (!["ct", "domain", "none"].includes(techniques.mode)) techniques.mode = "none";
   if (!JUJUTSU_SUBTABS.has(techniques.activeSubtab)) techniques.activeSubtab = "technique";
   if (!Array.isArray(techniques.applications)) techniques.applications = [];
-  if (!Array.isArray(techniques.bindingVows)) techniques.bindingVows = [];
+  if (!Array.isArray(techniques.bindingVows))  techniques.bindingVows  = [];
 
   if (!techniques.applications.length) {
-    const legacyCt = Array.isArray(techniques.ctAbilities) ? techniques.ctAbilities : [];
-    const legacyDomain = Array.isArray(techniques.domainAbilities) ? techniques.domainAbilities : [];
+    const legacyCt     = Array.isArray(techniques.ctAbilities)     ? techniques.ctAbilities     : [];
+    const legacyDomain = Array.isArray(techniques.domainAbilities)  ? techniques.domainAbilities  : [];
     const legacy = [...legacyCt, ...legacyDomain]
-      .map(v => String(v || "").trim())
-      .filter(Boolean)
+      .map(v => String(v || "").trim()).filter(Boolean)
       .map((title, idx) => ({ title: title || `Application ${idx + 1}`, description: "" }));
     if (legacy.length) techniques.applications = legacy;
   }
 
   techniques.applications = techniques.applications.map((entry, idx) => normalizeApplication(entry, idx));
-  techniques.bindingVows = techniques.bindingVows.map((entry, idx) => normalizeBindingVow(entry, idx));
+  techniques.bindingVows  = techniques.bindingVows.map((entry, idx)  => normalizeBindingVow(entry, idx));
 
-  // CT/Domain should always start with one editable application slot.
   if (techniques.mode !== "none" && techniques.applications.length === 0) {
     techniques.applications = [createDefaultApplication(0)];
   }
 
-  techniques.noCtPath = String(techniques.noCtPath || "");
-  techniques.notes = String(techniques.notes || "");
-  techniques.bindingVowsNotes = String(techniques.bindingVowsNotes || "");
+  techniques.noCtPath          = String(techniques.noCtPath          || "");
+  techniques.notes             = String(techniques.notes             || "");
+  techniques.bindingVowsNotes  = String(techniques.bindingVowsNotes  || "");
 
   if (!techniques.bindingVows.length && techniques.bindingVowsNotes.trim()) {
-    techniques.bindingVows = [{
-      title: "Vow 1",
-      benefits: techniques.bindingVowsNotes.trim(),
-      conditions: "",
-    }];
+    techniques.bindingVows = [{ title: "Vow 1", benefits: techniques.bindingVowsNotes.trim(), conditions: "" }];
   }
 }
 
@@ -365,16 +454,13 @@ function getActiveSubtab(state) {
 
 function setJujutsuSubtabUI(subtabKey) {
   const target = JUJUTSU_SUBTABS.has(subtabKey) ? subtabKey : "technique";
-
   document.querySelectorAll(".jujutsu-subtab").forEach(btn => {
     const isActive = btn.dataset.subtab === target;
     btn.classList.toggle("active", isActive);
     btn.setAttribute("aria-selected", isActive ? "true" : "false");
   });
-
   document.querySelectorAll(".jujutsu-subpanel").forEach(panel => {
-    const isActive = panel.dataset.subpanel === target;
-    panel.classList.toggle("active", isActive);
+    panel.classList.toggle("active", panel.dataset.subpanel === target);
   });
 }
 
@@ -386,15 +472,12 @@ function setActiveSubtab(state, subtabKey) {
 
 function createEditSnapshot(state) {
   ensureTechniquesState(state);
-  return {
-    ct: String(state.ct || ""),
-    techniques: JSON.parse(JSON.stringify(state.techniques)),
-  };
+  return { ct: String(state.ct || ""), techniques: JSON.parse(JSON.stringify(state.techniques)) };
 }
 
 function restoreEditSnapshot(state, snapshot) {
   if (!state || !snapshot) return;
-  state.ct = String(snapshot.ct || "");
+  state.ct         = String(snapshot.ct || "");
   state.techniques = JSON.parse(JSON.stringify(snapshot.techniques || {}));
   ensureTechniquesState(state);
 }
@@ -409,38 +492,26 @@ function getTechniqueSummaryText(state) {
 
 function getTechniqueTypeText(mode) {
   if (mode === "domain") return "Domain-Based Cursed Technique";
-  if (mode === "none") return "No Cursed Technique";
+  if (mode === "none")   return "No Cursed Technique";
   return "Cursed Technique";
 }
 
 function setTechniqueAddButtonState() {
   const addBtn = document.getElementById("techniqueAddAppSummaryBtn");
   if (!addBtn) return;
-
   const isCancelMode = Number.isFinite(_pendingNewApplicationIndex);
   addBtn.classList.toggle("is-open", isCancelMode);
   addBtn.setAttribute("aria-label", isCancelMode ? "Cancel New Application" : "Add Application");
-  addBtn.setAttribute("title", isCancelMode ? "Cancel New Application" : "Add Application");
-
+  addBtn.setAttribute("title",      isCancelMode ? "Cancel New Application" : "Add Application");
   const path = addBtn.querySelector("path");
-  if (path) {
-    path.setAttribute("d", isCancelMode ? "M5 11h14v2H5z" : "M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6V5z");
-  }
+  if (path) path.setAttribute("d", isCancelMode
+    ? "M5 11h14v2H5z"
+    : "M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6V5z");
 }
 
 function refreshApplicationCards(state) {
   renderApplicationsSummary(state);
   setTechniqueAddButtonState();
-}
-
-function getAnchoredDeleteConfirmStyle(anchor, mode = "left-corner") {
-  if (!anchor) return "";
-  const x = Math.round(anchor.x);
-  const y = Math.round(anchor.y - 8);
-  if (mode === "left-corner") {
-    return ` style="position:fixed;left:${x}px;top:${y}px;right:auto;bottom:auto;margin-left:0;transform:translate(0, -100%);transform-origin:bottom left;"`;
-  }
-  return ` style="position:fixed;left:${x}px;top:${y}px;right:auto;bottom:auto;margin-left:0;transform:translate(-50%, -100%);transform-origin:bottom center;"`;
 }
 
 function renderInlineApplicationDeleteWrap(idx) {
@@ -452,16 +523,14 @@ function renderInlineApplicationDeleteWrap(idx) {
           <path fill="none" stroke="currentColor" stroke-width="1.5" d="M6 7.5h12"/>
         </svg>
       </button>
-    </span>
-  `;
+    </span>`;
 }
 
 function renderEditorApplicationDeleteWrap(idx) {
   return `
     <span class="skills-delete-wrap">
       <button type="button" class="inventory-secondary-btn techniques-app-remove-btn" data-app-remove="${idx}">Remove</button>
-    </span>
-  `;
+    </span>`;
 }
 
 function renderVowDeleteWrap(idx) {
@@ -473,44 +542,7 @@ function renderVowDeleteWrap(idx) {
           <path fill="none" stroke="currentColor" stroke-width="1.5" d="M6 7.5h12"/>
         </svg>
       </button>
-    </span>
-  `;
-}
-
-function updateInlineApplicationDeleteWrap(state, idx) {
-  const grid = document.getElementById("techniqueApplicationsSummary");
-  const trigger = grid?.querySelector(`[data-app-remove-inline="${idx}"]`);
-  const wrap = trigger?.closest(".skills-delete-wrap");
-  if (!wrap || !state) {
-    if (state) refreshApplicationCards(state);
-    return;
-  }
-  wrap.outerHTML = renderInlineApplicationDeleteWrap(idx);
-  requestAnimationFrame(repositionTechniquesFloatingMenus);
-}
-
-function updateEditorApplicationDeleteWrap(state, idx) {
-  const list = document.getElementById("techniqueApplicationsList");
-  const trigger = list?.querySelector(`[data-app-remove="${idx}"]`);
-  const wrap = trigger?.closest(".skills-delete-wrap");
-  if (!wrap || !state) {
-    if (state) renderApplicationsEditor(state);
-    return;
-  }
-  wrap.outerHTML = renderEditorApplicationDeleteWrap(idx);
-  requestAnimationFrame(repositionTechniquesFloatingMenus);
-}
-
-function updateVowDeleteWrap(state, idx) {
-  const list = document.getElementById("bindingVowsList");
-  const trigger = list?.querySelector(`[data-vow-remove="${idx}"]`);
-  const wrap = trigger?.closest(".skills-delete-wrap");
-  if (!wrap || !state) {
-    if (state) renderBindingVowsEditor(state);
-    return;
-  }
-  wrap.outerHTML = renderVowDeleteWrap(idx);
-  requestAnimationFrame(repositionTechniquesFloatingMenus);
+    </span>`;
 }
 
 function repositionTechniquesFloatingMenus() {
@@ -518,10 +550,10 @@ function repositionTechniquesFloatingMenus() {
   const viewportPad = 8;
   menus.forEach(menu => {
     const kind = menu.dataset.techDeleteKind;
-    const idx = parseNonNegativeInt(menu.dataset.techDeleteIdx);
+    const idx  = parseNonNegativeInt(menu.dataset.techDeleteIdx);
 
     let anchor = null;
-    let mode = "left-corner";
+    const mode = "left-corner";
     if (kind === "inline-app" && _pendingInlineApplicationDeleteAnchor?.idx === idx) {
       anchor = _pendingInlineApplicationDeleteAnchor;
     } else if (kind === "editor-app" && _pendingEditorApplicationDeleteAnchor?.idx === idx) {
@@ -530,57 +562,167 @@ function repositionTechniquesFloatingMenus() {
 
     if (anchor) {
       menu.classList.remove("confirm-below", "confirm-align-left", "confirm-align-right");
-      menu.style.position = "fixed";
-      menu.style.left = `${Math.round(anchor.x)}px`;
-      menu.style.top = `${Math.round(anchor.y - 8)}px`;
-      menu.style.right = "auto";
-      menu.style.bottom = "auto";
-      menu.style.marginLeft = "0px";
-      if (mode === "left-corner") {
-        menu.style.transform = "translate(0, -100%)";
-        menu.style.transformOrigin = "bottom left";
-      } else {
-        menu.style.transform = "translate(-50%, -100%)";
-        menu.style.transformOrigin = "bottom center";
-      }
+      menu.style.position      = "fixed";
+      menu.style.left          = `${Math.round(anchor.x)}px`;
+      menu.style.top           = `${Math.round(anchor.y - 8)}px`;
+      menu.style.right         = "auto";
+      menu.style.bottom        = "auto";
+      menu.style.marginLeft    = "0px";
+      menu.style.transform     = "translate(0, -100%)";
+      menu.style.transformOrigin = "bottom left";
 
       let rect = menu.getBoundingClientRect();
-      const minLeft = viewportPad;
-      const maxLeft = window.innerWidth - viewportPad - rect.width;
+      const minLeft    = viewportPad;
+      const maxLeft    = window.innerWidth - viewportPad - rect.width;
       const clampedLeft = clamp(rect.left, minLeft, Math.max(minLeft, maxLeft));
       if (clampedLeft !== rect.left) {
         menu.style.left = `${Math.round(anchor.x + (clampedLeft - rect.left))}px`;
         rect = menu.getBoundingClientRect();
       }
-
       if (rect.top < viewportPad) {
-        menu.style.top = `${Math.round(anchor.y + 8)}px`;
-        if (mode === "left-corner") {
-          menu.style.transform = "translate(0, 0)";
-          menu.style.transformOrigin = "top left";
-        } else {
-          menu.style.transform = "translate(-50%, 0)";
-          menu.style.transformOrigin = "top center";
-        }
+        menu.style.top           = `${Math.round(anchor.y + 8)}px`;
+        menu.style.transform     = "translate(0, 0)";
+        menu.style.transformOrigin = "top left";
       }
       return;
     }
 
-    menu.style.position = "";
-    menu.style.left = "";
-    menu.style.top = "";
-    menu.style.right = "";
-    menu.style.bottom = "";
-    menu.style.marginLeft = "";
-    menu.style.transform = "";
-    menu.style.transformOrigin = "";
+    menu.style.position = menu.style.left = menu.style.top = menu.style.right =
+      menu.style.bottom = menu.style.marginLeft = menu.style.transform = menu.style.transformOrigin = "";
     menu.classList.remove("confirm-below", "confirm-align-left", "confirm-align-right");
     const rect = menu.getBoundingClientRect();
-    if (rect.top < viewportPad) menu.classList.add("confirm-below");
-    if (rect.right > window.innerWidth - viewportPad) menu.classList.add("confirm-align-left");
-    if (rect.left < viewportPad) menu.classList.add("confirm-align-right");
+    if (rect.top   < viewportPad)                          menu.classList.add("confirm-below");
+    if (rect.right > window.innerWidth - viewportPad)      menu.classList.add("confirm-align-left");
+    if (rect.left  < viewportPad)                          menu.classList.add("confirm-align-right");
   });
 }
+
+// ─── Render: view card (collapsed) ────────────────────────────────────────────
+
+function renderViewCard(state, app, idx) {
+  const normalized   = normalizeApplication(app, idx);
+  const scaled       = getScaledApplicationValues(normalized);
+  const displayCost  = getAppCeCostOverride(state, idx, scaled.ceCost);
+  const displayDc    = getAppDcOverride(state, idx, scaled.dc);
+  const costText     = displayCost > 0 ? String(displayCost) : "-";
+  const dcText       = displayDc   > 0 ? String(displayDc)   : "-";
+  const range        = getRangeSummary(normalized);
+  const effectText   = normalized.effect      || "No effect listed.";
+  const description  = normalized.description || "No description yet.";
+  const btnState     = getApplicationButtonState(state, idx);
+  const hasModifier  = hasTechniqueAppModifiers(state, idx);
+
+  const btnClasses = [
+    "techniques-app-cast-btn",
+    btnState.isAutoPass                    ? "techniques-app-cast-btn--auto-pass"    : "",
+    btnState.rollMode === "advantage"      ? "techniques-app-cast-btn--advantage"    : "",
+    btnState.rollMode === "disadvantage"   ? "techniques-app-cast-btn--disadvantage" : "",
+  ].filter(Boolean).join(" ");
+
+  const star = btnState.isAutoPass              ? "✦ " : "";
+  const adv  = btnState.rollMode === "advantage"    ? "⬆ " :
+               btnState.rollMode === "disadvantage" ? "⬇ " : "";
+
+  return `
+    <article class="techniques-app-card${hasModifier ? " has-app-modifier" : ""}" data-app-idx="${idx}">
+      <button type="button" class="techniques-app-card-edit-btn" data-app-edit-toggle="${idx}" aria-label="Edit application" title="Edit">&#9998;</button>
+      <h4 class="techniques-app-card-title">${normalized.title}</h4>
+      ${hasModifier ? `<span class="app-modifier-badge" title="Modifiers active – right-click to edit">⚙</span>` : ""}
+      <div class="techniques-app-metrics">
+        <span class="techniques-app-metric"><strong>CE Cost:</strong> <span data-app-metric-cost-value="${idx}">${costText}</span></span>
+        <span class="techniques-app-metric"><strong>DC:</strong> <span data-app-metric-dc-value="${idx}">${dcText}</span></span>
+        <span class="techniques-app-metric"><strong>${range.startsWith("AOE") ? "AOE" : "Range"}:</strong> ${range.replace(/^AOE:\s*|^Range:\s*/, "")}</span>
+        ${normalized.scalingEnabled ? `<span class="techniques-app-metric"><strong>Scaling:</strong> <span data-app-scaling-summary="${idx}">${getScalingSummary(normalized)}</span></span>` : ""}
+      </div>
+      <div class="techniques-app-effect"><strong>Effect:</strong> ${effectText}</div>
+      <p class="techniques-app-card-desc">${description}</p>
+      <div class="techniques-app-card-footer">
+        ${normalized.scalingEnabled ? `
+        <div class="techniques-app-stepper">
+          <button type="button" class="techniques-app-step-btn" data-app-step-down="${idx}"${scaled.currentStep <= 0 ? " disabled" : ""}>-</button>
+          <span class="techniques-app-step-label" data-app-step-label="${idx}">Step ${scaled.currentStep}</span>
+          <button type="button" class="techniques-app-step-btn" data-app-step-up="${idx}">+</button>
+        </div>
+        ` : ""}
+        <button type="button" class="${btnClasses}" data-app-cast="${idx}" title="${btnState.tooltip}"${btnState.disabled ? " disabled" : ""}>${star}${adv}Use</button>
+      </div>
+    </article>`;
+}
+
+// ─── Render: expanded edit card ────────────────────────────────────────────────
+
+function renderExpandedCard(normalized, idx) {
+  return `
+    <article class="techniques-app-card techniques-app-card--editing" data-app-idx="${idx}">
+      <div class="techniques-app-edit-grid">
+      <label class="techniques-field" for="appCardTitle${idx}">
+        <span class="field-label">Title</span>
+        <input id="appCardTitle${idx}" class="meta-input techniques-app-card-field" data-app-title-inline="${idx}" value="${normalized.title}" />
+      </label>
+      <label class="techniques-field" for="appCardCost${idx}">
+        <span class="field-label">CE Cost</span>
+        <input id="appCardCost${idx}" class="meta-input techniques-app-card-field" type="number" min="0" step="1" inputmode="numeric" data-app-cost-inline="${idx}" value="${normalized.ceCost || 0}" />
+      </label>
+      <label class="techniques-field" for="appCardDc${idx}">
+        <span class="field-label">DC</span>
+        <input id="appCardDc${idx}" class="meta-input techniques-app-card-field" type="number" min="0" step="1" inputmode="numeric" data-app-dc-inline="${idx}" value="${normalized.dc || 0}" />
+      </label>
+      <label class="techniques-field techniques-field--checkbox" for="appCardScaling${idx}">
+        <span class="field-label">Scaling</span>
+        <input id="appCardScaling${idx}" class="techniques-checkbox" type="checkbox" data-app-scaling-inline="${idx}"${normalized.scalingEnabled ? " checked" : ""} />
+      </label>
+      ${normalized.scalingEnabled ? `
+      <label class="techniques-field" for="appCardScalingCe${idx}">
+        <span class="field-label">CE / Step</span>
+        <input id="appCardScalingCe${idx}" class="meta-input techniques-app-card-field" type="number" min="0" step="1" inputmode="numeric" data-app-scaling-ce-inline="${idx}" value="${normalized.scalingCeStep || 0}" />
+      </label>
+      <label class="techniques-field" for="appCardScalingDc${idx}">
+        <span class="field-label">DC / Step</span>
+        <input id="appCardScalingDc${idx}" class="meta-input techniques-app-card-field" type="number" min="0" step="1" inputmode="numeric" data-app-scaling-dc-inline="${idx}" value="${normalized.scalingDcStep || 0}" />
+      </label>` : ""}
+      <label class="techniques-field" for="appCardRangeType${idx}">
+        <span class="field-label">Range Type</span>
+        <select id="appCardRangeType${idx}" class="meta-select techniques-app-card-field" data-app-range-type-inline="${idx}">
+          <option value="self"${normalized.rangeType === "self"   ? " selected" : ""}>Self</option>
+          <option value="melee"${normalized.rangeType === "melee" ? " selected" : ""}>Melee</option>
+          <option value="range"${normalized.rangeType === "range" ? " selected" : ""}>Range</option>
+          <option value="aoe"${normalized.rangeType === "aoe"     ? " selected" : ""}>AOE</option>
+        </select>
+      </label>
+      ${normalized.rangeType === "range" ? `
+      <label class="techniques-field" for="appCardRangeValue${idx}">
+        <span class="field-label">Range</span>
+        <input id="appCardRangeValue${idx}" class="meta-input techniques-app-card-field" data-app-range-inline="${idx}" value="${normalized.rangeValue}" placeholder="30 ft" />
+      </label>` : ""}
+      ${normalized.rangeType === "aoe" ? `
+      <label class="techniques-field" for="appCardAoeShape${idx}">
+        <span class="field-label">AOE Shape</span>
+        <select id="appCardAoeShape${idx}" class="meta-select techniques-app-card-field" data-app-aoe-shape-inline="${idx}">
+          ${APPLICATION_AOE_SHAPES.map(shape => `<option value="${shape}"${normalized.aoeShape === shape ? " selected" : ""}>${getAoeShapeLabel(shape)}</option>`).join("")}
+        </select>
+      </label>
+      <label class="techniques-field" for="appCardAoeSize${idx}">
+        <span class="field-label">AOE Size</span>
+        <input id="appCardAoeSize${idx}" class="meta-input techniques-app-card-field" data-app-aoe-size-inline="${idx}" value="${normalized.aoeSize}" placeholder="15 ft radius" />
+      </label>` : ""}
+      </div>
+      <label class="techniques-field" for="appCardEffect${idx}">
+        <span class="field-label">Effect</span>
+        <textarea id="appCardEffect${idx}" class="inventory-textarea techniques-app-card-field" data-app-effect-inline="${idx}" rows="3" maxlength="700">${normalized.effect}</textarea>
+      </label>
+      <label class="techniques-field" for="appCardDesc${idx}">
+        <span class="field-label">Notes</span>
+        <textarea id="appCardDesc${idx}" class="inventory-textarea techniques-app-card-field" data-app-desc-inline="${idx}" rows="3" maxlength="360">${normalized.description}</textarea>
+      </label>
+      <div class="techniques-app-card-footer">
+        ${renderInlineApplicationDeleteWrap(idx)}
+        <button type="button" class="inventory-secondary-btn" data-app-cancel-inline="${idx}">Cancel</button>
+        <button type="button" class="meta-toggle-btn techniques-app-save-btn" data-app-save-inline="${idx}">Save</button>
+      </div>
+    </article>`;
+}
+
+// ─── Render: Applications Summary (view cards) ─────────────────────────────────
 
 function renderApplicationsSummary(state) {
   const grid = document.getElementById("techniqueApplicationsSummary");
@@ -588,135 +730,29 @@ function renderApplicationsSummary(state) {
 
   const mode = state?.techniques?.mode || "none";
   const apps = Array.isArray(state?.techniques?.applications) ? state.techniques.applications : [];
+
   if (_pendingInlineApplicationDeleteIndex !== null && !apps[_pendingInlineApplicationDeleteIndex]) {
     _pendingInlineApplicationDeleteIndex = null;
     _pendingInlineApplicationDeleteAnchor = null;
   }
 
-  if (mode === "none") {
-    grid.innerHTML = "";
-    return;
-  }
-
+  if (mode === "none") { grid.innerHTML = ""; return; }
   if (!apps.length) {
     grid.innerHTML = '<div class="techniques-app-empty">No applications added yet.</div>';
     return;
   }
 
   grid.innerHTML = apps.map((app, idx) => {
-    const normalized = normalizeApplication(app, idx);
     if (_expandedAppIndices.has(idx)) {
-      return `
-        <article class="techniques-app-card techniques-app-card--editing" data-app-idx="${idx}">
-          <div class="techniques-app-edit-grid">
-          <label class="techniques-field" for="appCardTitle${idx}">
-            <span class="field-label">Title</span>
-            <input id="appCardTitle${idx}" class="meta-input techniques-app-card-field" data-app-title-inline="${idx}" value="${normalized.title}" />
-          </label>
-          <label class="techniques-field" for="appCardCost${idx}">
-            <span class="field-label">CE Cost</span>
-            <input id="appCardCost${idx}" class="meta-input techniques-app-card-field" type="number" min="0" step="1" inputmode="numeric" data-app-cost-inline="${idx}" value="${normalized.ceCost || 0}" />
-          </label>
-          <label class="techniques-field" for="appCardDc${idx}">
-            <span class="field-label">DC</span>
-            <input id="appCardDc${idx}" class="meta-input techniques-app-card-field" type="number" min="0" step="1" inputmode="numeric" data-app-dc-inline="${idx}" value="${normalized.dc || 0}" />
-          </label>
-          <label class="techniques-field techniques-field--checkbox" for="appCardScaling${idx}">
-            <span class="field-label">Scaling</span>
-            <input id="appCardScaling${idx}" class="techniques-checkbox" type="checkbox" data-app-scaling-inline="${idx}"${normalized.scalingEnabled ? " checked" : ""} />
-          </label>
-          ${normalized.scalingEnabled ? `
-          <label class="techniques-field" for="appCardScalingCe${idx}">
-            <span class="field-label">CE / Step</span>
-            <input id="appCardScalingCe${idx}" class="meta-input techniques-app-card-field" type="number" min="0" step="1" inputmode="numeric" data-app-scaling-ce-inline="${idx}" value="${normalized.scalingCeStep || 0}" />
-          </label>
-          <label class="techniques-field" for="appCardScalingDc${idx}">
-            <span class="field-label">DC / Step</span>
-            <input id="appCardScalingDc${idx}" class="meta-input techniques-app-card-field" type="number" min="0" step="1" inputmode="numeric" data-app-scaling-dc-inline="${idx}" value="${normalized.scalingDcStep || 0}" />
-          </label>
-          ` : ""}
-          <label class="techniques-field" for="appCardRangeType${idx}">
-            <span class="field-label">Range Type</span>
-            <select id="appCardRangeType${idx}" class="meta-select techniques-app-card-field" data-app-range-type-inline="${idx}">
-              <option value="self"${normalized.rangeType === "self" ? " selected" : ""}>Self</option>
-              <option value="melee"${normalized.rangeType === "melee" ? " selected" : ""}>Melee</option>
-              <option value="range"${normalized.rangeType === "range" ? " selected" : ""}>Range</option>
-              <option value="aoe"${normalized.rangeType === "aoe" ? " selected" : ""}>AOE</option>
-            </select>
-          </label>
-          ${normalized.rangeType === "range" ? `
-          <label class="techniques-field" for="appCardRangeValue${idx}">
-            <span class="field-label">Range</span>
-            <input id="appCardRangeValue${idx}" class="meta-input techniques-app-card-field" data-app-range-inline="${idx}" value="${normalized.rangeValue}" placeholder="30 ft" />
-          </label>
-          ` : ""}
-          ${normalized.rangeType === "aoe" ? `
-          <label class="techniques-field" for="appCardAoeShape${idx}">
-            <span class="field-label">AOE Shape</span>
-            <select id="appCardAoeShape${idx}" class="meta-select techniques-app-card-field" data-app-aoe-shape-inline="${idx}">
-              ${APPLICATION_AOE_SHAPES.map(shape => `<option value="${shape}"${normalized.aoeShape === shape ? " selected" : ""}>${getAoeShapeLabel(shape)}</option>`).join("")}
-            </select>
-          </label>
-          <label class="techniques-field" for="appCardAoeSize${idx}">
-            <span class="field-label">AOE Size</span>
-            <input id="appCardAoeSize${idx}" class="meta-input techniques-app-card-field" data-app-aoe-size-inline="${idx}" value="${normalized.aoeSize}" placeholder="15 ft radius" />
-          </label>
-          ` : ""}
-          </div>
-          <label class="techniques-field" for="appCardEffect${idx}">
-            <span class="field-label">Effect</span>
-            <textarea id="appCardEffect${idx}" class="inventory-textarea techniques-app-card-field" data-app-effect-inline="${idx}" rows="3" maxlength="700">${normalized.effect}</textarea>
-          </label>
-          <label class="techniques-field" for="appCardDesc${idx}">
-            <span class="field-label">Notes</span>
-            <textarea id="appCardDesc${idx}" class="inventory-textarea techniques-app-card-field" data-app-desc-inline="${idx}" rows="3" maxlength="360">${normalized.description}</textarea>
-          </label>
-          <div class="techniques-app-card-footer">
-            ${renderInlineApplicationDeleteWrap(idx)}
-            <button type="button" class="inventory-secondary-btn" data-app-cancel-inline="${idx}">Cancel</button>
-            <button type="button" class="meta-toggle-btn techniques-app-save-btn" data-app-save-inline="${idx}">Save</button>
-          </div>
-        </article>
-      `;
+      return renderExpandedCard(normalizeApplication(app, idx), idx);
     }
-    const description = normalized.description || "No description yet.";
-    const scaled = getScaledApplicationValues(normalized);
-    const costText = scaled.ceCost > 0 ? String(scaled.ceCost) : "-";
-    const dcText = scaled.dc > 0 ? String(scaled.dc) : "-";
-    const range = getRangeSummary(normalized);
-    const effectText = normalized.effect || "No effect listed.";
-    const btnState = getApplicationButtonState(state, idx);
-    const btnClass = btnState.isAutoPass ? "techniques-app-cast-btn--auto-pass" : "";
-    const btnDisabled = btnState.disabled ? " disabled" : "";
-    const starMarkup = btnState.isAutoPass ? "✦ " : "";
-    return `
-      <article class="techniques-app-card" data-app-idx="${idx}">
-        <button type="button" class="techniques-app-card-edit-btn" data-app-edit-toggle="${idx}" aria-label="Edit application" title="Edit">&#9998;</button>
-        <h4 class="techniques-app-card-title">${normalized.title}</h4>
-        <div class="techniques-app-metrics">
-          <span class="techniques-app-metric"><strong>CE Cost:</strong> <span data-app-metric-cost-value="${idx}">${costText}</span></span>
-          <span class="techniques-app-metric"><strong>DC:</strong> <span data-app-metric-dc-value="${idx}">${dcText}</span></span>
-          <span class="techniques-app-metric"><strong>${range.startsWith("AOE") ? "AOE" : "Range"}:</strong> ${range.replace(/^AOE:\s*|^Range:\s*/, "")}</span>
-          ${normalized.scalingEnabled ? `<span class="techniques-app-metric"><strong>Scaling:</strong> <span data-app-scaling-summary="${idx}">${getScalingSummary(normalized)}</span></span>` : ""}
-        </div>
-        <div class="techniques-app-effect"><strong>Effect:</strong> ${effectText}</div>
-        <p class="techniques-app-card-desc">${description}</p>
-        <div class="techniques-app-card-footer">
-          ${normalized.scalingEnabled ? `
-          <div class="techniques-app-stepper">
-            <button type="button" class="techniques-app-step-btn" data-app-step-down="${idx}"${scaled.currentStep <= 0 ? " disabled" : ""}>-</button>
-            <span class="techniques-app-step-label" data-app-step-label="${idx}">Step ${scaled.currentStep}</span>
-            <button type="button" class="techniques-app-step-btn" data-app-step-up="${idx}">+</button>
-          </div>
-          ` : ""}
-          <button type="button" class="techniques-app-cast-btn ${btnClass}" data-app-cast="${idx}" title="${btnState.tooltip}"${btnDisabled}>${starMarkup}Use</button>
-        </div>
-      </article>
-    `;
+    return renderViewCard(state, app, idx);
   }).join("");
 
   requestAnimationFrame(repositionTechniquesFloatingMenus);
 }
+
+// ─── Render: Applications Editor ───────────────────────────────────────────────
 
 function renderApplicationsEditor(state) {
   const list = document.getElementById("techniqueApplicationsList");
@@ -768,23 +804,21 @@ function renderApplicationsEditor(state) {
         <label class="techniques-field" for="techniqueAppScalingDc${idx}">
           <span class="field-label">DC / Step</span>
           <input id="techniqueAppScalingDc${idx}" class="meta-input" type="number" min="0" step="1" inputmode="numeric" data-app-scaling-dc="${idx}" value="${normalized.scalingDcStep || 0}" />
-        </label>
-        ` : ""}
+        </label>` : ""}
         <label class="techniques-field" for="techniqueAppRangeType${idx}">
           <span class="field-label">Range Type</span>
           <select id="techniqueAppRangeType${idx}" class="meta-select" data-app-range-type="${idx}">
-            <option value="self"${normalized.rangeType === "self" ? " selected" : ""}>Self</option>
+            <option value="self"${normalized.rangeType === "self"   ? " selected" : ""}>Self</option>
             <option value="melee"${normalized.rangeType === "melee" ? " selected" : ""}>Melee</option>
             <option value="range"${normalized.rangeType === "range" ? " selected" : ""}>Range</option>
-            <option value="aoe"${normalized.rangeType === "aoe" ? " selected" : ""}>AOE</option>
+            <option value="aoe"${normalized.rangeType === "aoe"     ? " selected" : ""}>AOE</option>
           </select>
         </label>
         ${normalized.rangeType === "range" ? `
         <label class="techniques-field" for="techniqueAppRangeValue${idx}">
           <span class="field-label">Range</span>
           <input id="techniqueAppRangeValue${idx}" class="meta-input" data-app-range-value="${idx}" value="${normalized.rangeValue}" placeholder="30 ft" />
-        </label>
-        ` : ""}
+        </label>` : ""}
         ${normalized.rangeType === "aoe" ? `
         <label class="techniques-field" for="techniqueAppAoeShape${idx}">
           <span class="field-label">AOE Shape</span>
@@ -795,18 +829,18 @@ function renderApplicationsEditor(state) {
         <label class="techniques-field" for="techniqueAppAoeSize${idx}">
           <span class="field-label">AOE Size</span>
           <input id="techniqueAppAoeSize${idx}" class="meta-input" data-app-aoe-size="${idx}" value="${normalized.aoeSize}" placeholder="15 ft radius" />
-        </label>
-        ` : ""}
+        </label>` : ""}
         <label class="techniques-field" for="techniqueAppEffect${idx}">
           <span class="field-label">Effect</span>
           <textarea id="techniqueAppEffect${idx}" class="inventory-textarea" rows="3" maxlength="700" data-app-effect="${idx}">${normalized.effect}</textarea>
         </label>
-      </div>
-    `;
+      </div>`;
   }).join("");
 
   requestAnimationFrame(repositionTechniquesFloatingMenus);
 }
+
+// ─── Render: Binding Vows ──────────────────────────────────────────────────────
 
 function renderBindingVowsEditor(state) {
   const list = document.getElementById("bindingVowsList");
@@ -817,13 +851,8 @@ function renderBindingVowsEditor(state) {
     _pendingVowDeleteIndex = null;
     _pendingVowDeleteAnchor = null;
   }
-  if (!vows.length) {
-    list.innerHTML = '<div class="techniques-app-empty">No Vows Made.</div>';
-    return;
-  }
-
+  if (!vows.length) { list.innerHTML = '<div class="techniques-app-empty">No Vows Made.</div>'; return; }
   list.innerHTML = vows.map((vow, idx) => renderBindingVowEditorItem(vow, idx, _pendingNewVowIndex === idx)).join("");
-
   _pendingNewVowIndex = null;
   requestAnimationFrame(repositionTechniquesFloatingMenus);
 }
@@ -831,57 +860,54 @@ function renderBindingVowsEditor(state) {
 function renderBindingVowEditorItem(vow, idx, isNew = false) {
   const normalized = normalizeBindingVow(vow, idx);
   return `
-      <div class="techniques-app-editor-item${isNew ? " vow-enter" : ""}">
-        <label class="techniques-field" for="bindingVowTitle${idx}">
-          <span class="field-label">Title</span>
-          <input id="bindingVowTitle${idx}" class="meta-input" data-vow-title="${idx}" value="${normalized.title}" />
-        </label>
-        <label class="techniques-field" for="bindingVowBenefits${idx}">
-          <span class="field-label">Benefits</span>
-          <textarea id="bindingVowBenefits${idx}" class="inventory-textarea" rows="3" maxlength="700" data-vow-benefits="${idx}">${normalized.benefits}</textarea>
-        </label>
-        <label class="techniques-field" for="bindingVowConditions${idx}">
-          <span class="field-label">Conditions</span>
-          <textarea id="bindingVowConditions${idx}" class="inventory-textarea" rows="3" maxlength="700" data-vow-conditions="${idx}">${normalized.conditions}</textarea>
-        </label>
-        <div class="techniques-vow-footer">
-          ${renderVowDeleteWrap(idx)}
-        </div>
-      </div>
-    `;
+    <div class="techniques-app-editor-item${isNew ? " vow-enter" : ""}">
+      <label class="techniques-field" for="bindingVowTitle${idx}">
+        <span class="field-label">Title</span>
+        <input id="bindingVowTitle${idx}" class="meta-input" data-vow-title="${idx}" value="${normalized.title}" />
+      </label>
+      <label class="techniques-field" for="bindingVowBenefits${idx}">
+        <span class="field-label">Benefits</span>
+        <textarea id="bindingVowBenefits${idx}" class="inventory-textarea" rows="3" maxlength="700" data-vow-benefits="${idx}">${normalized.benefits}</textarea>
+      </label>
+      <label class="techniques-field" for="bindingVowConditions${idx}">
+        <span class="field-label">Conditions</span>
+        <textarea id="bindingVowConditions${idx}" class="inventory-textarea" rows="3" maxlength="700" data-vow-conditions="${idx}">${normalized.conditions}</textarea>
+      </label>
+      <div class="techniques-vow-footer">${renderVowDeleteWrap(idx)}</div>
+    </div>`;
 }
+
+// ─── Editor visibility ─────────────────────────────────────────────────────────
 
 function setEditorVisibility() {
   const summaryCard = document.getElementById("techniqueSummaryCard");
-  const editor = document.getElementById("techniqueEditor");
-  const modeStep = document.getElementById("techniqueEditorStepMode");
+  const editor      = document.getElementById("techniqueEditor");
+  const modeStep    = document.getElementById("techniqueEditorStepMode");
   const detailsStep = document.getElementById("techniqueEditorStepDetails");
-
   if (summaryCard) summaryCard.style.display = _isEditing ? "none" : "";
-  if (editor) editor.style.display = _isEditing ? "" : "none";
-  if (modeStep) modeStep.style.display = _isEditing && _editorStep === "mode" ? "" : "none";
+  if (editor)      editor.style.display      = _isEditing ? ""     : "none";
+  if (modeStep)    modeStep.style.display    = _isEditing && _editorStep === "mode"    ? "" : "none";
   if (detailsStep) detailsStep.style.display = _isEditing && _editorStep === "details" ? "" : "none";
 }
 
 function getSelectedMode() {
   if (document.getElementById("techniqueModeDomain")?.checked) return "domain";
-  if (document.getElementById("techniqueModeNone")?.checked) return "none";
+  if (document.getElementById("techniqueModeNone")?.checked)   return "none";
   return "ct";
 }
 
 function setModeUI(mode) {
-  const isNone = mode === "none";
-  const nameField = document.getElementById("techniquesNameField");
-  const noCtSection = document.getElementById("techniquesNoCtSection");
+  const isNone       = mode === "none";
+  const nameField    = document.getElementById("techniquesNameField");
+  const noCtSection  = document.getElementById("techniquesNoCtSection");
   const noCtInfoCard = document.getElementById("techniquesNoCtInfoCard");
-
-  if (nameField) nameField.style.display = isNone ? "none" : "";
-  if (noCtSection) noCtSection.style.display = isNone ? "" : "none";
-  if (noCtInfoCard) noCtInfoCard.style.display = isNone ? "" : "none";
+  if (nameField)    nameField.style.display    = isNone ? "none" : "";
+  if (noCtSection)  noCtSection.style.display  = isNone ? ""     : "none";
+  if (noCtInfoCard) noCtInfoCard.style.display = isNone ? ""     : "none";
 }
 
 function syncTechniqueNameInput() {
-  const nameInput = document.getElementById("techniqueNameInput");
+  const nameInput   = document.getElementById("techniqueNameInput");
   const headerInput = document.getElementById("ctInput");
   if (!nameInput || !headerInput) return;
   if (document.activeElement === nameInput) return;
@@ -894,6 +920,8 @@ function syncTechniqueNameInput() {
     if (summaryEl) summaryEl.textContent = getTechniqueSummaryText(state);
   }
 }
+
+// ─── Derived UI ────────────────────────────────────────────────────────────────
 
 export function updateTechniquesDerivedUI(stateArg = null) {
   const state = stateArg || getState();
@@ -908,149 +936,14 @@ export function updateTechniquesDerivedUI(stateArg = null) {
   if (typeEl) typeEl.innerHTML = `<em>${getTechniqueTypeText(state.techniques.mode)}</em>`;
 
   syncTechniqueThresholdLine(state);
-
   renderApplicationsSummary(state);
 
   const hasActiveTechnique = state.techniques.mode !== "none";
-
   setTechniqueAddButtonState();
-  const grid = document.getElementById("techniqueApplicationsSummary");
-  if (!grid) return;
 
-  const mode = state?.techniques?.mode || "none";
-  const apps = Array.isArray(state?.techniques?.applications) ? state.techniques.applications : [];
-
-  if (mode === "none") {
-    grid.innerHTML = "";
-    return;
-  }
-
-  if (!apps.length) {
-    grid.innerHTML = '<div class="techniques-app-empty">No applications added yet.</div>';
-    return;
-  }
-
-  grid.innerHTML = apps.map((app, idx) => {
-    const normalized = normalizeApplication(app, idx);
-    if (_expandedAppIndices.has(idx)) {
-      return `
-        <article class="techniques-app-card techniques-app-card--editing" data-app-idx="${idx}">
-          <div class="techniques-app-edit-grid">
-          <label class="techniques-field" for="appCardTitle${idx}">
-            <span class="field-label">Title</span>
-            <input id="appCardTitle${idx}" class="meta-input techniques-app-card-field" data-app-title-inline="${idx}" value="${normalized.title}" />
-          </label>
-          <label class="techniques-field" for="appCardCost${idx}">
-            <span class="field-label">CE Cost</span>
-            <input id="appCardCost${idx}" class="meta-input techniques-app-card-field" type="number" min="0" step="1" inputmode="numeric" data-app-cost-inline="${idx}" value="${normalized.ceCost || 0}" />
-          </label>
-          <label class="techniques-field" for="appCardDc${idx}">
-            <span class="field-label">DC</span>
-            <input id="appCardDc${idx}" class="meta-input techniques-app-card-field" type="number" min="0" step="1" inputmode="numeric" data-app-dc-inline="${idx}" value="${normalized.dc || 0}" />
-          </label>
-          <label class="techniques-field techniques-field--checkbox" for="appCardScaling${idx}">
-            <span class="field-label">Scaling</span>
-            <input id="appCardScaling${idx}" class="techniques-checkbox" type="checkbox" data-app-scaling-inline="${idx}"${normalized.scalingEnabled ? " checked" : ""} />
-          </label>
-          ${normalized.scalingEnabled ? `
-          <label class="techniques-field" for="appCardScalingCe${idx}">
-            <span class="field-label">CE / Step</span>
-            <input id="appCardScalingCe${idx}" class="meta-input techniques-app-card-field" type="number" min="0" step="1" inputmode="numeric" data-app-scaling-ce-inline="${idx}" value="${normalized.scalingCeStep || 0}" />
-          </label>
-          <label class="techniques-field" for="appCardScalingDc${idx}">
-            <span class="field-label">DC / Step</span>
-            <input id="appCardScalingDc${idx}" class="meta-input techniques-app-card-field" type="number" min="0" step="1" inputmode="numeric" data-app-scaling-dc-inline="${idx}" value="${normalized.scalingDcStep || 0}" />
-          </label>
-          ` : ""}
-          <label class="techniques-field" for="appCardRangeType${idx}">
-            <span class="field-label">Range Type</span>
-            <select id="appCardRangeType${idx}" class="meta-select techniques-app-card-field" data-app-range-type-inline="${idx}">
-              <option value="self"${normalized.rangeType === "self" ? " selected" : ""}>Self</option>
-              <option value="melee"${normalized.rangeType === "melee" ? " selected" : ""}>Melee</option>
-              <option value="range"${normalized.rangeType === "range" ? " selected" : ""}>Range</option>
-              <option value="aoe"${normalized.rangeType === "aoe" ? " selected" : ""}>AOE</option>
-            </select>
-          </label>
-          ${normalized.rangeType === "range" ? `
-          <label class="techniques-field" for="appCardRangeValue${idx}">
-            <span class="field-label">Range</span>
-            <input id="appCardRangeValue${idx}" class="meta-input techniques-app-card-field" data-app-range-inline="${idx}" value="${normalized.rangeValue}" placeholder="30 ft" />
-          </label>
-          ` : ""}
-          ${normalized.rangeType === "aoe" ? `
-          <label class="techniques-field" for="appCardAoeShape${idx}">
-            <span class="field-label">AOE Shape</span>
-            <select id="appCardAoeShape${idx}" class="meta-select techniques-app-card-field" data-app-aoe-shape-inline="${idx}">
-              ${APPLICATION_AOE_SHAPES.map(shape => `<option value="${shape}"${normalized.aoeShape === shape ? " selected" : ""}>${getAoeShapeLabel(shape)}</option>`).join("")}
-            </select>
-          </label>
-          <label class="techniques-field" for="appCardAoeSize${idx}">
-            <span class="field-label">AOE Size</span>
-            <input id="appCardAoeSize${idx}" class="meta-input techniques-app-card-field" data-app-aoe-size-inline="${idx}" value="${normalized.aoeSize}" placeholder="15 ft radius" />
-          </label>
-          ` : ""}
-          </div>
-          <label class="techniques-field" for="appCardEffect${idx}">
-            <span class="field-label">Effect</span>
-            <textarea id="appCardEffect${idx}" class="inventory-textarea techniques-app-card-field" data-app-effect-inline="${idx}" rows="3" maxlength="700">${normalized.effect}</textarea>
-          </label>
-          <label class="techniques-field" for="appCardDesc${idx}">
-            <span class="field-label">Notes</span>
-            <textarea id="appCardDesc${idx}" class="inventory-textarea techniques-app-card-field" data-app-desc-inline="${idx}" rows="3" maxlength="360">${normalized.description}</textarea>
-          </label>
-          <div class="techniques-app-card-footer">
-            <button type="button" class="inventory-mini-btn inventory-icon-btn danger" data-app-remove-inline="${idx}" aria-label="Delete application" title="Delete">
-              <svg class="inventory-icon-trash" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                <path fill="currentColor" d="M9 3h6a1 1 0 0 1 1 1v1h4v2h-1l-1 12a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 7H4V5h4V4a1 1 0 0 1 1-1Zm1 2v0h4V5h-4Zm-1 4h2v9H9V9Zm4 0h2v9h-2V9Z"/>
-                <path fill="none" stroke="currentColor" stroke-width="1.5" d="M6 7.5h12"/>
-              </svg>
-            </button>
-            <button type="button" class="inventory-secondary-btn" data-app-cancel-inline="${idx}">Cancel</button>
-            <button type="button" class="meta-toggle-btn techniques-app-save-btn" data-app-save-inline="${idx}">Save</button>
-          </div>
-        </article>
-      `;
-    }
-    const description = normalized.description || "No description yet.";
-    const scaled = getScaledApplicationValues(normalized);
-    const costText = scaled.ceCost > 0 ? String(scaled.ceCost) : "-";
-    const dcText = scaled.dc > 0 ? String(scaled.dc) : "-";
-    const range = getRangeSummary(normalized);
-    const effectText = normalized.effect || "No effect listed.";
-    const btnState = getApplicationButtonState(state, idx);
-    const btnClass = btnState.isAutoPass ? "techniques-app-cast-btn--auto-pass" : "";
-    const btnDisabled = btnState.disabled ? " disabled" : "";
-    const starMarkup = btnState.isAutoPass ? "✦ " : "";
-    return `
-      <article class="techniques-app-card" data-app-idx="${idx}">
-        <button type="button" class="techniques-app-card-edit-btn" data-app-edit-toggle="${idx}" aria-label="Edit application" title="Edit">&#9998;</button>
-        <h4 class="techniques-app-card-title">${normalized.title}</h4>
-        <div class="techniques-app-metrics">
-          <span class="techniques-app-metric"><strong>CE Cost:</strong> <span data-app-metric-cost-value="${idx}">${costText}</span></span>
-          <span class="techniques-app-metric"><strong>DC:</strong> <span data-app-metric-dc-value="${idx}">${dcText}</span></span>
-          <span class="techniques-app-metric"><strong>${range.startsWith("AOE") ? "AOE" : "Range"}:</strong> ${range.replace(/^AOE:\s*|^Range:\s*/, "")}</span>
-          ${normalized.scalingEnabled ? `<span class="techniques-app-metric"><strong>Scaling:</strong> <span data-app-scaling-summary="${idx}">${getScalingSummary(normalized)}</span></span>` : ""}
-        </div>
-        <div class="techniques-app-effect"><strong>Effect:</strong> ${effectText}</div>
-        <p class="techniques-app-card-desc">${description}</p>
-        <div class="techniques-app-card-footer">
-          ${normalized.scalingEnabled ? `
-          <div class="techniques-app-stepper">
-            <button type="button" class="techniques-app-step-btn" data-app-step-down="${idx}"${scaled.currentStep <= 0 ? " disabled" : ""}>-</button>
-            <span class="techniques-app-step-label" data-app-step-label="${idx}">Step ${scaled.currentStep}</span>
-            <button type="button" class="techniques-app-step-btn" data-app-step-up="${idx}">+</button>
-          </div>
-          ` : ""}
-          <button type="button" class="techniques-app-cast-btn ${btnClass}" data-app-cast="${idx}" title="${btnState.tooltip}"${btnDisabled}>${starMarkup}Use</button>
-        </div>
-      </article>
-    `;
-  }).join("");
   const summaryFooter = document.getElementById("techniqueSummaryFooter");
   if (summaryFooter) summaryFooter.style.display = hasActiveTechnique ? "" : "none";
-
   if (!hasActiveTechnique) _pendingNewApplicationIndex = null;
-  setTechniqueAddButtonState();
 
   const inlineNotes = document.getElementById("techniqueInlineNotesInput");
   if (inlineNotes && document.activeElement !== inlineNotes) {
@@ -1064,13 +957,13 @@ export function applyTechniquesStateToUI() {
 
   ensureTechniquesState(state);
 
-  const mode = state.techniques.mode;
-  const modeCt = document.getElementById("techniqueModeCt");
+  const mode      = state.techniques.mode;
+  const modeCt    = document.getElementById("techniqueModeCt");
   const modeDomain = document.getElementById("techniqueModeDomain");
-  const modeNone = document.getElementById("techniqueModeNone");
-  if (modeCt) modeCt.checked = mode === "ct";
+  const modeNone  = document.getElementById("techniqueModeNone");
+  if (modeCt)     modeCt.checked     = mode === "ct";
   if (modeDomain) modeDomain.checked = mode === "domain";
-  if (modeNone) modeNone.checked = mode === "none";
+  if (modeNone)   modeNone.checked   = mode === "none";
 
   const nameInput = document.getElementById("techniqueNameInput");
   if (nameInput) nameInput.value = state.ct || "";
@@ -1086,20 +979,20 @@ export function applyTechniquesStateToUI() {
 
   renderApplicationsEditor(state);
   renderBindingVowsEditor(state);
-
   setJujutsuSubtabUI(getActiveSubtab(state));
-
   setModeUI(mode);
   updateTechniquesDerivedUI(state);
   setEditorVisibility();
 }
 
+// ─── Editing lifecycle ─────────────────────────────────────────────────────────
+
 function startTechniqueEditing() {
   const state = getState();
   if (!state) return;
   _editSnapshot = createEditSnapshot(state);
-  _isEditing = true;
-  _editorStep = "mode";
+  _isEditing    = true;
+  _editorStep   = "mode";
   applyTechniquesStateToUI();
 }
 
@@ -1110,12 +1003,9 @@ function cancelTechniqueEditing() {
   _isEditing = false;
   _editorStep = "mode";
   _pendingNewApplicationIndex = null;
-  _pendingInlineApplicationDeleteIndex = null;
-  _pendingInlineApplicationDeleteAnchor = null;
-  _pendingEditorApplicationDeleteIndex = null;
-  _pendingEditorApplicationDeleteAnchor = null;
-  _pendingVowDeleteIndex = null;
-  _pendingVowDeleteAnchor = null;
+  _pendingInlineApplicationDeleteIndex = _pendingInlineApplicationDeleteAnchor = null;
+  _pendingEditorApplicationDeleteIndex = _pendingEditorApplicationDeleteAnchor = null;
+  _pendingVowDeleteIndex = _pendingVowDeleteAnchor = null;
   _expandedAppIndices.clear();
   refreshCharacterStats();
   applyTechniquesStateToUI();
@@ -1147,54 +1037,46 @@ function saveTechniqueEditing() {
   _isEditing = false;
   _editorStep = "mode";
   _pendingNewApplicationIndex = null;
-  _pendingInlineApplicationDeleteIndex = null;
-  _pendingInlineApplicationDeleteAnchor = null;
-  _pendingEditorApplicationDeleteIndex = null;
-  _pendingEditorApplicationDeleteAnchor = null;
-  _pendingVowDeleteIndex = null;
-  _pendingVowDeleteAnchor = null;
+  _pendingInlineApplicationDeleteIndex = _pendingInlineApplicationDeleteAnchor = null;
+  _pendingEditorApplicationDeleteIndex = _pendingEditorApplicationDeleteAnchor = null;
+  _pendingVowDeleteIndex = _pendingVowDeleteAnchor = null;
   _editSnapshot = null;
   refreshCharacterStats();
   applyTechniquesStateToUI();
   scheduleSave();
 }
 
+// ─── Init ──────────────────────────────────────────────────────────────────────
+
 export function initTechniques({ getState: getStateFn, scheduleSave: scheduleSaveFn, refreshCharacterStats: refreshCharacterStatsFn, showRollToast: showRollToastFn }) {
-  _getState = getStateFn;
-  _scheduleSave = scheduleSaveFn;
+  _getState             = getStateFn;
+  _scheduleSave         = scheduleSaveFn;
   _refreshCharacterStats = refreshCharacterStatsFn;
-  _showRollToast = showRollToastFn;
+  _showRollToast        = showRollToastFn;
 
-  if (_initialized) {
-    applyTechniquesStateToUI();
-    return;
-  }
+  if (_initialized) { applyTechniquesStateToUI(); return; }
 
-  const modeInputs = [
-    document.getElementById("techniqueModeCt"),
-    document.getElementById("techniqueModeDomain"),
-    document.getElementById("techniqueModeNone"),
-  ].filter(Boolean);
-
-  modeInputs.forEach(input => {
-    input.addEventListener("change", () => {
-      const state = getState();
-      if (!state) return;
-      ensureTechniquesState(state);
-      state.techniques.mode = getSelectedMode();
-      setModeUI(state.techniques.mode);
-      updateTechniquesDerivedUI(state);
-      refreshCharacterStats();
-      scheduleSave();
+  // Mode radios
+  [document.getElementById("techniqueModeCt"), document.getElementById("techniqueModeDomain"), document.getElementById("techniqueModeNone")]
+    .filter(Boolean).forEach(input => {
+      input.addEventListener("change", () => {
+        const state = getState();
+        if (!state) return;
+        ensureTechniquesState(state);
+        state.techniques.mode = getSelectedMode();
+        setModeUI(state.techniques.mode);
+        updateTechniquesDerivedUI(state);
+        refreshCharacterStats();
+        scheduleSave();
+      });
     });
-  });
 
+  // Subtabs
   document.querySelectorAll(".jujutsu-subtab").forEach(btn => {
     btn.addEventListener("click", () => {
       const state = getState();
       if (!state) return;
-      const next = String(btn.dataset.subtab || "technique");
-      setActiveSubtab(state, next);
+      setActiveSubtab(state, String(btn.dataset.subtab || "technique"));
       scheduleSave();
     });
   });
@@ -1202,6 +1084,7 @@ export function initTechniques({ getState: getStateFn, scheduleSave: scheduleSav
   const editBtn = document.getElementById("techniqueEditBtn");
   if (editBtn) editBtn.addEventListener("click", startTechniqueEditing);
 
+  // Add application (summary view)
   const addAppSummaryBtn = document.getElementById("techniqueAddAppSummaryBtn");
   if (addAppSummaryBtn) {
     addAppSummaryBtn.addEventListener("click", () => {
@@ -1213,7 +1096,7 @@ export function initTechniques({ getState: getStateFn, scheduleSave: scheduleSav
         const idx = _pendingNewApplicationIndex;
         if (state.techniques.applications[idx]) {
           state.techniques.applications.splice(idx, 1);
-          state.techniques.applications = state.techniques.applications.map((entry, i) => normalizeApplication(entry, i));
+          state.techniques.applications = state.techniques.applications.map((e, i) => normalizeApplication(e, i));
         }
         _pendingNewApplicationIndex = null;
         _expandedAppIndices.clear();
@@ -1224,34 +1107,61 @@ export function initTechniques({ getState: getStateFn, scheduleSave: scheduleSav
 
       const newIdx = state.techniques.applications.length;
       state.techniques.applications.push(createDefaultApplication(newIdx));
-      const newSnap = JSON.parse(JSON.stringify(state.techniques.applications[newIdx]));
-      _expandedAppIndices.set(newIdx, newSnap);
+      _expandedAppIndices.set(newIdx, JSON.parse(JSON.stringify(state.techniques.applications[newIdx])));
       _pendingNewApplicationIndex = newIdx;
       refreshApplicationCards(state);
       scheduleSave();
     });
   }
 
+  // ── Summary grid ────────────────────────────────────────────────────────────
   const summaryGrid = document.getElementById("techniqueApplicationsSummary");
   if (summaryGrid) {
+
+    // RIGHT-CLICK → open existing sheetModifierPanel for this application
+    summaryGrid.addEventListener("contextmenu", e => {
+      const card = e.target?.closest?.("[data-app-idx]");
+      if (!card || card.classList.contains("techniques-app-card--editing")) return;
+      const idx = parseNonNegativeInt(card.dataset.appIdx);
+
+      // Right-click on the Use/cast button → roll mode menu (advantage / disadvantage / normal)
+      const castBtn = e.target?.closest?.("[data-app-cast]");
+      if (castBtn) {
+        const state = getState();
+        if (!state) return;
+        openRollModeMenu(e,
+          selectedMode => {
+            castWithRollMode(state, idx, selectedMode);
+            scheduleSave();
+          },
+          {
+            onAddModifier: () => openModifierContextMenu(e, "techniqueApp", String(idx)),
+          }
+        );
+        return;
+      }
+
+      // Right-click anywhere else on the card → modifier panel
+      openModifierContextMenu(e, "techniqueApp", String(idx));
+    });
+
     summaryGrid.addEventListener("click", e => {
       if (e.target?.tagName !== "INPUT" && e.target?.tagName !== "SELECT" && e.target?.tagName !== "TEXTAREA") {
         e.preventDefault();
         e.stopPropagation();
       }
-      // Open edit (pencil icon on view card)
+
       const openTrigger = e.target?.closest?.("[data-app-edit-toggle]");
       if (openTrigger) {
         const state = getState();
         if (!state) return;
         const idx = parseNonNegativeInt(openTrigger.dataset.appEditToggle);
         _pendingInlineApplicationDeleteIndex = null;
-        const snap = JSON.parse(JSON.stringify(state.techniques.applications[idx] || {}));
-        _expandedAppIndices.set(idx, snap);
+        _expandedAppIndices.set(idx, JSON.parse(JSON.stringify(state.techniques.applications[idx] || {})));
         refreshApplicationCards(state);
         return;
       }
-      // Save (collapse, keep changes already written on input)
+
       const saveTrigger = e.target?.closest?.("[data-app-save-inline]");
       if (saveTrigger) {
         const idx = parseNonNegativeInt(saveTrigger.dataset.appSaveInline);
@@ -1262,46 +1172,45 @@ export function initTechniques({ getState: getStateFn, scheduleSave: scheduleSav
         if (state) refreshApplicationCards(state);
         return;
       }
-      // Cancel (collapse, revert to snapshot)
+
       const cancelTrigger = e.target?.closest?.("[data-app-cancel-inline]");
       if (cancelTrigger) {
-        const idx = parseNonNegativeInt(cancelTrigger.dataset.appCancelInline);
+        const idx  = parseNonNegativeInt(cancelTrigger.dataset.appCancelInline);
         _pendingInlineApplicationDeleteIndex = null;
         const snap = _expandedAppIndices.get(idx);
         _expandedAppIndices.delete(idx);
         const state = getState();
         if (!state) return;
         ensureTechniquesState(state);
-        if (snap && state.techniques.applications[idx]) {
-          state.techniques.applications[idx] = { ...snap };
-        }
+        if (snap && state.techniques.applications[idx]) state.techniques.applications[idx] = { ...snap };
         if (_pendingNewApplicationIndex === idx) _pendingNewApplicationIndex = null;
         refreshApplicationCards(state);
         scheduleSave();
         return;
       }
-      const removeConfirmTrigger = e.target?.closest?.("[data-app-remove-inline-confirm]");
-      if (removeConfirmTrigger) return;
-      // Delete
+
+      if (e.target?.closest?.("[data-app-remove-inline-confirm]")) return;
+
       const removeTrigger = e.target?.closest?.("[data-app-remove-inline]");
       if (removeTrigger) {
-        const state = getState();
+        const state      = getState();
         if (!state) return;
         ensureTechniquesState(state);
-        const removeIdx = parseNonNegativeInt(removeTrigger.dataset.appRemoveInline);
+        const removeIdx  = parseNonNegativeInt(removeTrigger.dataset.appRemoveInline);
         state.techniques.applications.splice(removeIdx, 1);
-        state.techniques.applications = state.techniques.applications.map((entry, i) => normalizeApplication(entry, i));
+        state.techniques.applications = state.techniques.applications.map((e, i) => normalizeApplication(e, i));
         if (_pendingNewApplicationIndex !== null) _pendingNewApplicationIndex = null;
         _expandedAppIndices.clear();
         refreshApplicationCards(state);
         scheduleSave();
         return;
       }
+
       const stepDownTrigger = e.target?.closest?.("[data-app-step-down]");
       if (stepDownTrigger) {
         const state = getState();
         if (!state) return;
-        const idx = parseNonNegativeInt(stepDownTrigger.dataset.appStepDown);
+        const idx        = parseNonNegativeInt(stepDownTrigger.dataset.appStepDown);
         const normalized = normalizeApplication(state.techniques.applications[idx], idx);
         if (state.techniques.applications[idx] && normalized.scalingEnabled) {
           state.techniques.applications[idx].currentStep = Math.max(0, normalized.currentStep - 1);
@@ -1310,11 +1219,12 @@ export function initTechniques({ getState: getStateFn, scheduleSave: scheduleSav
         }
         return;
       }
+
       const stepUpTrigger = e.target?.closest?.("[data-app-step-up]");
       if (stepUpTrigger) {
         const state = getState();
         if (!state) return;
-        const idx = parseNonNegativeInt(stepUpTrigger.dataset.appStepUp);
+        const idx        = parseNonNegativeInt(stepUpTrigger.dataset.appStepUp);
         const normalized = normalizeApplication(state.techniques.applications[idx], idx);
         if (state.techniques.applications[idx] && normalized.scalingEnabled) {
           state.techniques.applications[idx].currentStep = normalized.currentStep + 1;
@@ -1323,7 +1233,7 @@ export function initTechniques({ getState: getStateFn, scheduleSave: scheduleSav
         }
         return;
       }
-      // Cast/Use Application
+
       const castTrigger = e.target?.closest?.("[data-app-cast]");
       if (castTrigger) {
         const state = getState();
@@ -1333,54 +1243,25 @@ export function initTechniques({ getState: getStateFn, scheduleSave: scheduleSav
         syncApplicationButtonStates(state);
       }
     });
+
     summaryGrid.addEventListener("input", e => {
       const state = getState();
       if (!state) return;
       ensureTechniquesState(state);
-      const titleAttr = e.target?.dataset?.appTitleInline;
-      const descAttr = e.target?.dataset?.appDescInline;
-      const costAttr = e.target?.dataset?.appCostInline;
-      const scalingCeAttr = e.target?.dataset?.appScalingCeInline;
-      const scalingDcAttr = e.target?.dataset?.appScalingDcInline;
-      if (titleAttr !== undefined) {
-        const idx = parseNonNegativeInt(titleAttr);
-        if (state.techniques.applications[idx]) state.techniques.applications[idx].title = String(e.target.value || "");
-      }
-      if (descAttr !== undefined) {
-        const idx = parseNonNegativeInt(descAttr);
-        if (state.techniques.applications[idx]) state.techniques.applications[idx].description = String(e.target.value || "");
-      }
-      if (costAttr !== undefined) {
-        const idx = parseNonNegativeInt(costAttr);
-        if (state.techniques.applications[idx]) state.techniques.applications[idx].ceCost = parseNonNegativeInt(e.target.value);
-      }
-      if (scalingCeAttr !== undefined) {
-        const idx = parseNonNegativeInt(scalingCeAttr);
-        if (state.techniques.applications[idx]) state.techniques.applications[idx].scalingCeStep = parseNonNegativeInt(e.target.value);
-      }
-      if (scalingDcAttr !== undefined) {
-        const idx = parseNonNegativeInt(scalingDcAttr);
-        if (state.techniques.applications[idx]) state.techniques.applications[idx].scalingDcStep = parseNonNegativeInt(e.target.value);
-      }
-      const dcAttr = e.target?.dataset?.appDcInline;
-      if (dcAttr !== undefined) {
-        const idx = parseNonNegativeInt(dcAttr);
-        if (state.techniques.applications[idx]) state.techniques.applications[idx].dc = parseNonNegativeInt(e.target.value);
-      }
-      const rangeAttr = e.target?.dataset?.appRangeInline;
-      if (rangeAttr !== undefined) {
-        const idx = parseNonNegativeInt(rangeAttr);
-        if (state.techniques.applications[idx]) state.techniques.applications[idx].rangeValue = String(e.target.value || "").trim();
-      }
-      const aoeSizeAttr = e.target?.dataset?.appAoeSizeInline;
-      if (aoeSizeAttr !== undefined) {
-        const idx = parseNonNegativeInt(aoeSizeAttr);
-        if (state.techniques.applications[idx]) state.techniques.applications[idx].aoeSize = String(e.target.value || "").trim();
-      }
-      const effectAttr = e.target?.dataset?.appEffectInline;
-      if (effectAttr !== undefined) {
-        const idx = parseNonNegativeInt(effectAttr);
-        if (state.techniques.applications[idx]) state.techniques.applications[idx].effect = String(e.target.value || "");
+      const ds = e.target?.dataset || {};
+      const inlineMap = {
+        appTitleInline:     (idx, v) => { if (state.techniques.applications[idx]) state.techniques.applications[idx].title       = String(v || ""); },
+        appDescInline:      (idx, v) => { if (state.techniques.applications[idx]) state.techniques.applications[idx].description = String(v || ""); },
+        appCostInline:      (idx, v) => { if (state.techniques.applications[idx]) state.techniques.applications[idx].ceCost      = parseNonNegativeInt(v); },
+        appDcInline:        (idx, v) => { if (state.techniques.applications[idx]) state.techniques.applications[idx].dc          = parseNonNegativeInt(v); },
+        appScalingCeInline: (idx, v) => { if (state.techniques.applications[idx]) state.techniques.applications[idx].scalingCeStep = parseNonNegativeInt(v); },
+        appScalingDcInline: (idx, v) => { if (state.techniques.applications[idx]) state.techniques.applications[idx].scalingDcStep = parseNonNegativeInt(v); },
+        appRangeInline:     (idx, v) => { if (state.techniques.applications[idx]) state.techniques.applications[idx].rangeValue  = String(v || "").trim(); },
+        appAoeSizeInline:   (idx, v) => { if (state.techniques.applications[idx]) state.techniques.applications[idx].aoeSize     = String(v || "").trim(); },
+        appEffectInline:    (idx, v) => { if (state.techniques.applications[idx]) state.techniques.applications[idx].effect      = String(v || ""); },
+      };
+      for (const [key, handler] of Object.entries(inlineMap)) {
+        if (ds[key] !== undefined) handler(parseNonNegativeInt(ds[key]), e.target.value);
       }
       scheduleSave();
     });
@@ -1389,34 +1270,29 @@ export function initTechniques({ getState: getStateFn, scheduleSave: scheduleSav
       const state = getState();
       if (!state) return;
       ensureTechniquesState(state);
+      const ds = e.target?.dataset || {};
 
-      const rangeTypeAttr = e.target?.dataset?.appRangeTypeInline;
-      const scalingToggleAttr = e.target?.dataset?.appScalingInline;
-      if (scalingToggleAttr !== undefined) {
-        const idx = parseNonNegativeInt(scalingToggleAttr);
+      if (ds.appScalingInline !== undefined) {
+        const idx = parseNonNegativeInt(ds.appScalingInline);
         if (state.techniques.applications[idx]) {
           state.techniques.applications[idx].scalingEnabled = Boolean(e.target.checked);
           if (!state.techniques.applications[idx].scalingEnabled) state.techniques.applications[idx].currentStep = 0;
           refreshApplicationCards(state);
         }
-        scheduleSave();
-        return;
+        scheduleSave(); return;
       }
-      if (rangeTypeAttr !== undefined) {
-        const idx = parseNonNegativeInt(rangeTypeAttr);
+      if (ds.appRangeTypeInline !== undefined) {
+        const idx = parseNonNegativeInt(ds.appRangeTypeInline);
         if (state.techniques.applications[idx]) {
           state.techniques.applications[idx].rangeType = String(e.target.value || "self").toLowerCase();
           if (state.techniques.applications[idx].rangeType !== "range") state.techniques.applications[idx].rangeValue = "";
-          if (state.techniques.applications[idx].rangeType !== "aoe") state.techniques.applications[idx].aoeSize = "";
+          if (state.techniques.applications[idx].rangeType !== "aoe")   state.techniques.applications[idx].aoeSize = "";
           refreshApplicationCards(state);
         }
-        scheduleSave();
-        return;
+        scheduleSave(); return;
       }
-
-      const aoeShapeAttr = e.target?.dataset?.appAoeShapeInline;
-      if (aoeShapeAttr !== undefined) {
-        const idx = parseNonNegativeInt(aoeShapeAttr);
+      if (ds.appAoeShapeInline !== undefined) {
+        const idx = parseNonNegativeInt(ds.appAoeShapeInline);
         if (state.techniques.applications[idx]) {
           state.techniques.applications[idx].aoeShape = String(e.target.value || "cone").toLowerCase();
           refreshApplicationCards(state);
@@ -1426,6 +1302,7 @@ export function initTechniques({ getState: getStateFn, scheduleSave: scheduleSav
     });
   }
 
+  // Inline notes
   const inlineNotesInput = document.getElementById("techniqueInlineNotesInput");
   if (inlineNotesInput) {
     inlineNotesInput.addEventListener("input", e => {
@@ -1464,6 +1341,7 @@ export function initTechniques({ getState: getStateFn, scheduleSave: scheduleSav
     });
   }
 
+  // Editor: add application
   const addApplicationBtn = document.getElementById("addTechniqueApplicationBtn");
   if (addApplicationBtn) {
     addApplicationBtn.addEventListener("click", () => {
@@ -1476,68 +1354,51 @@ export function initTechniques({ getState: getStateFn, scheduleSave: scheduleSav
     });
   }
 
+  // Editor: application list
   const appList = document.getElementById("techniqueApplicationsList");
   if (appList) {
     appList.addEventListener("input", e => {
       const state = getState();
       if (!state) return;
       ensureTechniquesState(state);
-
-      const titleIdx = parseNonNegativeInt(e.target?.dataset?.appTitle);
-      const descIdx = parseNonNegativeInt(e.target?.dataset?.appDescription);
-      const costIdx = parseNonNegativeInt(e.target?.dataset?.appCeCost);
-      const dcIdx = parseNonNegativeInt(e.target?.dataset?.appDc);
-      const rangeTypeIdx = parseNonNegativeInt(e.target?.dataset?.appRangeType);
-      const rangeValueIdx = parseNonNegativeInt(e.target?.dataset?.appRangeValue);
-      const aoeShapeIdx = parseNonNegativeInt(e.target?.dataset?.appAoeShape);
-      const aoeSizeIdx = parseNonNegativeInt(e.target?.dataset?.appAoeSize);
-      const effectIdx = parseNonNegativeInt(e.target?.dataset?.appEffect);
-      const scalingIdx = parseNonNegativeInt(e.target?.dataset?.appScaling);
-      const scalingCeIdx = parseNonNegativeInt(e.target?.dataset?.appScalingCe);
-      const scalingDcIdx = parseNonNegativeInt(e.target?.dataset?.appScalingDc);
-
-      if (e.target?.dataset?.appTitle !== undefined && state.techniques.applications[titleIdx]) {
-        state.techniques.applications[titleIdx].title = String(e.target.value || "");
+      const ds = e.target?.dataset || {};
+      const editorMap = {
+        appTitle:       (idx, v) => { if (state.techniques.applications[idx]) state.techniques.applications[idx].title       = String(v || ""); },
+        appDescription: (idx, v) => { if (state.techniques.applications[idx]) state.techniques.applications[idx].description = String(v || ""); },
+        appCeCost:      (idx, v) => { if (state.techniques.applications[idx]) state.techniques.applications[idx].ceCost      = parseNonNegativeInt(v); },
+        appDc:          (idx, v) => { if (state.techniques.applications[idx]) state.techniques.applications[idx].dc          = parseNonNegativeInt(v); },
+        appScalingCe:   (idx, v) => { if (state.techniques.applications[idx]) state.techniques.applications[idx].scalingCeStep = parseNonNegativeInt(v); },
+        appScalingDc:   (idx, v) => { if (state.techniques.applications[idx]) state.techniques.applications[idx].scalingDcStep = parseNonNegativeInt(v); },
+        appRangeValue:  (idx, v) => { if (state.techniques.applications[idx]) state.techniques.applications[idx].rangeValue  = String(v || "").trim(); },
+        appAoeSize:     (idx, v) => { if (state.techniques.applications[idx]) state.techniques.applications[idx].aoeSize     = String(v || "").trim(); },
+        appEffect:      (idx, v) => { if (state.techniques.applications[idx]) state.techniques.applications[idx].effect      = String(v || ""); },
+      };
+      for (const [key, handler] of Object.entries(editorMap)) {
+        if (ds[key] !== undefined) handler(parseNonNegativeInt(ds[key]), e.target.value);
       }
-      if (e.target?.dataset?.appDescription !== undefined && state.techniques.applications[descIdx]) {
-        state.techniques.applications[descIdx].description = String(e.target.value || "");
+      if (ds.appScaling !== undefined) {
+        const idx = parseNonNegativeInt(ds.appScaling);
+        if (state.techniques.applications[idx]) {
+          state.techniques.applications[idx].scalingEnabled = Boolean(e.target.checked);
+          if (!state.techniques.applications[idx].scalingEnabled) state.techniques.applications[idx].currentStep = 0;
+          renderApplicationsEditor(state);
+        }
       }
-      if (e.target?.dataset?.appCeCost !== undefined && state.techniques.applications[costIdx]) {
-        state.techniques.applications[costIdx].ceCost = parseNonNegativeInt(e.target.value);
+      if (ds.appRangeType !== undefined) {
+        const idx = parseNonNegativeInt(ds.appRangeType);
+        if (state.techniques.applications[idx]) {
+          state.techniques.applications[idx].rangeType = String(e.target.value || "self").toLowerCase();
+          if (state.techniques.applications[idx].rangeType !== "range") state.techniques.applications[idx].rangeValue = "";
+          if (state.techniques.applications[idx].rangeType !== "aoe")   state.techniques.applications[idx].aoeSize = "";
+          renderApplicationsEditor(state);
+        }
       }
-      if (e.target?.dataset?.appDc !== undefined && state.techniques.applications[dcIdx]) {
-        state.techniques.applications[dcIdx].dc = parseNonNegativeInt(e.target.value);
+      if (ds.appAoeShape !== undefined) {
+        const idx = parseNonNegativeInt(ds.appAoeShape);
+        if (state.techniques.applications[idx]) {
+          state.techniques.applications[idx].aoeShape = String(e.target.value || "cone").toLowerCase();
+        }
       }
-      if (e.target?.dataset?.appScaling !== undefined && state.techniques.applications[scalingIdx]) {
-        state.techniques.applications[scalingIdx].scalingEnabled = Boolean(e.target.checked);
-        if (!state.techniques.applications[scalingIdx].scalingEnabled) state.techniques.applications[scalingIdx].currentStep = 0;
-        renderApplicationsEditor(state);
-      }
-      if (e.target?.dataset?.appScalingCe !== undefined && state.techniques.applications[scalingCeIdx]) {
-        state.techniques.applications[scalingCeIdx].scalingCeStep = parseNonNegativeInt(e.target.value);
-      }
-      if (e.target?.dataset?.appScalingDc !== undefined && state.techniques.applications[scalingDcIdx]) {
-        state.techniques.applications[scalingDcIdx].scalingDcStep = parseNonNegativeInt(e.target.value);
-      }
-      if (e.target?.dataset?.appRangeType !== undefined && state.techniques.applications[rangeTypeIdx]) {
-        state.techniques.applications[rangeTypeIdx].rangeType = String(e.target.value || "self").toLowerCase();
-        if (state.techniques.applications[rangeTypeIdx].rangeType !== "range") state.techniques.applications[rangeTypeIdx].rangeValue = "";
-        if (state.techniques.applications[rangeTypeIdx].rangeType !== "aoe") state.techniques.applications[rangeTypeIdx].aoeSize = "";
-        renderApplicationsEditor(state);
-      }
-      if (e.target?.dataset?.appRangeValue !== undefined && state.techniques.applications[rangeValueIdx]) {
-        state.techniques.applications[rangeValueIdx].rangeValue = String(e.target.value || "").trim();
-      }
-      if (e.target?.dataset?.appAoeShape !== undefined && state.techniques.applications[aoeShapeIdx]) {
-        state.techniques.applications[aoeShapeIdx].aoeShape = String(e.target.value || "cone").toLowerCase();
-      }
-      if (e.target?.dataset?.appAoeSize !== undefined && state.techniques.applications[aoeSizeIdx]) {
-        state.techniques.applications[aoeSizeIdx].aoeSize = String(e.target.value || "").trim();
-      }
-      if (e.target?.dataset?.appEffect !== undefined && state.techniques.applications[effectIdx]) {
-        state.techniques.applications[effectIdx].effect = String(e.target.value || "");
-      }
-
       scheduleSave();
     });
 
@@ -1572,11 +1433,14 @@ export function initTechniques({ getState: getStateFn, scheduleSave: scheduleSav
       const state = getState();
       if (!state) return;
       ensureTechniquesState(state);
-      state.techniques.notes = e.target.value;      const inlineNotes = document.getElementById("techniqueInlineNotesInput");
-      if (inlineNotes && document.activeElement !== inlineNotes) inlineNotes.value = state.techniques.notes;      scheduleSave();
+      state.techniques.notes = e.target.value;
+      const inlineNotes = document.getElementById("techniqueInlineNotesInput");
+      if (inlineNotes && document.activeElement !== inlineNotes) inlineNotes.value = state.techniques.notes;
+      scheduleSave();
     });
   }
 
+  // Binding vows
   const addBindingVowBtn = document.getElementById("addBindingVowBtn");
   if (addBindingVowBtn) {
     addBindingVowBtn.addEventListener("click", () => {
@@ -1585,7 +1449,7 @@ export function initTechniques({ getState: getStateFn, scheduleSave: scheduleSav
       ensureTechniquesState(state);
       const newIndex = state.techniques.bindingVows.length;
       state.techniques.bindingVows.push(createDefaultBindingVow(newIndex));
-      const list = document.getElementById("bindingVowsList");
+      const list       = document.getElementById("bindingVowsList");
       const emptyState = list?.querySelector?.(".techniques-app-empty");
       if (emptyState) emptyState.remove();
       if (list) {
@@ -1605,32 +1469,20 @@ export function initTechniques({ getState: getStateFn, scheduleSave: scheduleSav
       const state = getState();
       if (!state) return;
       ensureTechniquesState(state);
-
-      const titleIdx = parseNonNegativeInt(e.target?.dataset?.vowTitle);
-      const benefitsIdx = parseNonNegativeInt(e.target?.dataset?.vowBenefits);
-      const conditionsIdx = parseNonNegativeInt(e.target?.dataset?.vowConditions);
-
-      if (e.target?.dataset?.vowTitle !== undefined && state.techniques.bindingVows[titleIdx]) {
-        state.techniques.bindingVows[titleIdx].title = String(e.target.value || "");
-      }
-      if (e.target?.dataset?.vowBenefits !== undefined && state.techniques.bindingVows[benefitsIdx]) {
-        state.techniques.bindingVows[benefitsIdx].benefits = String(e.target.value || "");
-      }
-      if (e.target?.dataset?.vowConditions !== undefined && state.techniques.bindingVows[conditionsIdx]) {
-        state.techniques.bindingVows[conditionsIdx].conditions = String(e.target.value || "");
-      }
-
+      const ds = e.target?.dataset || {};
+      if (ds.vowTitle     !== undefined && state.techniques.bindingVows[parseNonNegativeInt(ds.vowTitle)])      state.techniques.bindingVows[parseNonNegativeInt(ds.vowTitle)].title      = String(e.target.value || "");
+      if (ds.vowBenefits  !== undefined && state.techniques.bindingVows[parseNonNegativeInt(ds.vowBenefits)])   state.techniques.bindingVows[parseNonNegativeInt(ds.vowBenefits)].benefits  = String(e.target.value || "");
+      if (ds.vowConditions !== undefined && state.techniques.bindingVows[parseNonNegativeInt(ds.vowConditions)])state.techniques.bindingVows[parseNonNegativeInt(ds.vowConditions)].conditions = String(e.target.value || "");
       scheduleSave();
     });
 
     bindingVowsList.addEventListener("click", e => {
       const removeTrigger = e.target?.closest?.("[data-vow-remove]");
-      const removeIdxRaw = removeTrigger?.dataset?.vowRemove;
-      if (removeIdxRaw === undefined) return;
+      if (!removeTrigger || removeTrigger.dataset.vowRemove === undefined) return;
       const state = getState();
       if (!state) return;
       ensureTechniquesState(state);
-      const removeIdx = parseNonNegativeInt(removeIdxRaw);
+      const removeIdx = parseNonNegativeInt(removeTrigger.dataset.vowRemove);
       state.techniques.bindingVows.splice(removeIdx, 1);
       state.techniques.bindingVows = state.techniques.bindingVows.map((entry, idx) => normalizeBindingVow(entry, idx));
       renderBindingVowsEditor(state);
@@ -1640,7 +1492,7 @@ export function initTechniques({ getState: getStateFn, scheduleSave: scheduleSav
 
   const headerCtInput = document.getElementById("ctInput");
   if (headerCtInput) {
-    headerCtInput.addEventListener("input", syncTechniqueNameInput);
+    headerCtInput.addEventListener("input",  syncTechniqueNameInput);
     headerCtInput.addEventListener("change", syncTechniqueNameInput);
   }
 

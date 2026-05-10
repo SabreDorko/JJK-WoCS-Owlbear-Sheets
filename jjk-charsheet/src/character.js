@@ -1,9 +1,8 @@
 // Returns the fully computed value for a subskill (statKey, skillIndex) using the current state
 // This is the value that should be used for combat, initiative, etc.
 import { ARCHETYPES, CENTER_STATS, RIGHT_STATS } from "./state/store.js";
-import { computeActiveModifierEffects, applyDirectModifiers, normalizeDirectModifierList, getRollModifierSources } from "./modifiers.js";
+import { computeActiveModifierEffects, applyDirectModifiers, normalizeDirectModifierList, getRollModifierSources, getEffectiveXpThreshold, hasTechniqueAppModifiers } from "./modifiers.js";
 import { updateTechniquesDerivedUI } from "./techniques.js";
-// import { showRollToast } from "./rolls.js";
 
 let _getState = null;
 let _scheduleSave = null;
@@ -18,11 +17,12 @@ let _editingDirectModifierId = null;
 let _refreshCombatTab = null;
 
 const DIRECT_DERIVED_LABELS = {
-  hpMax: "Max HP",
-  ceMax: "Max CE",
-  ac: "Armor Class",
-  movement: "Movement",
+  hpMax:         "Max HP",
+  ceMax:         "Max CE",
+  ac:            "Armor Class",
+  movement:      "Movement",
   aptitudeBonus: "Aptitude Bonus",
+  xpThreshold:   "Sorcerer XP Threshold",
 };
 
 function getState() {
@@ -90,14 +90,20 @@ function parseSubskillTargetKey(targetKey) {
 }
 
 function getDirectModifierTargetLabel(targetType, targetKey) {
-  if (targetType === "stat") return `${getStatLabel(targetKey)} Level`;
-  if (targetType === "statRoll") return `${getStatLabel(targetKey)} Rolls`;
+  if (targetType === "stat")         return `${getStatLabel(targetKey)} Level`;
+  if (targetType === "statRoll")     return `${getStatLabel(targetKey)} Rolls`;
   if (targetType === "subskill") {
     const parsed = parseSubskillTargetKey(targetKey);
     if (!parsed) return "Substat";
     return `${parsed.skillName} (${parsed.statLabel})`;
   }
-  if (targetType === "derived") return DIRECT_DERIVED_LABELS[targetKey] || "Derived Field";
+  if (targetType === "derived")      return DIRECT_DERIVED_LABELS[targetKey] || "Derived Field";
+  if (targetType === "techniqueApp") {
+    const state = getState();
+    const idx = parseInt(targetKey, 10);
+    const appTitle = state?.techniques?.applications?.[idx]?.title;
+    return appTitle ? `${appTitle}` : `Application ${idx + 1}`;
+  }
   return "Modifier Target";
 }
 
@@ -127,24 +133,23 @@ function setModifiedBadgeState(badgeEl, isVisible) {
 function ensureVitalModifierBadge(containerId) {
   const container = document.getElementById(containerId);
   if (!container) return null;
-
   let badge = container.querySelector(".direct-modified-badge.vital-mod-badge");
   if (!badge) {
     badge = document.createElement("span");
     badge.className = "direct-modified-badge vital-mod-badge";
     container.appendChild(badge);
   }
-
   return badge;
 }
 
 function updateDerivedModifierBadges(state) {
   const configs = [
-    ["hpVitalBox", "derived", "hpMax"],
-    ["ceVitalBox", "derived", "ceMax"],
-    ["acVitalBox", "derived", "ac"],
-    ["movementVitalBox", "derived", "movement"],
-    ["aptitudeBonusVitalBox", "derived", "aptitudeBonus"],
+    ["hpVitalBox",           "derived", "hpMax"],
+    ["ceVitalBox",           "derived", "ceMax"],
+    ["acVitalBox",           "derived", "ac"],
+    ["movementVitalBox",     "derived", "movement"],
+    ["aptitudeBonusVitalBox","derived", "aptitudeBonus"],
+    ["xpThresholdVitalBox",  "derived", "xpThreshold"],
   ];
 
   configs.forEach(([containerId, targetType, targetKey]) => {
@@ -171,7 +176,7 @@ function updateDerivedModifierBadges(state) {
 
 function getDirectModifierOperationLabel(operation, value) {
   if (operation === "multiply") return `x${value}`;
-  if (operation === "divide") return `/${value}`;
+  if (operation === "divide")   return `/${value}`;
   return formatSignedValue(value);
 }
 
@@ -186,11 +191,7 @@ function applyDirectModifiersForTarget(state, targetType, targetKey, baseValue) 
 
 function getDirectModifierSummaryDelta(state, targetType, targetKey, baseValue) {
   const totalValue = applyDirectModifiersForTarget(state, targetType, targetKey, baseValue);
-  return {
-    baseValue,
-    totalValue,
-    deltaValue: totalValue - baseValue,
-  };
+  return { baseValue, totalValue, deltaValue: totalValue - baseValue };
 }
 
 function parseOptionalInt(rawValue) {
@@ -245,7 +246,6 @@ function showRollToast(statLabel, diceCount, rolls, total, critStatus, skillName
   }
 }
 
-
 function rollDicePool(diceCount) {
   return Array.from({ length: diceCount }, () => Math.floor(Math.random() * 6) + 1);
 }
@@ -255,36 +255,28 @@ function buildComparedBreakdown(baseBreakdown, rollMode, firstRolls, firstTotal,
   return {
     ...baseBreakdown,
     rollMode,
-    comparedRolls: [firstRolls, secondRolls],
-    comparedTotals: [firstTotal, secondTotal],
-    selectedRollIndex: selectedIndex,
+    comparedRolls:      [firstRolls, secondRolls],
+    comparedTotals:     [firstTotal, secondTotal],
+    selectedRollIndex:  selectedIndex,
   };
 }
 
 function rollWithMode(diceCount, computeTotal, rollMode = "normal") {
-  const firstRolls = rollDicePool(diceCount);
-  const firstTotal = computeTotal(firstRolls);
+  const firstRolls  = rollDicePool(diceCount);
+  const firstTotal  = computeTotal(firstRolls);
   if (rollMode !== "advantage" && rollMode !== "disadvantage") {
-    return {
-      rolls: firstRolls,
-      total: firstTotal,
-      selectedRollIndex: 0,
-      firstRolls,
-      firstTotal,
-      secondRolls: null,
-      secondTotal: null,
-    };
+    return { rolls: firstRolls, total: firstTotal, selectedRollIndex: 0, firstRolls, firstTotal, secondRolls: null, secondTotal: null };
   }
 
-  const secondRolls = rollDicePool(diceCount);
-  const secondTotal = computeTotal(secondRolls);
+  const secondRolls  = rollDicePool(diceCount);
+  const secondTotal  = computeTotal(secondRolls);
   const selectedRollIndex = rollMode === "advantage"
     ? (firstTotal >= secondTotal ? 0 : 1)
     : (firstTotal <= secondTotal ? 0 : 1);
 
   return {
-    rolls: selectedRollIndex === 0 ? firstRolls : secondRolls,
-    total: selectedRollIndex === 0 ? firstTotal : secondTotal,
+    rolls:              selectedRollIndex === 0 ? firstRolls  : secondRolls,
+    total:              selectedRollIndex === 0 ? firstTotal  : secondTotal,
     selectedRollIndex,
     firstRolls,
     firstTotal,
@@ -322,7 +314,6 @@ function ensureRollModeMenu() {
       if (modifierAction) modifierAction();
       return;
     }
-
     const button = e.target.closest("[data-roll-mode]");
     if (!button) return;
     const selectedMode = button.dataset.rollMode;
@@ -334,15 +325,13 @@ function ensureRollModeMenu() {
   document.body.appendChild(menu);
   document.addEventListener("click", closeRollModeMenu);
   document.addEventListener("scroll", closeRollModeMenu, true);
-  document.addEventListener("keydown", e => {
-    if (e.key === "Escape") closeRollModeMenu();
-  });
+  document.addEventListener("keydown", e => { if (e.key === "Escape") closeRollModeMenu(); });
 
   _rollModeMenu = menu;
   return menu;
 }
 
-function openRollModeMenu(event, onSelectMode, options = {}) {
+export function openRollModeMenu(event, onSelectMode, options = {}) {
   event.preventDefault();
   event.stopPropagation();
 
@@ -353,19 +342,15 @@ function openRollModeMenu(event, onSelectMode, options = {}) {
     : null;
 
   const modifierButton = menu.querySelector("[data-roll-mode-action='addModifier']");
-  const divider = menu.querySelector("[data-roll-mode-divider]");
+  const divider        = menu.querySelector("[data-roll-mode-divider]");
   const showModifierAction = Boolean(_pendingRollModeModifierAction);
   if (modifierButton) modifierButton.hidden = !showModifierAction;
-  if (divider) divider.hidden = !showModifierAction;
+  if (divider)        divider.hidden        = !showModifierAction;
 
   menu.hidden = false;
-  const viewportWidth = window.innerWidth;
-  const viewportHeight = window.innerHeight;
   const rect = menu.getBoundingClientRect();
-  const left = Math.max(8, Math.min(event.clientX, viewportWidth - rect.width - 8));
-  const top = Math.max(8, Math.min(event.clientY, viewportHeight - rect.height - 8));
-  menu.style.left = `${left}px`;
-  menu.style.top = `${top}px`;
+  menu.style.left = `${Math.max(8, Math.min(event.clientX, window.innerWidth  - rect.width  - 8))}px`;
+  menu.style.top  = `${Math.max(8, Math.min(event.clientY, window.innerHeight - rect.height - 8))}px`;
 }
 
 function getModifierContextMenu() {
@@ -376,12 +361,13 @@ function closeModifierContextMenu() {
   const menu = getModifierContextMenu();
   if (!menu) return;
   menu.hidden = true;
-  menu.dataset.targetType = "";
-  menu.dataset.targetKey = "";
+  menu.dataset.targetType  = "";
+  menu.dataset.targetKey   = "";
   menu.dataset.targetLabel = "";
 }
 
-function openModifierContextMenu(event, targetType, targetKey) {
+// Exported so techniques.js can call it directly for right-click on app cards.
+export function openModifierContextMenu(event, targetType, targetKey) {
   event.preventDefault();
   event.stopPropagation();
 
@@ -389,16 +375,13 @@ function openModifierContextMenu(event, targetType, targetKey) {
   if (!menu) return;
 
   menu.hidden = false;
-  menu.dataset.targetType = targetType;
-  menu.dataset.targetKey = targetKey;
+  menu.dataset.targetType  = targetType;
+  menu.dataset.targetKey   = targetKey;
   menu.dataset.targetLabel = getDirectModifierTargetLabel(targetType, targetKey);
-  const viewportWidth = window.innerWidth;
-  const viewportHeight = window.innerHeight;
+
   const rect = menu.getBoundingClientRect();
-  const left = Math.max(8, Math.min(event.clientX, viewportWidth - rect.width - 8));
-  const top = Math.max(8, Math.min(event.clientY, viewportHeight - rect.height - 8));
-  menu.style.left = `${left}px`;
-  menu.style.top = `${top}px`;
+  menu.style.left = `${Math.max(8, Math.min(event.clientX, window.innerWidth  - rect.width  - 8))}px`;
+  menu.style.top  = `${Math.max(8, Math.min(event.clientY, window.innerHeight - rect.height - 8))}px`;
 }
 
 function getDirectModifierTargetValues(state, targetType, targetKey, effects) {
@@ -409,7 +392,7 @@ function getDirectModifierTargetValues(state, targetType, targetKey, effects) {
 
   if (targetType === "statRoll") {
     const baseEffects = computeActiveModifierEffects({ ...state, directModifiers: [] });
-    const baseValue = baseEffects?.rollBonuses?.[targetKey] || 0;
+    const baseValue   = baseEffects?.rollBonuses?.[targetKey] || 0;
     return getDirectModifierSummaryDelta(state, targetType, targetKey, baseValue);
   }
 
@@ -426,19 +409,26 @@ function getDirectModifierTargetValues(state, targetType, targetKey, effects) {
       return getDirectModifierSummaryDelta(state, targetType, targetKey, baseValue);
     }
 
+    // xpThreshold: base is techScore * 2 (before direct modifiers)
+    if (targetKey === "xpThreshold") {
+      const techScore = parseStatScore(state?.stats?.technique?.score);
+      const baseValue = Math.max(0, techScore * 2);
+      return getDirectModifierSummaryDelta(state, targetType, targetKey, baseValue);
+    }
+
     let baseValue = 0;
     if (targetKey === "hpMax") {
       const powerLevel = getEffectiveStatLevel(state, effects, "power");
       baseValue = Math.max(1, 10 + (powerLevel * 5));
       baseValue = Math.max(1, getDerivedOverride(state, "hpMax") ?? baseValue);
     } else if (targetKey === "ceMax") {
-      const techniqueLevel = getEffectiveStatLevel(state, effects, "technique");
-      const domainCtBonus = state?.techniques?.mode === "domain" ? 10 : 0;
+      const techniqueLevel  = getEffectiveStatLevel(state, effects, "technique");
+      const domainCtBonus   = state?.techniques?.mode === "domain" ? 10 : 0;
       baseValue = Math.max(1, 15 + (techniqueLevel * 5) + domainCtBonus);
       baseValue = Math.max(1, getDerivedOverride(state, "ceMax") ?? baseValue);
     } else if (targetKey === "ac") {
       const techniqueLevel = getEffectiveStatLevel(state, effects, "technique");
-      const speedLevel = getEffectiveStatLevel(state, effects, "speed");
+      const speedLevel     = getEffectiveStatLevel(state, effects, "speed");
       baseValue = Math.max(0, techniqueLevel + speedLevel + (effects?.acBonus || 0));
       baseValue = Math.max(0, getDerivedOverride(state, "ac") ?? baseValue);
     } else if (targetKey === "movement") {
@@ -449,6 +439,18 @@ function getDirectModifierTargetValues(state, targetType, targetKey, effects) {
     return getDirectModifierSummaryDelta(state, targetType, targetKey, baseValue);
   }
 
+  // techniqueApp: show numeric modifiers only (advantage/disadvantage are flags, not deltas)
+  if (targetType === "techniqueApp") {
+    const idx  = parseInt(targetKey, 10);
+    const app  = state?.techniques?.applications?.[idx];
+    if (!app) return { baseValue: 0, totalValue: 0, deltaValue: 0 };
+
+    // Base is the raw app values; show each overrideable field as separate entries
+    // in the panel.  For the summary row we just report 0 base/delta since these
+    // are independent field overrides, not a single numeric stack.
+    return { baseValue: 0, totalValue: 0, deltaValue: 0 };
+  }
+
   return { baseValue: 0, totalValue: 0, deltaValue: 0 };
 }
 
@@ -457,9 +459,7 @@ function setDirectModifierFormOpen(isOpen) {
   if (!form) return;
   if (!isOpen) {
     form.classList.remove("is-open");
-    setTimeout(() => {
-      if (!form.classList.contains("is-open")) form.hidden = true;
-    }, 160);
+    setTimeout(() => { if (!form.classList.contains("is-open")) form.hidden = true; }, 160);
     return;
   }
   form.hidden = false;
@@ -481,11 +481,9 @@ function closeDirectModifierPanel() {
   const panel = document.getElementById("sheetModifierPanel");
   if (!panel) return;
   panel.classList.remove("is-open");
-  setTimeout(() => {
-    if (!panel.classList.contains("is-open")) panel.hidden = true;
-  }, 220);
-  _activeDirectModifierTarget = null;
-  _editingDirectModifierId = null;
+  setTimeout(() => { if (!panel.classList.contains("is-open")) panel.hidden = true; }, 220);
+  _activeDirectModifierTarget  = null;
+  _editingDirectModifierId     = null;
   setDirectModifierFormOpen(false);
 }
 
@@ -497,26 +495,32 @@ function renderDirectModifierPanel() {
 
   const { targetType, targetKey, label } = _activeDirectModifierTarget;
   const effects = computeActiveModifierEffects(state);
-  const totals = getDirectModifierTargetValues(state, targetType, targetKey, effects);
+  const totals  = getDirectModifierTargetValues(state, targetType, targetKey, effects);
   const entries = getTargetDirectModifiers(state, targetType, targetKey);
 
   const headingEl = document.getElementById("sheetModifierTargetLabel");
-  const baseEl = document.getElementById("sheetModifierBaseValue");
-  const deltaEl = document.getElementById("sheetModifierDeltaValue");
-  const totalEl = document.getElementById("sheetModifierTotalValue");
-  const listEl = document.getElementById("sheetModifierList");
+  const baseEl    = document.getElementById("sheetModifierBaseValue");
+  const deltaEl   = document.getElementById("sheetModifierDeltaValue");
+  const totalEl   = document.getElementById("sheetModifierTotalValue");
+  const listEl    = document.getElementById("sheetModifierList");
 
   if (headingEl) headingEl.textContent = label || getDirectModifierTargetLabel(targetType, targetKey);
-  if (baseEl) baseEl.textContent = `${Math.round(totals.baseValue * 1000) / 1000}`;
-  if (deltaEl) deltaEl.textContent = formatSignedValue(Math.round(totals.deltaValue * 1000) / 1000);
-  if (totalEl) totalEl.textContent = `${Math.round(totals.totalValue * 1000) / 1000}`;
+
+  // For techniqueApp the base/delta/total summary isn't meaningful as a single
+  // number, so hide the summary row.
+  const isTechApp = targetType === "techniqueApp";
+  const summaryRow = document.getElementById("sheetModifierSummaryRow");
+  if (summaryRow) summaryRow.hidden = isTechApp;
+
+  if (!isTechApp) {
+    if (baseEl)  baseEl.textContent  = `${Math.round(totals.baseValue  * 1000) / 1000}`;
+    if (deltaEl) deltaEl.textContent = formatSignedValue(Math.round(totals.deltaValue * 1000) / 1000);
+    if (totalEl) totalEl.textContent = `${Math.round(totals.totalValue * 1000) / 1000}`;
+  }
 
   if (!listEl) return;
-  const addRow = `
-    <button type="button" id="sheetModifierAddBtn" class="sheet-modifier-add-row">
-      + Add Modifier
-    </button>
-  `;
+
+  const addRow = `<button type="button" id="sheetModifierAddBtn" class="sheet-modifier-add-row">+ Add Modifier</button>`;
 
   if (!entries.length) {
     listEl.innerHTML = `<div class="sheet-modifier-empty">No direct modifiers yet.</div>${addRow}`;
@@ -524,12 +528,16 @@ function renderDirectModifierPanel() {
   }
 
   listEl.innerHTML = entries.map(entry => {
-    const sourceText = entry.source ? escapeHtml(entry.source) : "No source";
+    const sourceText    = entry.source ? escapeHtml(entry.source) : "No source";
     const modifierLabel = getDirectModifierOperationLabel(entry.operation, entry.value);
+    // For boolean flags (advantage/disadvantage) show a friendlier label
+    const displayLabel  = (entry.source === "advantage" || entry.source === "disadvantage")
+      ? `${entry.source.charAt(0).toUpperCase() + entry.source.slice(1)} (active)`
+      : modifierLabel;
     return `
       <div class="sheet-modifier-row" data-direct-modifier-id="${escapeHtml(entry.id)}">
         <div class="sheet-modifier-row-main">
-          <span class="sheet-modifier-row-value">${modifierLabel}</span>
+          <span class="sheet-modifier-row-value">${displayLabel}</span>
           <span class="sheet-modifier-row-source">${sourceText}</span>
         </div>
         <div class="sheet-modifier-row-actions">
@@ -542,9 +550,9 @@ function renderDirectModifierPanel() {
 }
 
 function openDirectModifierPanel(targetType, targetKey) {
-  const panel = document.getElementById("sheetModifierPanel");
-  const statModeWrap = document.getElementById("sheetModifierStatTargetModeWrap");
-  const statModeSelect = document.getElementById("sheetModifierStatTargetMode");
+  const panel           = document.getElementById("sheetModifierPanel");
+  const statModeWrap    = document.getElementById("sheetModifierStatTargetModeWrap");
+  const statModeSelect  = document.getElementById("sheetModifierStatTargetMode");
   if (!panel) return;
 
   const resolvedType = targetType === "statRoll" ? "statRoll" : targetType;
@@ -555,7 +563,7 @@ function openDirectModifierPanel(targetType, targetKey) {
   };
 
   const isStatTarget = resolvedType === "stat" || resolvedType === "statRoll";
-  if (statModeWrap) statModeWrap.hidden = !isStatTarget;
+  if (statModeWrap)   statModeWrap.hidden    = !isStatTarget;
   if (statModeSelect && isStatTarget) statModeSelect.value = resolvedType;
 
   _editingDirectModifierId = null;
@@ -570,37 +578,59 @@ function addDirectModifierFromForm() {
   const state = getState();
   if (!state || !_activeDirectModifierTarget) return;
 
-  const valueInput = document.getElementById("sheetModifierValueInput");
-  const sourceInput = document.getElementById("sheetModifierSourceInput");
+  const valueInput     = document.getElementById("sheetModifierValueInput");
+  const sourceInput    = document.getElementById("sheetModifierSourceInput");
   const operationInput = document.getElementById("sheetModifierOperationInput");
   if (!valueInput || !sourceInput || !operationInput) return;
 
+  const { targetType, targetKey } = _activeDirectModifierTarget;
   const operation = operationInput.value || "add";
-  const value = parseDirectModifierValue(valueInput.value, operation);
-  if (!Number.isFinite(value)) {
+  const source    = sourceInput.value.trim();
+
+  // techniqueApp advantage / disadvantage are stored as boolean flags.
+  // Accept "advantage" / "disadvantage" as the source field and store value 1.
+  const isBoolFlag = targetType === "techniqueApp" &&
+    (source === "advantage" || source === "disadvantage");
+
+  const value = isBoolFlag
+    ? 1
+    : parseDirectModifierValue(valueInput.value, operation);
+
+  if (!isBoolFlag && !Number.isFinite(value)) {
     valueInput.focus();
     return;
   }
 
   ensureDirectModifierState(state);
-  const normalized = normalizeDirectModifierList(state.directModifiers);
+  const normalized  = normalizeDirectModifierList(state.directModifiers);
   const editingIndex = normalized.findIndex(entry => entry.id === _editingDirectModifierId);
+
   const nextEntry = {
     id: _editingDirectModifierId || `direct_mod_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-    targetType: _activeDirectModifierTarget.targetType,
-    targetKey: _activeDirectModifierTarget.targetKey,
+    targetType,
+    targetKey,
     operation,
-    value,
-    source: sourceInput.value,
+    value: isBoolFlag ? 1 : value,
+    source,
   };
 
-  if (editingIndex >= 0) normalized[editingIndex] = nextEntry;
-  else normalized.push(nextEntry);
-  state.directModifiers = normalizeDirectModifierList(normalized);
+  // For boolean flags, enforce one-per-type: remove any existing advantage/disadvantage
+  // of the same source before adding.
+  let base = editingIndex >= 0
+    ? normalized.map((e, i) => i === editingIndex ? nextEntry : e)
+    : [...normalized, nextEntry];
 
-  valueInput.value = "";
-  sourceInput.value = "";
-  operationInput.value = "add";
+  if (isBoolFlag) {
+    base = base.filter(e =>
+      !(e.targetType === targetType && e.targetKey === targetKey && e.source === source && e.id !== nextEntry.id)
+    );
+  }
+
+  state.directModifiers = normalizeDirectModifierList(base);
+
+  valueInput.value        = "";
+  sourceInput.value       = "";
+  operationInput.value    = "add";
   _editingDirectModifierId = null;
   setDirectModifierFormOpen(false);
   applyCharacterStateToUI();
@@ -631,37 +661,39 @@ function beginEditDirectModifier(modifierId) {
   const state = getState();
   if (!state || !_activeDirectModifierTarget || !modifierId) return;
 
-  const targetModifiers = getTargetDirectModifiers(
+  const current = getTargetDirectModifiers(
     state,
     _activeDirectModifierTarget.targetType,
     _activeDirectModifierTarget.targetKey,
-  );
-  const current = targetModifiers.find(entry => entry.id === modifierId);
+  ).find(entry => entry.id === modifierId);
   if (!current) return;
 
-  const valueInput = document.getElementById("sheetModifierValueInput");
-  const sourceInput = document.getElementById("sheetModifierSourceInput");
+  const valueInput     = document.getElementById("sheetModifierValueInput");
+  const sourceInput    = document.getElementById("sheetModifierSourceInput");
   const operationInput = document.getElementById("sheetModifierOperationInput");
   if (!valueInput || !sourceInput || !operationInput) return;
 
   _editingDirectModifierId = modifierId;
-  operationInput.value = current.operation || "add";
+  operationInput.value     = current.operation || "add";
   syncDirectModifierOperationAvailability();
-  valueInput.value = String(current.value);
-  valueInput.step = operationInput.value === "add" ? "1" : "0.1";
+  // Boolean flags don't have a meaningful numeric value to show
+  valueInput.value = (current.source === "advantage" || current.source === "disadvantage")
+    ? ""
+    : String(current.value);
+  valueInput.step  = operationInput.value === "add" ? "1" : "0.1";
   sourceInput.value = current.source || "";
   setDirectModifierFormOpen(true);
   valueInput.focus();
 }
 
 function initDirectModifierUI() {
-  const menu = getModifierContextMenu();
-  const menuBtn = document.getElementById("sheetModifierContextAdjustBtn");
-  const panel = document.getElementById("sheetModifierPanel");
-  const closeBtn = document.getElementById("sheetModifierCloseBtn");
-  const saveBtn = document.getElementById("sheetModifierSaveBtn");
-  const cancelBtn = document.getElementById("sheetModifierCancelBtn");
-  const listEl = document.getElementById("sheetModifierList");
+  const menu           = getModifierContextMenu();
+  const menuBtn        = document.getElementById("sheetModifierContextAdjustBtn");
+  const panel          = document.getElementById("sheetModifierPanel");
+  const closeBtn       = document.getElementById("sheetModifierCloseBtn");
+  const saveBtn        = document.getElementById("sheetModifierSaveBtn");
+  const cancelBtn      = document.getElementById("sheetModifierCancelBtn");
+  const listEl         = document.getElementById("sheetModifierList");
   const operationInput = document.getElementById("sheetModifierOperationInput");
   const statModeSelect = document.getElementById("sheetModifierStatTargetMode");
 
@@ -671,15 +703,13 @@ function initDirectModifierUI() {
     e.preventDefault();
     e.stopPropagation();
     const targetType = menu.dataset.targetType;
-    const targetKey = menu.dataset.targetKey;
+    const targetKey  = menu.dataset.targetKey;
     closeModifierContextMenu();
     if (!targetType || !targetKey) return;
-    // Defer panel open so document-level click handlers from this same click cannot close it.
     setTimeout(() => openDirectModifierPanel(targetType, targetKey), 0);
   });
 
   closeBtn.addEventListener("click", closeDirectModifierPanel);
-
   saveBtn.addEventListener("click", addDirectModifierFromForm);
   cancelBtn.addEventListener("click", () => {
     _editingDirectModifierId = null;
@@ -694,10 +724,13 @@ function initDirectModifierUI() {
 
   if (statModeSelect) {
     statModeSelect.addEventListener("change", () => {
-      if (!_activeDirectModifierTarget || _activeDirectModifierTarget.targetType === "subskill" || _activeDirectModifierTarget.targetType === "derived") return;
+      if (!_activeDirectModifierTarget ||
+          _activeDirectModifierTarget.targetType === "subskill" ||
+          _activeDirectModifierTarget.targetType === "derived"  ||
+          _activeDirectModifierTarget.targetType === "techniqueApp") return;
       const nextType = statModeSelect.value === "statRoll" ? "statRoll" : "stat";
       _activeDirectModifierTarget.targetType = nextType;
-      _activeDirectModifierTarget.label = getDirectModifierTargetLabel(nextType, _activeDirectModifierTarget.targetKey);
+      _activeDirectModifierTarget.label      = getDirectModifierTargetLabel(nextType, _activeDirectModifierTarget.targetKey);
       _editingDirectModifierId = null;
       setDirectModifierFormOpen(false);
       syncDirectModifierOperationAvailability();
@@ -709,13 +742,13 @@ function initDirectModifierUI() {
     const addBtn = e.target.closest("#sheetModifierAddBtn");
     if (addBtn) {
       _editingDirectModifierId = null;
-      const valueInput = document.getElementById("sheetModifierValueInput");
-      const sourceInput = document.getElementById("sheetModifierSourceInput");
+      const valueInput        = document.getElementById("sheetModifierValueInput");
+      const sourceInput       = document.getElementById("sheetModifierSourceInput");
       const operationInputInner = document.getElementById("sheetModifierOperationInput");
-      if (valueInput) valueInput.value = "";
-      if (sourceInput) sourceInput.value = "";
+      if (valueInput)        valueInput.value        = "";
+      if (sourceInput)       sourceInput.value       = "";
       if (operationInputInner) operationInputInner.value = "add";
-      if (valueInput) valueInput.step = "1";
+      if (valueInput)        valueInput.step         = "1";
       syncDirectModifierOperationAvailability();
       setDirectModifierFormOpen(true);
       if (valueInput) valueInput.focus();
@@ -723,10 +756,7 @@ function initDirectModifierUI() {
     }
 
     const editBtn = e.target.closest("button[data-action='editDirectModifier']");
-    if (editBtn) {
-      beginEditDirectModifier(editBtn.dataset.modifierId || "");
-      return;
-    }
+    if (editBtn) { beginEditDirectModifier(editBtn.dataset.modifierId || ""); return; }
 
     const removeBtn = e.target.closest("button[data-action='removeDirectModifier']");
     if (removeBtn) {
@@ -738,13 +768,9 @@ function initDirectModifierUI() {
   document.addEventListener("click", e => {
     if (!menu.hidden && !menu.contains(e.target)) closeModifierContextMenu();
   });
-
   document.addEventListener("scroll", () => closeModifierContextMenu(), true);
   document.addEventListener("keydown", e => {
-    if (e.key === "Escape") {
-      closeModifierContextMenu();
-      closeDirectModifierPanel();
-    }
+    if (e.key === "Escape") { closeModifierContextMenu(); closeDirectModifierPanel(); }
   });
 }
 
@@ -784,8 +810,6 @@ export function promoteStatFromFullAptitudes(state, statKey) {
     if (!hasAptitude) return false;
     if (!lockedFromArchetype && aptitudeState === 1) temporaryAptitudeIndices.push(i);
   }
-
-  // Only consume temporary aptitudes; permanent aptitudes are preserved.
   if (!temporaryAptitudeIndices.length) return false;
 
   const newStatValue = parseStatScore(statState.score) + 1;
@@ -813,13 +837,12 @@ function parseResourceValue(rawValue) {
 
 function applyRestRecovery(state, kind) {
   ensureRestState(state);
-
   if (kind === "quick" && state.restState.quickRestUsed) return false;
 
   const hpCurrent = parseResourceValue(state.hpCurrent);
-  const hpMax = parseResourceValue(state.hpMax);
+  const hpMax     = parseResourceValue(state.hpMax);
   const ceCurrent = parseResourceValue(state.ceCurrent);
-  const ceMax = parseResourceValue(state.ceMax);
+  const ceMax     = parseResourceValue(state.ceMax);
 
   if (kind === "full") {
     state.hpCurrent = String(hpMax);
@@ -828,11 +851,11 @@ function applyRestRecovery(state, kind) {
     return true;
   }
 
-  const fraction = kind === "short" ? 0.5 : 0.25;
+  const fraction    = kind === "short" ? 0.5 : 0.25;
   const hpRecovered = hpMax > 0 ? Math.max(1, Math.floor(hpMax * fraction)) : 0;
   const ceRecovered = ceMax > 0 ? Math.max(1, Math.floor(ceMax * fraction)) : 0;
-  state.hpCurrent = String(Math.min(hpMax, hpCurrent + hpRecovered));
-  state.ceCurrent = String(Math.min(ceMax, ceCurrent + ceRecovered));
+  state.hpCurrent   = String(Math.min(hpMax, hpCurrent + hpRecovered));
+  state.ceCurrent   = String(Math.min(ceMax, ceCurrent + ceRecovered));
   if (kind === "quick") state.restState.quickRestUsed = true;
   return true;
 }
@@ -849,20 +872,19 @@ function syncRestControlsUI(state) {
   ensureRestState(state);
   const quickRestBtn = document.getElementById("quickRestBtn");
   if (!quickRestBtn) return;
-
   const disabled = Boolean(state.restState.quickRestUsed);
   quickRestBtn.disabled = disabled;
-  quickRestBtn.title = disabled
-    ? "Must full rest first"
-    : "Recover 25% HP and CE";
+  quickRestBtn.title = disabled ? "Must full rest first" : "Recover 25% HP and CE";
 }
 
 function getArchetypePermanentAptitudeSource(state, statKey, skillIndex) {
   const picks = state?.archetypeProgress?.permanentAptitudeSelections;
   if (!Array.isArray(picks)) return null;
-  return picks.find(entry => entry?.sourceArchetype === state.archetype
-    && entry?.statKey === statKey
-    && parseInt(entry?.skillIndex, 10) === skillIndex) || null;
+  return picks.find(entry =>
+    entry?.sourceArchetype === state.archetype &&
+    entry?.statKey === statKey &&
+    parseInt(entry?.skillIndex, 10) === skillIndex
+  ) || null;
 }
 
 function setInputValueWithPulse(inputEl, nextValue) {
@@ -877,9 +899,7 @@ function setInputValueWithPulse(inputEl, nextValue) {
   inputEl.classList.remove("stat-derived-pulse");
   void inputEl.offsetWidth;
   inputEl.classList.add("stat-derived-pulse");
-  inputEl.addEventListener("animationend", () => {
-    inputEl.classList.remove("stat-derived-pulse");
-  }, { once: true });
+  inputEl.addEventListener("animationend", () => inputEl.classList.remove("stat-derived-pulse"), { once: true });
 }
 
 function getEffectiveStatLevel(state, effects, statKey) {
@@ -890,30 +910,20 @@ function getEffectiveStatLevel(state, effects, statKey) {
 }
 
 function getSubskillValue(state, effects, statKey, skillIndex) {
-  // Use manual override if set
   const override = getSubskillOverride?.(state, statKey, skillIndex);
   if (override !== null && override !== undefined) return override;
 
-  // Count all sources of aptitude for this subskill
   let aptitudeCount = 0;
-  // 1. Manual aptitude (checkbox/dot)
-  const skillState = state?.stats?.[statKey]?.skills?.[skillIndex] || {};
+  const skillState  = state?.stats?.[statKey]?.skills?.[skillIndex] || {};
   if (parseInt(skillState.aptitude, 10) > 0) aptitudeCount++;
-  // 2. Permanent aptitude from archetype
   if (getArchetypePermanentAptitudeSource?.(state, statKey, skillIndex)) aptitudeCount++;
-  // 3. Inventory or custom modifiers (effects.specificSkillBonuses for this subskill, if used for aptitude)
-  //    (If you have a more specific way to detect inventory-granted aptitudes, add here)
-  // 4. Any other sources (add as needed)
 
-  // Each aptitude grants a bonus (default 2, or use getAptitudeBonusValue if it returns per-aptitude value)
-  const perAptitudeBonus = 2; // Change if your system uses a different value per aptitude
-  const aptitudeBonus = aptitudeCount * perAptitudeBonus;
+  const perAptitudeBonus = 2;
+  const aptitudeBonus    = aptitudeCount * perAptitudeBonus;
+  const statSkillBonus   = effects?.skillBonuses?.[statKey] || 0;
+  const specificBonus    = effects?.specificSkillBonuses?.[`${statKey}:${skillIndex}`] || 0;
+  const baseValue        = aptitudeBonus + statSkillBonus + specificBonus;
 
-  const statSkillBonus = effects?.skillBonuses?.[statKey] || 0;
-  const specificBonus = effects?.specificSkillBonuses?.[`${statKey}:${skillIndex}`] || 0;
-  const baseValue = aptitudeBonus + statSkillBonus + specificBonus;
-
-  // Apply direct modifiers for this subskill
   const directMods = normalizeDirectModifierList(state?.directModifiers || [])
     .filter(e => e.targetType === "subskill" && e.targetKey === `${statKey}:${skillIndex}`);
   return Math.round(applyDirectModifiers(baseValue, directMods));
@@ -921,7 +931,7 @@ function getSubskillValue(state, effects, statKey, skillIndex) {
 
 function getAptitudeBonusValue(state, effects) {
   const overridden = parseInt(state?.overrides?.derived?.aptitudeBonus, 10);
-  const base = Number.isFinite(overridden) ? overridden : 2;
+  const base       = Number.isFinite(overridden) ? overridden : 2;
   const directMods = normalizeDirectModifierList(state?.directModifiers || [])
     .filter(e => e.targetType === "derived" && e.targetKey === "aptitudeBonus");
   return Math.round(applyDirectModifiers(base, directMods));
@@ -931,35 +941,35 @@ function applyDerivedCharacterFields({ preserveCurrent = true } = {}) {
   const state = getState();
   if (!state) return;
 
-  const effects = computeActiveModifierEffects(state);
-  const powerLevel = getEffectiveStatLevel(state, effects, "power");
+  const effects        = computeActiveModifierEffects(state);
+  const powerLevel     = getEffectiveStatLevel(state, effects, "power");
   const techniqueLevel = getEffectiveStatLevel(state, effects, "technique");
-  const speedLevel = getEffectiveStatLevel(state, effects, "speed");
-  const domainCtBonus = state?.techniques?.mode === "domain" ? 10 : 0;
+  const speedLevel     = getEffectiveStatLevel(state, effects, "speed");
+  const domainCtBonus  = state?.techniques?.mode === "domain" ? 10 : 0;
 
-  const baseHpMax = Math.max(1, 10 + (powerLevel * 5));
-  const baseCeMax = Math.max(1, 15 + (techniqueLevel * 5) + domainCtBonus);
-  const baseAc = Math.max(0, techniqueLevel + speedLevel + (effects.acBonus || 0));
+  const baseHpMax    = Math.max(1, 10 + (powerLevel * 5));
+  const baseCeMax    = Math.max(1, 15 + (techniqueLevel * 5) + domainCtBonus);
+  const baseAc       = Math.max(0, techniqueLevel + speedLevel + (effects.acBonus || 0));
   const baseMovement = Math.max(0, 30 + (speedLevel * 5) + (effects.movementBonus || 0));
 
-  const hpBaseFromOverride = Math.max(1, getDerivedOverride(state, "hpMax") ?? baseHpMax);
-  const ceBaseFromOverride = Math.max(1, getDerivedOverride(state, "ceMax") ?? baseCeMax);
-  const acBaseFromOverride = Math.max(0, getDerivedOverride(state, "ac") ?? baseAc);
+  const hpBaseFromOverride       = Math.max(1, getDerivedOverride(state, "hpMax")    ?? baseHpMax);
+  const ceBaseFromOverride       = Math.max(1, getDerivedOverride(state, "ceMax")    ?? baseCeMax);
+  const acBaseFromOverride       = Math.max(0, getDerivedOverride(state, "ac")       ?? baseAc);
   const movementBaseFromOverride = Math.max(0, getDerivedOverride(state, "movement") ?? baseMovement);
 
-  const finalHpMax = Math.max(0, Math.round(applyDirectModifiersForTarget(state, "derived", "hpMax", hpBaseFromOverride)));
-  const finalCeMax = Math.max(0, Math.round(applyDirectModifiersForTarget(state, "derived", "ceMax", ceBaseFromOverride)));
-  const finalAc = Math.max(0, Math.round(applyDirectModifiersForTarget(state, "derived", "ac", acBaseFromOverride)));
+  const finalHpMax    = Math.max(0, Math.round(applyDirectModifiersForTarget(state, "derived", "hpMax",    hpBaseFromOverride)));
+  const finalCeMax    = Math.max(0, Math.round(applyDirectModifiersForTarget(state, "derived", "ceMax",    ceBaseFromOverride)));
+  const finalAc       = Math.max(0, Math.round(applyDirectModifiersForTarget(state, "derived", "ac",       acBaseFromOverride)));
   const finalMovement = Math.max(0, Math.round(applyDirectModifiersForTarget(state, "derived", "movement", movementBaseFromOverride)));
 
   const previousHpMax = parseInt(state.hpMax, 10);
   const previousCeMax = parseInt(state.ceMax, 10);
-  const currentHp = parseInt(state.hpCurrent, 10);
-  const currentCe = parseInt(state.ceCurrent, 10);
+  const currentHp     = parseInt(state.hpCurrent, 10);
+  const currentCe     = parseInt(state.ceCurrent, 10);
 
-  state.hpMax = String(finalHpMax);
-  state.ceMax = String(finalCeMax);
-  state.ac = String(finalAc);
+  state.hpMax    = String(finalHpMax);
+  state.ceMax    = String(finalCeMax);
+  state.ac       = String(finalAc);
   state.movement = String(finalMovement);
 
   if (!preserveCurrent || !Number.isFinite(currentHp) || !Number.isFinite(previousHpMax) || currentHp === previousHpMax) {
@@ -967,7 +977,6 @@ function applyDerivedCharacterFields({ preserveCurrent = true } = {}) {
   } else {
     state.hpCurrent = String(Math.max(0, Math.min(currentHp, finalHpMax)));
   }
-
   if (!preserveCurrent || !Number.isFinite(currentCe) || !Number.isFinite(previousCeMax) || currentCe === previousCeMax) {
     state.ceCurrent = String(finalCeMax);
   } else {
@@ -976,30 +985,28 @@ function applyDerivedCharacterFields({ preserveCurrent = true } = {}) {
 }
 
 export function updateBlackFlashRangeDisplay() {
-  const state = getState();
-  const valueEl = document.getElementById("blackFlashRangeValue");
-  const noteEl = document.getElementById("blackFlashRangeNote");
+  const state    = getState();
+  const valueEl  = document.getElementById("blackFlashRangeValue");
+  const noteEl   = document.getElementById("blackFlashRangeNote");
   if (!valueEl || !noteEl || !state) return;
 
-  const techRaw = state?.stats?.technique?.score;
   const effects = computeActiveModifierEffects(state);
-  const tech = getEffectiveStatLevel(state, effects, "technique");
-  const range = getBlackFlashRange(tech);
+  const tech    = getEffectiveStatLevel(state, effects, "technique");
+  const range   = getBlackFlashRange(tech);
 
   if (range === null) {
     valueEl.textContent = "—";
-    noteEl.textContent = "Requires Technique 2-7";
+    noteEl.textContent  = "Requires Technique 2-7";
     return;
   }
-
   valueEl.textContent = String(range);
-  noteEl.textContent = `Technique ${tech}`;
+  noteEl.textContent  = `Technique ${tech}`;
   updateTechniquesDerivedUI(state);
 }
 
 export function renderStats() {
   buildStatBlocks(CENTER_STATS, document.getElementById("centerStats"));
-  buildStatBlocks(RIGHT_STATS, document.getElementById("rightStats"));
+  buildStatBlocks(RIGHT_STATS,  document.getElementById("rightStats"));
 }
 
 function buildStatBlocks(defs, container) {
@@ -1009,7 +1016,7 @@ function buildStatBlocks(defs, container) {
 
   container.innerHTML = "";
   defs.forEach(def => {
-    const sd = state.stats[def.key];
+    const sd    = state.stats[def.key];
     const block = document.createElement("div");
     block.className = "stat-block";
 
@@ -1019,33 +1026,28 @@ function buildStatBlocks(defs, container) {
     scoreSide.innerHTML = `
       <div class="stat-label">${def.label}</div>
       <span class="direct-modified-badge stat-mod-badge${statHasDirectModifiers ? " visible" : ""}" title="${statHasDirectModifiers ? "Modified" : ""}" aria-label="${statHasDirectModifiers ? "Modified" : ""}"></span>
-      <input class="stat-score-input" type="number" placeholder="—"
-             id="score_${def.key}" value="${sd.score}" min="0" />
+      <input class="stat-score-input" type="number" placeholder="—" id="score_${def.key}" value="${sd.score}" min="0" />
       <button class="roll-btn" type="button" title="Roll ${def.label.charAt(0).toUpperCase() + def.label.slice(1).toLowerCase()}">Roll</button>
     `;
 
     const runStatRoll = (rollMode = "normal") => {
       const currentEffects = computeActiveModifierEffects(state);
-      const n = getEffectiveStatLevel(state, currentEffects, def.key);
+      const n              = getEffectiveStatLevel(state, currentEffects, def.key);
       if (!n || n < 1) return;
-      const rollBonus = currentEffects.rollBonuses[def.key] || 0;
+      const rollBonus  = currentEffects.rollBonuses[def.key] || 0;
       const rollResult = rollWithMode(n, rolls => rolls.reduce((a, b) => a + b, 0) + rollBonus, rollMode);
-      const breakdown = buildComparedBreakdown(
-        {
-        equipmentBonuses: getRollModifierSources(state, def.key),
-        },
+      const breakdown  = buildComparedBreakdown(
+        { equipmentBonuses: getRollModifierSources(state, def.key) },
         rollMode,
-        rollResult.firstRolls,
-        rollResult.firstTotal,
-        rollResult.secondRolls,
-        rollResult.secondTotal,
+        rollResult.firstRolls, rollResult.firstTotal,
+        rollResult.secondRolls, rollResult.secondTotal,
         rollResult.selectedRollIndex,
       );
       if (breakdown) breakdown.die = "d6";
       showRollToast(def.label, n, rollResult.rolls, rollResult.total, null, null, breakdown, rollMode === "normal" ? null : rollMode);
     };
 
-    const statRollBtn = scoreSide.querySelector(".roll-btn");
+    const statRollBtn   = scoreSide.querySelector(".roll-btn");
     const statScoreInput = scoreSide.querySelector(".stat-score-input");
     scoreSide.addEventListener("contextmenu", event => {
       const target = event.target;
@@ -1054,45 +1056,39 @@ function buildStatBlocks(defs, container) {
     });
     if (statScoreInput) {
       statScoreInput.title = "Base stat value (right-click to adjust modifiers)";
-      statScoreInput.addEventListener("contextmenu", event => {
-        openModifierContextMenu(event, "stat", def.key);
-      });
+      statScoreInput.addEventListener("contextmenu", event => openModifierContextMenu(event, "stat", def.key));
     }
     const statBadgeEl = scoreSide.querySelector(".direct-modified-badge.stat-mod-badge");
     if (statBadgeEl) {
       statBadgeEl.addEventListener("click", e => {
-        e.preventDefault();
-        e.stopPropagation();
+        e.preventDefault(); e.stopPropagation();
         if (!statBadgeEl.classList.contains("visible")) return;
         openDirectModifierPanel("stat", def.key);
       });
       statBadgeEl.addEventListener("keydown", e => {
         if (e.key !== "Enter" && e.key !== " ") return;
-        e.preventDefault();
-        e.stopPropagation();
+        e.preventDefault(); e.stopPropagation();
         if (!statBadgeEl.classList.contains("visible")) return;
         openDirectModifierPanel("stat", def.key);
       });
     }
     statRollBtn.addEventListener("click", () => runStatRoll("normal"));
-    statRollBtn.addEventListener("contextmenu", event => {
-      openRollModeMenu(event, selectedMode => runStatRoll(selectedMode));
-    });
+    statRollBtn.addEventListener("contextmenu", event => openRollModeMenu(event, selectedMode => runStatRoll(selectedMode)));
 
     const skillsSide = document.createElement("div");
     skillsSide.className = "skills-side";
     def.skills.forEach((skill, i) => {
-      const sk = sd.skills[i];
+      const sk                  = sd.skills[i];
       const lockedAptitudeSource = getArchetypePermanentAptitudeSource(state, def.key, i);
-      const aptitudeState = lockedAptitudeSource ? 2 : getAptitudeState(sk);
-      const trainedAptitude = Boolean(sk?.trainedAptitude) && aptitudeState > 0 && !lockedAptitudeSource;
-      const overriddenAptitude = Boolean(sk?.overriddenAptitude) && aptitudeState > 0 && !lockedAptitudeSource;
-      const subskillValue = getSubskillValue(state, effects, def.key, i);
-      const aptitudeLabel = aptitudeState === 2 ? "Permanent Aptitude" : aptitudeState === 1 ? "Aptitude" : "No Aptitude";
-      const sourceLabel = lockedAptitudeSource?.sourceLabel || (lockedAptitudeSource?.sourceArchetype
+      const aptitudeState       = lockedAptitudeSource ? 2 : getAptitudeState(sk);
+      const trainedAptitude     = Boolean(sk?.trainedAptitude) && aptitudeState > 0 && !lockedAptitudeSource;
+      const overriddenAptitude  = Boolean(sk?.overriddenAptitude) && aptitudeState > 0 && !lockedAptitudeSource;
+      const subskillValue       = getSubskillValue(state, effects, def.key, i);
+      const aptitudeLabel       = aptitudeState === 2 ? "Permanent Aptitude" : aptitudeState === 1 ? "Aptitude" : "No Aptitude";
+      const sourceLabel         = lockedAptitudeSource?.sourceLabel || (lockedAptitudeSource?.sourceArchetype
         ? lockedAptitudeSource.sourceArchetype.charAt(0).toUpperCase() + lockedAptitudeSource.sourceArchetype.slice(1)
         : "");
-      const nextAptitudeAction = lockedAptitudeSource
+      const nextAptitudeAction  = lockedAptitudeSource
         ? (_isOverrideMode ? "Override lock: cycle aptitude" : `Permanent Aptitude (${sourceLabel || "Archetype"})`)
         : overriddenAptitude
         ? (_isOverrideMode ? getNextAptitudeActionLabel(aptitudeState, true) : "Overridden")
@@ -1101,7 +1097,7 @@ function buildStatBlocks(defs, container) {
         : _isOverrideMode
         ? getNextAptitudeActionLabel(aptitudeState, true)
         : (aptitudeState > 0 ? "Aptitude" : "Locked");
-      const hasOverride = Number.isFinite(getSubskillOverride(state, def.key, i));
+      const hasOverride              = Number.isFinite(getSubskillOverride(state, def.key, i));
       const subskillHasDirectModifiers = hasDirectModifiers(state, "subskill", `${def.key}:${i}`);
       const row = document.createElement("div");
       row.className = "skill-row";
@@ -1112,7 +1108,7 @@ function buildStatBlocks(defs, container) {
                id="bonus_${def.key}_${i}" value="${formatSignedValue(subskillValue)}" ${_isOverrideMode ? "" : "readonly"} title="${hasOverride ? "Overridden" : "Auto-calculated"}" />
         <button type="button" class="override-marker-btn${hasOverride ? " visible" : ""}" data-subskill-override-clear="${def.key}:${i}" title="${_isOverrideMode ? "Click to clear override" : "Overridden"}" ${_isOverrideMode ? "" : "tabindex=\"-1\""}>*</button>
         <span class="skill-name" title="Roll ${skill}">${skill}</span>
-         <span class="direct-modified-badge skill-mod-badge${subskillHasDirectModifiers ? " visible" : ""}" title="${subskillHasDirectModifiers ? "Modified" : ""}" aria-label="${subskillHasDirectModifiers ? "Modified" : ""}"></span>
+        <span class="direct-modified-badge skill-mod-badge${subskillHasDirectModifiers ? " visible" : ""}" title="${subskillHasDirectModifiers ? "Modified" : ""}" aria-label="${subskillHasDirectModifiers ? "Modified" : ""}"></span>
       `;
       skillsSide.appendChild(row);
 
@@ -1126,37 +1122,27 @@ function buildStatBlocks(defs, container) {
       const subskillBadgeEl = row.querySelector(".direct-modified-badge.skill-mod-badge");
       if (subskillBadgeEl) {
         subskillBadgeEl.addEventListener("click", e => {
-          e.preventDefault();
-          e.stopPropagation();
+          e.preventDefault(); e.stopPropagation();
           if (!subskillBadgeEl.classList.contains("visible")) return;
           openDirectModifierPanel("subskill", `${def.key}:${i}`);
         });
         subskillBadgeEl.addEventListener("keydown", e => {
           if (e.key !== "Enter" && e.key !== " ") return;
-          e.preventDefault();
-          e.stopPropagation();
+          e.preventDefault(); e.stopPropagation();
           if (!subskillBadgeEl.classList.contains("visible")) return;
           openDirectModifierPanel("subskill", `${def.key}:${i}`);
         });
       }
 
       row.querySelector(".skill-dot").addEventListener("click", () => {
-        // In normal mode, dots are fully locked
         if (!_isOverrideMode) return;
-        // In override mode, archetype-permanent locks can cycle but not be cleared to 0
         if (lockedAptitudeSource && !_isOverrideMode) return;
-        const skillState = state.stats[def.key].skills[i] || { aptitude: 0 };
+        const skillState    = state.stats[def.key].skills[i] || { aptitude: 0 };
         const currentAptitude = getAptitudeState(skillState);
-        const nextAptitude = _isOverrideMode
+        const nextAptitude    = _isOverrideMode
           ? (currentAptitude + 1) % 3
           : (currentAptitude > 0 ? 0 : 1);
-        // In override mode, mark as overridden (clear trainedAptitude flag)
-        state.stats[def.key].skills[i] = {
-          ...skillState,
-          aptitude: nextAptitude,
-          trainedAptitude: false,
-          overriddenAptitude: nextAptitude > 0,
-        };
+        state.stats[def.key].skills[i] = { ...skillState, aptitude: nextAptitude, trainedAptitude: false, overriddenAptitude: nextAptitude > 0 };
 
         if (promoteStatFromFullAptitudes(state, def.key)) {
           applyCharacterStateToUI();
@@ -1165,23 +1151,22 @@ function buildStatBlocks(defs, container) {
         }
 
         const dot = row.querySelector(".skill-dot");
-        dot.classList.toggle("filled", nextAptitude > 0);
-        dot.classList.toggle("permanent", nextAptitude === 2);
+        dot.classList.toggle("filled",              nextAptitude > 0);
+        dot.classList.toggle("permanent",           nextAptitude === 2);
         dot.classList.toggle("locked-by-archetype", Boolean(lockedAptitudeSource));
-        dot.classList.toggle("trained-aptitude", false);
+        dot.classList.toggle("trained-aptitude",    false);
         dot.classList.toggle("overridden-aptitude", nextAptitude > 0);
-        const nextLabel = nextAptitude === 2 ? "Permanent Aptitude" : nextAptitude === 1 ? "Aptitude" : "No Aptitude";
         dot.setAttribute("title", lockedAptitudeSource
           ? "Override lock: cycle aptitude"
           : nextAptitude > 0
           ? getNextAptitudeActionLabel(nextAptitude, true)
           : getNextAptitudeActionLabel(0, true));
-        dot.setAttribute("aria-label", `${skill} ${nextLabel}`);
+        dot.setAttribute("aria-label", `${skill} ${nextAptitude === 2 ? "Permanent Aptitude" : nextAptitude === 1 ? "Aptitude" : "No Aptitude"}`);
         const valueEl = row.querySelector(".skill-bonus-input");
-        const nextValue = getSubskillValue(state, computeActiveModifierEffects(state), def.key, i);
-        valueEl.value = formatSignedValue(nextValue);
+        valueEl.value = formatSignedValue(getSubskillValue(state, computeActiveModifierEffects(state), def.key, i));
         scheduleSave();
       });
+
       row.querySelector(".skill-bonus-input").addEventListener("input", e => {
         if (!_isOverrideMode) return;
         setSubskillOverride(state, def.key, i, e.target.value);
@@ -1194,48 +1179,35 @@ function buildStatBlocks(defs, container) {
         applyCharacterStateToUI();
         scheduleSave();
       });
+
       const runSkillRoll = (rollMode = "normal") => {
         const currentEffects = computeActiveModifierEffects(state);
-        const n = getEffectiveStatLevel(state, currentEffects, def.key);
+        const n              = getEffectiveStatLevel(state, currentEffects, def.key);
         if (!n || n < 1) return;
-        const subskillBonus = getSubskillValue(state, currentEffects, def.key, i);
-        const statRollBonus = currentEffects.rollBonuses[def.key] || 0;
-        const rollResult = rollWithMode(
+        const subskillBonus  = getSubskillValue(state, currentEffects, def.key, i);
+        const statRollBonus  = currentEffects.rollBonuses[def.key] || 0;
+        const rollResult     = rollWithMode(
           n,
           rolls => rolls.reduce((a, b) => a + b, 0) + subskillBonus + statRollBonus,
           rollMode,
         );
-        const rolls = rollResult.rolls;
-        const total = rollResult.total;
+        const rolls       = rollResult.rolls;
+        const total       = rollResult.total;
         const maxPossible = n * 6;
-        const allOnes = rolls.every(r => r === 1);
-        const critStatus = allOnes ? "fail" : total >= maxPossible ? "success" : null;
-        const breakdown = buildComparedBreakdown(
-          {
-            skillModifier: subskillBonus,
-            equipmentBonuses: getRollModifierSources(state, def.key),
-          },
+        const allOnes     = rolls.every(r => r === 1);
+        const critStatus  = allOnes ? "fail" : total >= maxPossible ? "success" : null;
+        const breakdown   = buildComparedBreakdown(
+          { skillModifier: subskillBonus, equipmentBonuses: getRollModifierSources(state, def.key) },
           rollMode,
-          rollResult.firstRolls,
-          rollResult.firstTotal,
-          rollResult.secondRolls,
-          rollResult.secondTotal,
+          rollResult.firstRolls, rollResult.firstTotal,
+          rollResult.secondRolls, rollResult.secondTotal,
           rollResult.selectedRollIndex,
         );
         if (breakdown) breakdown.die = "d6";
-        showRollToast(
-          def.label,
-          n,
-          rolls,
-          total,
-          critStatus,
-          skill,
-          breakdown,
-          rollMode === "normal" ? null : rollMode,
-        );
+        showRollToast(def.label, n, rolls, total, critStatus, skill, breakdown, rollMode === "normal" ? null : rollMode);
       };
 
-      const skillNameEl = row.querySelector(".skill-name");
+      const skillNameEl  = row.querySelector(".skill-name");
       const skillBonusEl = row.querySelector(".skill-bonus-input");
 
       skillNameEl.addEventListener("click", () => runSkillRoll("normal"));
@@ -1244,11 +1216,7 @@ function buildStatBlocks(defs, container) {
           onAddModifier: () => openDirectModifierPanel("subskill", `${def.key}:${i}`),
         });
       });
-
-      skillBonusEl.addEventListener("click", () => {
-        if (_isOverrideMode) return;
-        runSkillRoll("normal");
-      });
+      skillBonusEl.addEventListener("click", () => { if (_isOverrideMode) return; runSkillRoll("normal"); });
       skillBonusEl.addEventListener("contextmenu", event => {
         if (_isOverrideMode) return;
         openRollModeMenu(event, selectedMode => runSkillRoll(selectedMode), {
@@ -1265,19 +1233,18 @@ function buildStatBlocks(defs, container) {
       state.stats[def.key].score = e.target.value;
       applyDerivedCharacterFields({ preserveCurrent: true });
       const currentEffects = computeActiveModifierEffects(state);
-      const valueInputs = block.querySelectorAll(".skill-bonus-input");
-      valueInputs.forEach((inputEl, idx) => {
+      block.querySelectorAll(".skill-bonus-input").forEach((inputEl, idx) => {
         setInputValueWithPulse(inputEl, formatSignedValue(getSubskillValue(state, currentEffects, def.key, idx)));
       });
-      setInputValueWithPulse(document.getElementById("acInput"), state.ac || "");
-      setInputValueWithPulse(document.getElementById("hpMax"), state.hpMax || "");
-      setInputValueWithPulse(document.getElementById("ceMax"), state.ceMax || "");
-      setInputValueWithPulse(document.getElementById("moveInput"), state.movement || "");
+      setInputValueWithPulse(document.getElementById("acInput"),  state.ac       || "");
+      setInputValueWithPulse(document.getElementById("hpMax"),    state.hpMax    || "");
+      setInputValueWithPulse(document.getElementById("ceMax"),    state.ceMax    || "");
+      setInputValueWithPulse(document.getElementById("moveInput"),state.movement || "");
       if (def.key === "technique") {
         updateBlackFlashRangeDisplay();
         updateTechniquesDerivedUI();
       }
-      if (_refreshCombatTab) _refreshCombatTab(); // ← add this
+      if (_refreshCombatTab) _refreshCombatTab();
       scheduleSave();
     });
   });
@@ -1285,25 +1252,23 @@ function buildStatBlocks(defs, container) {
 
 function handleArchetypeChange(archetypeId, subId, archetypeKey, subKey) {
   const state = getState();
-  const arc = document.getElementById(archetypeId).value;
+  const arc   = document.getElementById(archetypeId).value;
   state[archetypeKey] = arc;
-  state[subKey] = "";
+  state[subKey]       = "";
   updateSubSelect(subId, arc, "");
 }
 
 function updateSubSelect(subId, arc, selectedSub) {
   const sel = document.getElementById(subId);
   if (!sel) return;
-
   if (!arc) {
     sel.innerHTML = '<option value="">— Pick archetype first —</option>';
-    sel.disabled = true;
+    sel.disabled  = true;
     return;
   }
-
-  sel.disabled = false;
-  const state = getState();
-  const opts = arc === "custom"
+  sel.disabled  = false;
+  const state   = getState();
+  const opts    = arc === "custom"
     ? [state?.customArchetype?.subArchetypeA || "Custom A", state?.customArchetype?.subArchetypeB || "Custom B"]
     : (ARCHETYPES[arc] || []);
   sel.innerHTML = '<option value="">— Sub-Archetype —</option>' +
@@ -1311,20 +1276,19 @@ function updateSubSelect(subId, arc, selectedSub) {
 }
 
 function updateSecondArchetypeUI() {
-  const state = getState();
-  const show = !!state.hasSecondArchetype;
+  const state     = getState();
+  const show      = !!state.hasSecondArchetype;
   const className = "meta-field multi-class-field" + (show ? "" : " hidden");
-  document.getElementById("multiClassArchetypeField").className = className;
-  // document.getElementById("multiClassSubArchetypeField").className = className;
-  document.getElementById("removeSecondArchetypeField").className = className + " grid-col-full";
-  document.getElementById("addSecondArchetypeBtn").style.display = show ? "none" : "";
+  document.getElementById("multiClassArchetypeField").className       = className;
+  document.getElementById("removeSecondArchetypeField").className     = className + " grid-col-full";
+  document.getElementById("addSecondArchetypeBtn").style.display      = show ? "none" : "";
 }
 
 function toggleSecondArchetype() {
   const state = getState();
   state.hasSecondArchetype = !state.hasSecondArchetype;
   if (!state.hasSecondArchetype) {
-    state.archetype2 = "";
+    state.archetype2    = "";
     state.subArchetype2 = "";
     document.getElementById("archetypeSelect2").value = "";
     updateSubSelect("subArchetypeSelect2", "", "");
@@ -1336,18 +1300,8 @@ function toggleSecondArchetype() {
 function bindField(id, stateKey) {
   const el = document.getElementById(id);
   if (!el) return;
-  el.addEventListener("input", e => {
-    const state = getState();
-    if (!state) return;
-    state[stateKey] = e.target.value;
-    scheduleSave();
-  });
-  el.addEventListener("change", e => {
-    const state = getState();
-    if (!state) return;
-    state[stateKey] = e.target.value;
-    scheduleSave();
-  });
+  el.addEventListener("input",  e => { const state = getState(); if (!state) return; state[stateKey] = e.target.value; scheduleSave(); });
+  el.addEventListener("change", e => { const state = getState(); if (!state) return; state[stateKey] = e.target.value; scheduleSave(); });
 }
 
 function syncHP() {
@@ -1357,7 +1311,7 @@ function syncHP() {
 }
 
 function updateOverrideButtonUI() {
-  const btn = document.getElementById("overrideModeBtn");
+  const btn   = document.getElementById("overrideModeBtn");
   const label = document.getElementById("overrideModeBtnLabel");
   if (!btn) return;
   btn.classList.toggle("active", _isOverrideMode);
@@ -1372,9 +1326,8 @@ function ensureDerivedOverrideMarker(inputId, fieldKey) {
   let marker = input.parentElement.querySelector(`.override-marker-btn[data-derived-override-clear='${fieldKey}']`);
   if (!marker) {
     marker = document.createElement("button");
-    marker.type = "button";
-    marker.className = "override-marker-btn";
-    marker.classList.add("derived-override-marker");
+    marker.type      = "button";
+    marker.className = "override-marker-btn derived-override-marker";
     marker.dataset.derivedOverrideClear = fieldKey;
     marker.textContent = "*";
     input.parentElement.style.position = "relative";
@@ -1389,17 +1342,16 @@ function ensureDerivedOverrideMarker(inputId, fieldKey) {
     input.parentElement.appendChild(marker);
   }
 
-  const state = getState();
+  const state     = getState();
   const hasOverride = state ? Number.isFinite(getDerivedOverride(state, fieldKey)) : false;
   marker.classList.toggle("visible", hasOverride);
-  marker.title = _isOverrideMode ? "Click to clear override" : "Overridden";
+  marker.title   = _isOverrideMode ? "Click to clear override" : "Overridden";
   marker.tabIndex = _isOverrideMode && hasOverride ? 0 : -1;
 }
 
 function wireDerivedOverrideInput(inputId, fieldKey) {
   const input = document.getElementById(inputId);
   if (!input) return;
-
   input.addEventListener("input", e => {
     if (!_isOverrideMode) return;
     const state = getState();
@@ -1417,7 +1369,7 @@ function applyOverrideFieldReadOnlyState() {
     const el = document.getElementById(id);
     if (!el) return;
     el.readOnly = !_isOverrideMode;
-    el.title = _isOverrideMode ? "Manual override enabled" : "Auto-calculated";
+    el.title    = _isOverrideMode ? "Manual override enabled" : "Auto-calculated";
   });
 }
 
@@ -1430,28 +1382,28 @@ export function applyCharacterStateToUI() {
   ensureDirectModifierState(state);
   applyDerivedCharacterFields({ preserveCurrent: true });
 
-  document.getElementById("charName").value = state.charName || "";
-  document.getElementById("ageInput").value = state.age || "";
+  document.getElementById("charName").value   = state.charName   || "";
+  document.getElementById("ageInput").value   = state.age        || "";
   const ctInput = document.getElementById("ctInput");
   if (ctInput) {
-    ctInput.value = getDisplayedTechniqueName(state);
+    ctInput.value    = getDisplayedTechniqueName(state);
     ctInput.readOnly = true;
-    ctInput.title = "Managed from the Jujutsu tab";
+    ctInput.title    = "Managed from the Jujutsu tab";
   }
   const aptitudeBonusInput = document.getElementById("aptitudeBonusInput");
-  if (aptitudeBonusInput) {
-    setInputValueWithPulse(aptitudeBonusInput, formatSignedValue(getAptitudeBonusValue(state)));
-  }
+  if (aptitudeBonusInput) setInputValueWithPulse(aptitudeBonusInput, formatSignedValue(getAptitudeBonusValue(state)));
+
   state.xp = String(parseXpValue(state.xp));
   const xpInput = document.getElementById("xpInput");
   if (xpInput) xpInput.value = state.xp;
+
   document.getElementById("playerName").value = state.playerName || "";
-  setInputValueWithPulse(document.getElementById("acInput"), state.ac || "");
-  setInputValueWithPulse(document.getElementById("hpCurrent"), state.hpCurrent || "");
-  setInputValueWithPulse(document.getElementById("hpMax"), state.hpMax || "");
-  setInputValueWithPulse(document.getElementById("moveInput"), state.movement || "");
-  setInputValueWithPulse(document.getElementById("ceCurrent"), state.ceCurrent || "");
-  setInputValueWithPulse(document.getElementById("ceMax"), state.ceMax || "");
+  setInputValueWithPulse(document.getElementById("acInput"),    state.ac        || "");
+  setInputValueWithPulse(document.getElementById("hpCurrent"),  state.hpCurrent || "");
+  setInputValueWithPulse(document.getElementById("hpMax"),      state.hpMax     || "");
+  setInputValueWithPulse(document.getElementById("moveInput"),  state.movement  || "");
+  setInputValueWithPulse(document.getElementById("ceCurrent"),  state.ceCurrent || "");
+  setInputValueWithPulse(document.getElementById("ceMax"),      state.ceMax     || "");
   const ceNoteEl = document.getElementById("ceNote");
   if (ceNoteEl) ceNoteEl.value = state.ceNote || "";
 
@@ -1471,11 +1423,11 @@ export function applyCharacterStateToUI() {
   updateTechniquesDerivedUI(state);
   applyOverrideFieldReadOnlyState();
   updateOverrideButtonUI();
-  ensureDerivedOverrideMarker("acInput", "ac");
-  ensureDerivedOverrideMarker("hpMax", "hpMax");
-  ensureDerivedOverrideMarker("ceMax", "ceMax");
-  ensureDerivedOverrideMarker("moveInput", "movement");
-  ensureDerivedOverrideMarker("aptitudeBonusInput", "aptitudeBonus");
+  ensureDerivedOverrideMarker("acInput",           "ac");
+  ensureDerivedOverrideMarker("hpMax",             "hpMax");
+  ensureDerivedOverrideMarker("ceMax",             "ceMax");
+  ensureDerivedOverrideMarker("moveInput",         "movement");
+  ensureDerivedOverrideMarker("aptitudeBonusInput","aptitudeBonus");
   updateDerivedModifierBadges(state);
   syncRestControlsUI(state);
   if (_activeDirectModifierTarget) renderDirectModifierPanel();
@@ -1483,129 +1435,110 @@ export function applyCharacterStateToUI() {
 }
 
 export function initCharacter({ getState: getStateFn, scheduleSave: scheduleSaveFn, showRollToast: showRollToastFn, refreshCombatTab: refreshCombatTabFn = null }) {
-  _getState = getStateFn;
-  _scheduleSave = scheduleSaveFn;
-  _showRollToast = showRollToastFn;
-  _refreshCombatTab = refreshCombatTabFn;
+  _getState          = getStateFn;
+  _scheduleSave      = scheduleSaveFn;
+  _showRollToast     = showRollToastFn;
+  _refreshCombatTab  = refreshCombatTabFn;
 
-  window.onArchetypeChange = function () {
-    handleArchetypeChange("archetypeSelect", "subArchetypeSelect", "archetype", "subArchetype");
-    scheduleSave();
-  };
-
-  window.onArchetypeChange2 = function () {
-    handleArchetypeChange("archetypeSelect2", "subArchetypeSelect2", "archetype2", "subArchetype2");
-    scheduleSave();
-  };
-
+  window.onArchetypeChange  = function () { handleArchetypeChange("archetypeSelect",  "subArchetypeSelect",  "archetype",  "subArchetype");  scheduleSave(); };
+  window.onArchetypeChange2 = function () { handleArchetypeChange("archetypeSelect2", "subArchetypeSelect2", "archetype2", "subArchetype2"); scheduleSave(); };
   window.syncHP = syncHP;
 
-  if (_initialized) {
-    applyCharacterStateToUI();
-    return;
-  }
+  if (_initialized) { applyCharacterStateToUI(); return; }
 
-  bindField("charName", "charName");
-  bindField("ageInput", "age");
-  bindField("gradeSelect", "grade");
-  bindField("playerName", "playerName");
-  bindField("xpInput", "xp");
-  bindField("hpCurrent", "hpCurrent");
-  bindField("ceCurrent", "ceCurrent");
-  bindField("ceNote", "ceNote");
-  bindField("subArchetypeSelect", "subArchetype");
+  bindField("charName",         "charName");
+  bindField("ageInput",         "age");
+  bindField("gradeSelect",      "grade");
+  bindField("playerName",       "playerName");
+  bindField("xpInput",          "xp");
+  bindField("hpCurrent",        "hpCurrent");
+  bindField("ceCurrent",        "ceCurrent");
+  bindField("ceNote",           "ceNote");
+  bindField("subArchetypeSelect","subArchetype");
 
   const ceCurrentInput = document.getElementById("ceCurrent");
   if (ceCurrentInput) {
-    ceCurrentInput.addEventListener("input", () => updateTechniquesDerivedUI());
+    ceCurrentInput.addEventListener("input",  () => updateTechniquesDerivedUI());
     ceCurrentInput.addEventListener("change", () => updateTechniquesDerivedUI());
   }
 
-  wireDerivedOverrideInput("acInput", "ac");
-  wireDerivedOverrideInput("hpMax", "hpMax");
-  wireDerivedOverrideInput("ceMax", "ceMax");
-  wireDerivedOverrideInput("moveInput", "movement");
-  wireDerivedOverrideInput("aptitudeBonusInput", "aptitudeBonus");
+  wireDerivedOverrideInput("acInput",           "ac");
+  wireDerivedOverrideInput("hpMax",             "hpMax");
+  wireDerivedOverrideInput("ceMax",             "ceMax");
+  wireDerivedOverrideInput("moveInput",         "movement");
+  wireDerivedOverrideInput("aptitudeBonusInput","aptitudeBonus");
 
   [
-    ["hpMax", "derived", "hpMax"],
-    ["ceMax", "derived", "ceMax"],
-    ["acInput", "derived", "ac"],
-    ["moveInput", "derived", "movement"],
-    ["aptitudeBonusInput", "derived", "aptitudeBonus"],
+    ["hpMax",             "derived", "hpMax"],
+    ["ceMax",             "derived", "ceMax"],
+    ["acInput",           "derived", "ac"],
+    ["moveInput",         "derived", "movement"],
+    ["aptitudeBonusInput","derived", "aptitudeBonus"],
   ].forEach(([id, targetType, targetKey]) => {
     const input = document.getElementById(id);
     if (!input) return;
-    input.title = `${input.title ? `${input.title} ` : ""}(Right-click to adjust modifiers)`;
-    input.addEventListener("contextmenu", event => {
-      openModifierContextMenu(event, targetType, targetKey);
-    });
+    input.title += " (Right-click to adjust modifiers)";
+    input.addEventListener("contextmenu", event => openModifierContextMenu(event, targetType, targetKey));
   });
 
   [
-    ["hpVitalBox", "derived", "hpMax"],
-    ["ceVitalBox", "derived", "ceMax"],
-    ["acVitalBox", "derived", "ac"],
-    ["movementVitalBox", "derived", "movement"],
-    ["aptitudeBonusVitalBox", "derived", "aptitudeBonus"],
+    ["hpVitalBox",           "derived", "hpMax"],
+    ["ceVitalBox",           "derived", "ceMax"],
+    ["acVitalBox",           "derived", "ac"],
+    ["movementVitalBox",     "derived", "movement"],
+    ["aptitudeBonusVitalBox","derived", "aptitudeBonus"],
+    ["xpThresholdVitalBox",  "derived", "xpThreshold"],
   ].forEach(([id, targetType, targetKey]) => {
     const box = document.getElementById(id);
     if (!box) return;
     box.title = "Right-click to adjust modifiers";
-    box.addEventListener("contextmenu", event => {
-      openModifierContextMenu(event, targetType, targetKey);
-    });
+    box.addEventListener("contextmenu", event => openModifierContextMenu(event, targetType, targetKey));
   });
 
-  const gradeSelect = document.getElementById("gradeSelect");
-  if (gradeSelect) {
-    gradeSelect.addEventListener("change", () => {
-      if (_refreshCombatTab) _refreshCombatTab();
-    });
+  // Wire right-click on the threshold line element itself (it lives inside the
+  // technique summary card, not a vital box, so we add it here too).
+  const thresholdLine = document.getElementById("techniqueXpThreshold");
+  if (thresholdLine) {
+    thresholdLine.style.cursor = "context-menu";
+    thresholdLine.title        = "Right-click to adjust XP Threshold modifiers";
+    thresholdLine.addEventListener("contextmenu", event =>
+      openModifierContextMenu(event, "derived", "xpThreshold")
+    );
   }
+
+  const gradeSelect = document.getElementById("gradeSelect");
+  if (gradeSelect) gradeSelect.addEventListener("change", () => { if (_refreshCombatTab) _refreshCombatTab(); });
 
   initDirectModifierUI();
 
   const overrideBtn = document.getElementById("overrideModeBtn");
-  if (overrideBtn) {
-    overrideBtn.addEventListener("click", () => {
-      _isOverrideMode = !_isOverrideMode;
-      applyCharacterStateToUI();
-    });
-  }
+  if (overrideBtn) overrideBtn.addEventListener("click", () => { _isOverrideMode = !_isOverrideMode; applyCharacterStateToUI(); });
 
   document.getElementById("addSecondArchetypeBtn").addEventListener("click", toggleSecondArchetype);
   document.getElementById("removeSecondArchetypeBtn").addEventListener("click", toggleSecondArchetype);
 
-  const restBtn = document.getElementById("restBtn");
+  const restBtn      = document.getElementById("restBtn");
   const quickRestBtn = document.getElementById("quickRestBtn");
   const shortRestBtn = document.getElementById("shortRestBtn");
-  const fullRestBtn = document.getElementById("fullRestBtn");
+  const fullRestBtn  = document.getElementById("fullRestBtn");
 
   if (restBtn) {
     restBtn.addEventListener("click", e => {
       e.stopPropagation();
       const popover = document.getElementById("restOptionsPopover");
-      const isOpen = popover ? popover.hidden : false;
+      const isOpen  = popover ? popover.hidden : false;
       setRestPopoverOpen(isOpen);
     });
   }
 
-  [
-    [quickRestBtn, "quick"],
-    [shortRestBtn, "short"],
-    [fullRestBtn, "full"],
-  ].forEach(([button, kind]) => {
+  [[quickRestBtn, "quick"], [shortRestBtn, "short"], [fullRestBtn, "full"]].forEach(([button, kind]) => {
     if (!button) return;
     button.addEventListener("click", e => {
       e.stopPropagation();
       const state = getState();
       if (!state) return;
       const applied = applyRestRecovery(state, kind);
-      if (!applied) {
-        syncRestControlsUI(state);
-        return;
-      }
+      if (!applied) { syncRestControlsUI(state); return; }
       setRestPopoverOpen(false);
       applyCharacterStateToUI();
       scheduleSave();
@@ -1614,7 +1547,7 @@ export function initCharacter({ getState: getStateFn, scheduleSave: scheduleSave
 
   document.addEventListener("click", e => {
     const popover = document.getElementById("restOptionsPopover");
-    const wrap = document.querySelector(".rest-control-wrap");
+    const wrap    = document.querySelector(".rest-control-wrap");
     if (!popover || popover.hidden) return;
     if (wrap && wrap.contains(e.target)) return;
     setRestPopoverOpen(false);
