@@ -7,8 +7,8 @@ import {
   getWeaponReachInFeet,
   normalizeWeaponType,
 } from "./weapons.js";
-import { computeActiveModifierEffects } from "./modifiers.js";
-import { getComputedSubskillValue } from "./character.js";
+import { computeActiveModifierEffects, getCombatAttackModifiers, getCombatAttackBonus, hasCombatAttackModifiers, getEffectiveBlackFlashRange } from "./modifiers.js";
+import { getComputedSubskillValue, openRollModeMenu, openModifierContextMenu, openDirectModifierPanel } from "./character.js";
 
 const _pendingAttackEffects = new Map();
 
@@ -17,69 +17,70 @@ const EFFECT_PIPELINE = {
     apply({ total, extraGroups, effect }) {
       const sides = parseInt(String(effect?.meta?.largestDie ?? "d6").replace("d", ""), 10) || 6;
       const roll = rollDice(1, sides)[0];
-
-      extraGroups.push({
-        summary: false,
-        label: `Crit (${effect?.meta?.largestDie})`,
-        rolls: [roll],
-        total: roll,
-      });
-
+      extraGroups.push({ summary: false, label: `Crit (${effect?.meta?.largestDie})`, rolls: [roll], total: roll });
       return total + roll;
     }
   },
-
   imbue: {
     apply({ total, extraGroups, effect, data }) {
       const imbue = rollImbueDie(effect.imbueStr || data.imbue.die);
-
-      extraGroups.push({
-        summary: false,
-        label: `Imbue`,
-        rolls: imbue.rolls,
-        total: imbue.total,
-      });
-
+      extraGroups.push({ summary: false, label: `Imbue`, rolls: imbue.rolls, total: imbue.total });
       return total + imbue.total;
     }
   },
-
   blackflash: {
     apply({ total, extraGroups }) {
       const newTotal = Math.floor(total * 2.5);
-
-      extraGroups.push({
-        summary: true,
-        label: "Black Flash ×2.5",
-        rolls: [],
-        total: null,
-        position: "before-total"
-      });
-
+      extraGroups.push({ summary: true, label: "Black Flash ×2.5", rolls: [], total: null, position: "before-total" });
       return newTotal;
     }
   }
 };
 
+// ── ROLL WITH MODE ────────────────────────────────────────────────────────────
+
+function rollDicePool(count, sides) {
+  return Array.from({ length: count }, () => Math.floor(Math.random() * sides) + 1);
+}
+
+function rollWithMode(count, sides, bonus, rollMode = "normal") {
+  const rollsA = rollDicePool(count, sides);
+  const totalA = rollsA.reduce((a, b) => a + b, 0) + bonus;
+  if (rollMode === "normal") {
+    return { rolls: rollsA, total: totalA, comparedRolls: null, comparedTotals: null, selectedRollIndex: 0 };
+  }
+  const rollsB = rollDicePool(count, sides);
+  const totalB = rollsB.reduce((a, b) => a + b, 0) + bonus;
+  const useA = rollMode === "advantage" ? totalA >= totalB : totalA <= totalB;
+  return {
+    rolls:             useA ? rollsA : rollsB,
+    total:             useA ? totalA : totalB,
+    comparedRolls:     [rollsA, rollsB],
+    comparedTotals:    [totalA, totalB],
+    selectedRollIndex: useA ? 0 : 1,
+  };
+}
+
+function buildRollBreakdown(base, result, rollMode) {
+  const bd = { ...base };
+  if (rollMode !== "normal" && result.comparedRolls) {
+    bd.rollMode          = rollMode;
+    bd.comparedRolls     = result.comparedRolls;
+    bd.comparedTotals    = result.comparedTotals;
+    bd.selectedRollIndex = result.selectedRollIndex;
+  }
+  return bd;
+}
+
 // ── HELPERS ───────────────────────────────────────────────────────────────────
 
 function applyEffectsPipeline(baseTotal, effect, extraGroups, data) {
   let total = baseTotal;
-
-  const steps = effect.steps || [];
-
-  for (const step of steps) {
+  for (const step of (effect.steps || [])) {
     const handler = EFFECT_PIPELINE[step];
     if (!handler) continue;
-
-    total = handler.apply({
-      total,
-      extraGroups,
-      effect,
-      data
-    });
+    total = handler.apply({ total, extraGroups, effect, data });
   }
-
   return total;
 }
 
@@ -87,9 +88,9 @@ function createPendingEffect(base = {}) {
   return {
     steps: Array.isArray(base.steps) ? base.steps : [],
     meta: {
-      imbueStr: base.meta?.imbueStr,
-      stacks: base.meta?.stacks,
-      largestDie: base.meta?.largestDie,
+      imbueStr:    base.meta?.imbueStr,
+      stacks:      base.meta?.stacks,
+      largestDie:  base.meta?.largestDie,
       damageParts: base.meta?.damageParts,
       damageBonus: base.meta?.damageBonus,
     }
@@ -108,15 +109,6 @@ function parseStatScore(rawValue) {
 
 function getEffectiveStatLevel(state, effects, statKey) {
   return parseStatScore(state?.stats?.[statKey]?.score) + (effects?.statBonuses?.[statKey] || 0);
-}
-
-function getSubskillValue(state, effects, statKey, skillIndex) {
-  const skillState = state?.stats?.[statKey]?.skills?.[skillIndex] || {};
-  const aptitude = parseInt(skillState.aptitude, 10) || 0;
-  const aptitudeBonus = aptitude > 0 ? (parseInt(state?.aptitudeBonus, 10) || 2) : 0;
-  const statSkillBonus = effects?.skillBonuses?.[statKey] || 0;
-  const specificBonus = effects?.specificSkillBonuses?.[`${statKey}:${skillIndex}`] || 0;
-  return aptitudeBonus + statSkillBonus + specificBonus;
 }
 
 function getBlackFlashRange(techniqueLevel) {
@@ -145,58 +137,44 @@ function escapeHtml(value) {
 // ── COMPUTE ───────────────────────────────────────────────────────────────────
 
 export function computeCombatTabData(state) {
+  if (!state) return null;
   const effects = computeActiveModifierEffects(state);
 
-  const techniqueLevel = getEffectiveStatLevel(state, effects, "technique");
+  const techniqueLevel  = getEffectiveStatLevel(state, effects, "technique");
   const blackFlashRange = getBlackFlashRange(techniqueLevel);
-  const actions = getActionsForGrade(state?.grade);
+  const actions         = getActionsForGrade(state?.grade);
 
-  const tempoBonus = getComputedSubskillValue(state, "speed", 3);
-  const combatBonus = getComputedSubskillValue(state, "power", 1);
+  const tempoBonus     = getComputedSubskillValue(state, "speed", 3);
+  const combatBonus    = getComputedSubskillValue(state, "power", 1);
   const precisionBonus = getComputedSubskillValue(state, "speed", 0);
-  const powerLevel = getEffectiveStatLevel(state, effects, "power");
-  const speedLevel = getEffectiveStatLevel(state, effects, "speed");
-  const imbue = getImbueDisplay(state?.imbueLevel ?? 1);
-  const reactions = speedLevel;
-  const imbueDC = techniqueLevel * 2;
+  const powerLevel     = getEffectiveStatLevel(state, effects, "power");
+  const speedLevel     = getEffectiveStatLevel(state, effects, "speed");
+  const imbue          = getImbueDisplay(state?.imbueLevel ?? 1);
+  const reactions      = speedLevel;
+  const imbueDC        = techniqueLevel * 2;
   const maxImbueStacks = techniqueLevel <= 2 ? 1 : techniqueLevel <= 4 ? 2 : 3;
-  const talentBonus = getComputedSubskillValue(state, "technique", 3);
-  const currentCE = parseInt(state?.ceCurrent, 10) || 0;
+  const talentBonus    = getComputedSubskillValue(state, "technique", 3);
+  const currentCE      = parseInt(state?.ceCurrent, 10) || 0;
 
-  // Default unarmed attacks
-    const unarmedAttacks = [
-      {
-        name: "Punch",
-        type: "Unarmed",
-        rangeText: "Melee",
-        damageStr: `1d4 + ${powerLevel}`,
-        hitStr: powerLevel > 0
-          ? `${powerLevel}d6 +${combatBonus}`
-          : `—`,
-        diceCount: powerLevel,
-        bonus: combatBonus,
-        statLabel: "Power",
-        damageParts: [{ count: 1, die: "d4" }],
-        damageBonus: powerLevel,
-      },
-      {
-        name: "Kick",
-        type: "Unarmed",
-        rangeText: "Melee",
-        damageStr: `1d4 + ${techniqueLevel}`,
-        hitStr: techniqueLevel > 0
-          ? `${powerLevel}d6 +${combatBonus}`
-          : `—`,
-        diceCount: powerLevel,
-        bonus: combatBonus,
-        statLabel: "Technique",
-        damageParts: [{ count: 1, die: "d4" }],
-        damageBonus: techniqueLevel,
-      },
-    ];
+  const unarmedAttacks = [
+    {
+      name: "Punch", type: "Unarmed", rangeText: "Melee",
+      damageStr: `1d4 + ${powerLevel}`,
+      hitStr: powerLevel > 0 ? `${powerLevel}d6 +${combatBonus}` : `—`,
+      diceCount: powerLevel, bonus: combatBonus, statLabel: "Power",
+      damageParts: [{ count: 1, die: "d4" }], damageBonus: powerLevel,
+    },
+    {
+      name: "Kick", type: "Unarmed", rangeText: "Melee",
+      damageStr: `1d4 + ${techniqueLevel}`,
+      hitStr: techniqueLevel > 0 ? `${powerLevel}d6 +${combatBonus}` : `—`,
+      diceCount: powerLevel, bonus: combatBonus, statLabel: "Technique",
+      damageParts: [{ count: 1, die: "d4" }], damageBonus: techniqueLevel,
+    },
+  ];
 
-  const equippedSlots = state?.equippedSlots || {};
-  const inventoryItems = state?.inventoryItems || [];
+  const equippedSlots   = state?.equippedSlots || {};
+  const inventoryItems  = state?.inventoryItems || [];
   const equippedWeapons = ['rightHand', 'leftHand']
     .map(slot => {
       const itemId = equippedSlots[slot];
@@ -204,118 +182,120 @@ export function computeCombatTabData(state) {
     })
     .filter(Boolean);
 
-  // Support for single, any, or all stat requirements
   function checkStatRequirement(requirement) {
     if (!requirement) return false;
-    // Legacy: single stat
-    if (requirement.stat && typeof requirement.value === 'number') {
+    if (requirement.stat && typeof requirement.value === 'number')
       return getEffectiveStatLevel(state, effects, requirement.stat) >= requirement.value;
-    }
-    // New: any/all mode
-    if (requirement.mode === 'any' && Array.isArray(requirement.requirements)) {
+    if (requirement.mode === 'any' && Array.isArray(requirement.requirements))
       return requirement.requirements.some(req => checkStatRequirement(req));
-    }
-    if (requirement.mode === 'all' && Array.isArray(requirement.requirements)) {
+    if (requirement.mode === 'all' && Array.isArray(requirement.requirements))
       return requirement.requirements.every(req => checkStatRequirement(req));
-    }
     return false;
   }
 
   const martialArts = martialArtsData.filter(art => checkStatRequirement(art.statRequirement));
 
   const weaponArts = weaponArtsData.filter(art => {
-    const unlockType = art.unlockType || "standard";
+    const unlockType   = art.unlockType || "standard";
     const hasAnyWeapon = equippedWeapons.length > 0;
-
     if (unlockType === "any_weapon") return hasAnyWeapon;
-
     if (unlockType === "weapon_stat_threshold") {
       const threshold = art.weaponStatThreshold ?? 4;
       return hasAnyWeapon && equippedWeapons.some(w => {
-        const isRanged = normalizeWeaponType(w.weaponType) === "ranged";
+        const isRanged  = normalizeWeaponType(w.weaponType) === "ranged";
         const weaponStat = isRanged ? "speed" : (w.weaponStat || "power");
         return getEffectiveStatLevel(state, effects, weaponStat) >= threshold;
       });
     }
-
     if (unlockType === "polearm_weapon_stat") {
       const threshold = art.statRequirement?.value ?? 1;
       return equippedWeapons.some(w => {
         if (normalizeWeaponType(w.weaponType) !== "polearm") return false;
-        const isRanged = normalizeWeaponType(w.weaponType) === "ranged";
+        const isRanged  = normalizeWeaponType(w.weaponType) === "ranged";
         const weaponStat = isRanged ? "speed" : (w.weaponStat || "power");
         return getEffectiveStatLevel(state, effects, weaponStat) >= threshold;
       });
     }
-
-    // Standard
     const stat = art.statRequirement?.stat;
     const value = art.statRequirement?.value;
     const weaponType = art.weaponTypeRequirement;
     if (!stat || value == null || !weaponType) return false;
-    const hasStat = getEffectiveStatLevel(state, effects, stat) >= value;
-    const hasWeapon = equippedWeapons.some(w => w.weaponType === weaponType);
-    return hasStat && hasWeapon;
+    return getEffectiveStatLevel(state, effects, stat) >= value &&
+      equippedWeapons.some(w => w.weaponType === weaponType);
   });
 
   return {
-    actions,
-    reactions,
-    tempoBonus,
-    combatBonus,
-    precisionBonus,
-    powerLevel,
-    speedLevel,
-    techniqueLevel,
-    imbue,
-    unarmedAttacks,
-    martialArts,
-    weaponArts,
-    equippedWeapons,
-    imbueDC,
-    maxImbueStacks,
-    talentBonus,
-    currentCE,
+    actions, reactions, tempoBonus, combatBonus, precisionBonus,
+    powerLevel, speedLevel, techniqueLevel, imbue,
+    unarmedAttacks, martialArts, weaponArts, equippedWeapons,
+    imbueDC, maxImbueStacks, talentBonus, currentCE,
     blackFlashRange: blackFlashRange ?? '—',
     blackFlashMin: blackFlashRange,
+    state,
   };
 }
 
 // ── RENDER ────────────────────────────────────────────────────────────────────
 
 export function renderCombatTabData(data) {
+  if (!data) return;
   const set = (id, val) => {
     const el = document.getElementById(id);
     if (el) el.textContent = val ?? "—";
   };
 
-  set("combatActionsValue", data.actions);
+  set("combatActionsValue",   data.actions);
   set("combatReactionsValue", data.reactions);
-  set("combatBlackFlashValue", data.blackFlashRange);
+
+  // Black flash range — apply directModifiers and show twinkling star badge
+  const effectiveBfRange = data.state
+    ? getEffectiveBlackFlashRange(data.state, data.blackFlashMin)
+    : data.blackFlashMin;
+  const bfDisplay = effectiveBfRange !== null ? String(effectiveBfRange) : "—";
+  set("combatBlackFlashValue", bfDisplay);
+
+  const bfBox = document.querySelector(".black-flash-box");
+  if (bfBox && data.state) {
+    const hasBfMod = (data.state.directModifiers || [])
+      .some(e => e.targetType === "derived" && e.targetKey === "blackFlashRange");
+    let bfBadge = bfBox.querySelector(".direct-modified-badge");
+    if (hasBfMod && !bfBadge) {
+      bfBadge = document.createElement("span");
+      bfBadge.className = "direct-modified-badge vital-mod-badge visible";
+      bfBadge.title     = "Modified";
+      bfBadge.setAttribute("aria-label", "Modified");
+      bfBadge.tabIndex  = 0;
+      bfBadge.setAttribute("role", "button");
+      bfBadge.addEventListener("click", () => openDirectModifierPanel("derived", "blackFlashRange"));
+      bfBox.appendChild(bfBadge);
+    } else if (!hasBfMod && bfBadge) {
+      bfBadge.remove();
+    }
+  }
 
   const initiativeStr = data.tempoBonus !== 0
     ? `${data.speedLevel}d6 ${data.tempoBonus > 0 ? "+" : ""}${data.tempoBonus}`
     : `${data.speedLevel}d6`;
   const initiativeEl = document.getElementById("combatInitiativeValue");
   if (initiativeEl) {
-    initiativeEl.textContent = initiativeStr;
-    initiativeEl.style.cursor = "pointer";
-    initiativeEl.title = "Click to roll initiative";
-    initiativeEl.onclick = () => rollInitiative(data);
+    initiativeEl.textContent     = initiativeStr;
+    initiativeEl.style.cursor    = "pointer";
+    initiativeEl.title           = "Click to roll — right-click for advantage/disadvantage";
+    initiativeEl.onclick         = () => rollInitiative(data);
+    initiativeEl.oncontextmenu   = (e) => {
+      e.preventDefault();
+      openRollModeMenu(e, selectedMode => rollInitiative(data, selectedMode));
+    };
   }
 
-  const imbueDieEl = document.getElementById("combatImbueDie");
-  const imbueInput = document.getElementById("combatImbueInput");
+  const imbueDieEl  = document.getElementById("combatImbueDie");
+  const imbueInput  = document.getElementById("combatImbueInput");
   if (imbueInput) imbueInput.value = data.imbue.level;
-  if (imbueDieEl) imbueDieEl.textContent = data.imbue.die;
+  if (imbueDieEl)  imbueDieEl.textContent = data.imbue.die;
 
-  // Strikes (unarmed)
   const strikesEl = document.getElementById("combatStrikesList");
-  if (strikesEl) {
-    strikesEl.innerHTML = data.unarmedAttacks.map((a, i) => renderUnarmedRow(a, i)).join("");
-  }
+  if (strikesEl) strikesEl.innerHTML = data.unarmedAttacks.map((a, i) => renderUnarmedRow(a, i, data.state)).join("");
 
-  // Weapons
   const attacksEl = document.getElementById("combatAttacksList");
   if (attacksEl) {
     attacksEl.innerHTML = data.equippedWeapons?.length
@@ -323,13 +303,12 @@ export function renderCombatTabData(data) {
       : '<span class="combat-empty">No weapons equipped.</span>';
   }
 
-  // Arts — apply search filters
   filterAndRenderArts(data);
 }
 
 function filterAndRenderArts(data) {
   const martialSearch = document.getElementById("combatMartialArtsSearch")?.value.toLowerCase() || "";
-  const weaponSearch = document.getElementById("combatWeaponArtsSearch")?.value.toLowerCase() || "";
+  const weaponSearch  = document.getElementById("combatWeaponArtsSearch")?.value.toLowerCase()  || "";
 
   const filteredMartial = data.martialArts.filter(art =>
     !martialSearch || art.title.toLowerCase().includes(martialSearch) || art.description.toLowerCase().includes(martialSearch)
@@ -352,8 +331,7 @@ function filterAndRenderArts(data) {
 function renderMartialArt(art) {
   const cooldownText = art.cooldown === 0 ? 'No Cooldown' : `Cooldown: ${art.cooldown} turn${art.cooldown === 1 ? '' : 's'}`;
   const reqText = (art.statRequirement.value && art.statRequirement.value !== 0)
-    ? `Req: ${art.statRequirement.stat} ${art.statRequirement.value}`
-    : '';
+    ? `Req: ${art.statRequirement.stat} ${art.statRequirement.value}` : '';
   return `
     <div class="combat-art-item">
       <strong>${escapeHtml(art.title)}</strong>
@@ -364,31 +342,19 @@ function renderMartialArt(art) {
 
 function renderWeaponArt(art) {
   const unlockType = art.unlockType || "standard";
-
   let reqText = "";
-  if (unlockType === "any_weapon") {
-    reqText = "Any weapon";
-  } else if (unlockType === "weapon_stat_threshold") {
-    reqText = `Any weapon, WS Lvl ${art.weaponStatThreshold ?? 4}+`;
-  } else if (unlockType === "polearm_weapon_stat") {
-    reqText = `Polearm, WS Lvl ${art.statRequirement?.value ?? 1}+`;
-  } else {
-    const statReq = art.statRequirement?.value
-      ? `${art.statRequirement.stat} ${art.statRequirement.value}`
-      : "";
+  if (unlockType === "any_weapon")              reqText = "Any weapon";
+  else if (unlockType === "weapon_stat_threshold") reqText = `Any weapon, WS Lvl ${art.weaponStatThreshold ?? 4}+`;
+  else if (unlockType === "polearm_weapon_stat")   reqText = `Polearm, WS Lvl ${art.statRequirement?.value ?? 1}+`;
+  else {
+    const statReq   = art.statRequirement?.value ? `${art.statRequirement.stat} ${art.statRequirement.value}` : "";
     const weaponReq = art.weaponTypeRequirement || "";
     reqText = [statReq, weaponReq].filter(Boolean).join(", ");
   }
-
-  const usesText = art.usesPerEncounter != null ? `Uses: ${art.usesPerEncounter}` : "";
-  const cooldownText = art.cooldown === 0
-    ? "No Cooldown"
-    : art.cooldown
-    ? `Cooldown: ${art.cooldown} turn${art.cooldown === 1 ? "" : "s"}`
-    : "";
-
+  const usesText     = art.usesPerEncounter != null ? `Uses: ${art.usesPerEncounter}` : "";
+  const cooldownText = art.cooldown === 0 ? "No Cooldown"
+    : art.cooldown ? `Cooldown: ${art.cooldown} turn${art.cooldown === 1 ? "" : "s"}` : "";
   const metaParts = [usesText, reqText ? `Req: ${reqText}` : "", cooldownText].filter(Boolean);
-
   return `
     <div class="combat-art-item">
       <strong>${escapeHtml(art.title)}</strong>
@@ -397,115 +363,83 @@ function renderWeaponArt(art) {
     </div>`;
 }
 
-function renderUnarmedRow(attack, index) {
-  const hitStr =
-    attack.diceCount > 0 && attack.bonus !== 0
-      ? `${attack.diceCount}d6 ${attack.bonus > 0 ? "+" : ""}${attack.bonus}`
-      : attack.diceCount > 0
-      ? `${attack.diceCount}d6`
-      : "—";
+function renderUnarmedRow(attack, index, state) {
+  const hitStr = attack.diceCount > 0 && attack.bonus !== 0
+    ? `${attack.diceCount}d6 ${attack.bonus > 0 ? "+" : ""}${attack.bonus}`
+    : attack.diceCount > 0 ? `${attack.diceCount}d6` : "—";
 
-  const attackKey = getAttackKey("unarmed", index);
+  const attackKey    = getAttackKey("unarmed", index);
   const pendingEffect = _pendingAttackEffects.get(attackKey);
 
-  const damageStr =
-    attack.damageBonus
-      ? `${attack.damageParts.map(p => `${p.count}${p.die}`).join(" + ")} + ${attack.damageBonus}`
-      : attack.damageParts.map(p => `${p.count}${p.die}`).join(" + ");
+  const damageStr = attack.damageBonus
+    ? `${attack.damageParts.map(p => `${p.count}${p.die}`).join(" + ")} + ${attack.damageBonus}`
+    : attack.damageParts.map(p => `${p.count}${p.die}`).join(" + ");
 
-  const damageAction = pendingEffect
-    ? "rollPendingDamage"
-    : "rollUnarmedDamage";
+  const damageAction = pendingEffect ? "rollPendingDamage" : "rollUnarmedDamage";
 
-  const damageDisplay = pendingEffect
-    ? (() => {
-        const steps = pendingEffect.steps || [];
+  const damageDisplay = pendingEffect ? (() => {
+    const steps = pendingEffect.steps || [];
+    let label = damageStr;
+    if (steps.includes("blackflash")) label = `✦${label}✦`;
+    if (steps.includes("crit"))       label += " + CRIT";
+    if (steps.includes("imbue"))      label += pendingEffect?.meta?.imbueStr ? ` + ${pendingEffect.meta.imbueStr}` : " + IMBUE";
+    return label;
+  })() : damageStr;
 
-        let label = damageStr;
-
-        if (steps.includes("blackflash")) {
-          label = `✦${label}✦`;
-        }
-
-        if (steps.includes("crit")) {
-          label += " + CRIT";
-        }
-
-        if (steps.includes("imbue")) {
-          label += pendingEffect?.meta?.imbueStr
-            ? ` + ${pendingEffect?.meta?.imbueStr}`
-            : " + IMBUE";
-        }
-
-        return label;
-      })()
-    : damageStr;
-    
+  // Modifier badges (twinkling star — reuses direct-modified-badge class)
+  const hitBadgeHtml    = (state && getCombatAttackModifiers(state, attackKey, "hit").length)
+    ? ` <span class="direct-modified-badge visible" style="font-size:0.7em;vertical-align:middle;" title="Hit modifier active">✦</span>` : "";
+  const damageBadgeHtml = (state && getCombatAttackModifiers(state, attackKey, "damage").length)
+    ? ` <span class="direct-modified-badge visible" style="font-size:0.7em;vertical-align:middle;" title="Damage modifier active">✦</span>` : "";
 
   return `
     <div class="combat-attack-row combat-attack-row--unarmed">
-
       <div class="combat-attack-name">${escapeHtml(attack.name)}</div>
-
       <div class="combat-attack-type">${escapeHtml(attack.type)}</div>
-
       <div class="combat-attack-range">${escapeHtml(attack.rangeText)}</div>
-
       <div class="combat-attack-hit combat-attack-rollable"
            data-action="rollUnarmedHit"
            data-unarmed-index="${index}"
-           title="Click to roll to hit">
-        ${escapeHtml(hitStr)}
+           data-attack-key="${attackKey}"
+           title="Click to roll — right-click for advantage/disadvantage">
+        ${escapeHtml(hitStr)}${hitBadgeHtml}
       </div>
-
       <div class="combat-attack-damage combat-attack-rollable"
            data-action="${damageAction}"
            data-attack-key="${attackKey}"
            data-unarmed-index="${index}"
-           title="Click to roll damage">
-        ${escapeHtml(damageDisplay)}
+           title="Click to roll damage — right-click to add modifiers">
+        ${escapeHtml(damageDisplay)}${damageBadgeHtml}
       </div>
-
       <button type="button"
               class="combat-imbue-btn"
               data-action="imbueAttack"
               data-unarmed-index="${index}"
-              title="Roll to imbue">
+              title="Click to imbue — right-click for advantage/disadvantage">
         Imbue
       </button>
-
-    </div>
-  `;
+    </div>`;
 }
 
 function renderAttackRow(weapon, index, data) {
-  const isRanged = normalizeWeaponType(weapon.weaponType) === "ranged";
+  const isRanged  = normalizeWeaponType(weapon.weaponType) === "ranged";
   const isPolearm = normalizeWeaponType(weapon.weaponType) === "polearm";
   const typeLabel = WEAPON_TYPE_LABELS[weapon.weaponType] ?? weapon.weaponType;
 
-  let statKey = weapon.weaponStat || "power";
-
-  let statLevel =
-    statKey === "speed"
-      ? data.speedLevel
-      : statKey === "technique"
-      ? (data.techniqueLevel || 0)
-      : data.powerLevel;
+  let statKey   = weapon.weaponStat || "power";
+  let statLevel = statKey === "speed" ? data.speedLevel
+    : statKey === "technique" ? (data.techniqueLevel || 0)
+    : data.powerLevel;
 
   let damageStr = "";
-
   if (Array.isArray(weapon.weaponDamageParts) && weapon.weaponDamageParts.length > 0) {
-    damageStr = weapon.weaponDamageParts
-      .map(p => `${p.count}${p.die}`)
-      .join(" + ");
-
+    damageStr = weapon.weaponDamageParts.map(p => `${p.count}${p.die}`).join(" + ");
     if (statLevel) damageStr += ` + ${statLevel}`;
   } else {
     damageStr = statLevel ? `+${statLevel}` : "—";
   }
 
   let rangeText = "Melee";
-
   if (isPolearm) {
     const reach = getWeaponReachInFeet(weapon);
     rangeText = reach && reach > 5 ? `Reach (${reach} ft)` : "Reach";
@@ -514,48 +448,32 @@ function renderAttackRow(weapon, index, data) {
     rangeText = reach ? `${reach} ft` : "Ranged";
   }
 
-  const diceCount = isRanged ? data.speedLevel : data.powerLevel;
-  const bonus = isRanged ? data.precisionBonus : data.combatBonus;
+  const diceCount = isRanged ? data.speedLevel  : data.powerLevel;
+  const bonus     = isRanged ? data.precisionBonus : data.combatBonus;
+  const hitStr    = bonus !== 0 ? `${diceCount}d6 ${bonus > 0 ? "+" : ""}${bonus}` : `${diceCount}d6`;
 
-  const hitStr =
-    bonus !== 0
-      ? `${diceCount}d6 ${bonus > 0 ? "+" : ""}${bonus}`
-      : `${diceCount}d6`;
-
-  const attackKey = getAttackKey("weapon", index);
+  const attackKey    = getAttackKey("weapon", index);
   const pendingEffect = _pendingAttackEffects.get(attackKey);
+  const damageAction = pendingEffect ? "rollPendingDamage" : "rollDamage";
 
-  const damageAction = pendingEffect
-    ? "rollPendingDamage"
-    : "rollDamage";
-
-  const damageDisplay = pendingEffect
-    ? (() => {
-        const steps = pendingEffect.steps || [];
-
-        let label = damageStr;
-
-        if (steps.includes("blackflash")) {
-          label = `✦${label}✦`;
-        }
-
-        if (steps.includes("crit")) {
-          label += " + CRIT";
-        }
-
-        if (steps.includes("imbue")) {
-          label += pendingEffect?.meta?.imbueStr
-            ? ` + ${pendingEffect?.meta?.imbueStr}`
-            : " + IMBUE";
-        }
-
-        return label;
-      })()
-    : damageStr;
+  const damageDisplay = pendingEffect ? (() => {
+    const steps = pendingEffect.steps || [];
+    let label = damageStr;
+    if (steps.includes("blackflash")) label = `✦${label}✦`;
+    if (steps.includes("crit"))       label += " + CRIT";
+    if (steps.includes("imbue"))      label += pendingEffect?.meta?.imbueStr ? ` + ${pendingEffect.meta.imbueStr}` : " + IMBUE";
+    return label;
+  })() : damageStr;
 
   const descLine = weapon.description
-    ? `<div class="combat-attack-desc">${escapeHtml(weapon.description)}</div>`
-    : "";
+    ? `<div class="combat-attack-desc">${escapeHtml(weapon.description)}</div>` : "";
+
+  // Modifier badges
+  const state = data.state;
+  const wHitBadgeHtml    = (state && getCombatAttackModifiers(state, attackKey, "hit").length)
+    ? ` <span class="direct-modified-badge visible" style="font-size:0.7em;vertical-align:middle;" title="Hit modifier active">✦</span>` : "";
+  const wDamageBadgeHtml = (state && getCombatAttackModifiers(state, attackKey, "damage").length)
+    ? ` <span class="direct-modified-badge visible" style="font-size:0.7em;vertical-align:middle;" title="Damage modifier active">✦</span>` : "";
 
   return `
     <div class="combat-attack-row" data-weapon-index="${index}">
@@ -563,46 +481,41 @@ function renderAttackRow(weapon, index, data) {
         <div class="combat-attack-name">${escapeHtml(weapon.name)}</div>
         ${descLine}
       </div>
-
       <div class="combat-attack-type">${escapeHtml(typeLabel)}</div>
-
       <div class="combat-attack-range">${escapeHtml(rangeText)}</div>
-
       <div class="combat-attack-hit combat-attack-rollable"
            data-action="rollHit"
            data-weapon-index="${index}"
-           title="Click to roll to hit">
-        ${escapeHtml(hitStr)}
+           data-attack-key="${attackKey}"
+           title="Click to roll — right-click for advantage/disadvantage">
+        ${escapeHtml(hitStr)}${wHitBadgeHtml}
       </div>
-
       <div class="combat-attack-damage combat-attack-rollable"
            data-action="${damageAction}"
            data-attack-key="${attackKey}"
            data-weapon-index="${index}"
-           title="Click to roll damage">
-        ${escapeHtml(damageDisplay)}
+           title="Click to roll damage — right-click to add modifiers">
+        ${escapeHtml(damageDisplay)}${wDamageBadgeHtml}
       </div>
-
       <button type="button"
               class="combat-imbue-btn"
               data-action="imbueAttack"
               data-weapon-index="${index}"
-              title="Roll to imbue">
+              title="Click to imbue — right-click for advantage/disadvantage">
         Imbue
       </button>
-    </div>
-  `;
+    </div>`;
 }
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
 
-let _getState = null;
+let _getState    = null;
 let _scheduleSave = null;
 let _showRollToast = null;
 
 export function initCombat({ getState, scheduleSave, showRollToast }) {
-  _getState = getState;
-  _scheduleSave = scheduleSave;
+  _getState      = getState;
+  _scheduleSave  = scheduleSave;
   _showRollToast = showRollToast;
 
   const imbueInput = document.getElementById("combatImbueInput");
@@ -617,8 +530,7 @@ export function initCombat({ getState, scheduleSave, showRollToast }) {
     });
   }
 
-  // Collapse button
-  const collapseBtn = document.getElementById("combatActionsCollapseBtn");
+  const collapseBtn   = document.getElementById("combatActionsCollapseBtn");
   const collapsePanel = document.getElementById("combatActionsPanel");
   if (collapseBtn && collapsePanel) {
     collapseBtn.addEventListener("click", () => {
@@ -628,7 +540,6 @@ export function initCombat({ getState, scheduleSave, showRollToast }) {
     });
   }
 
-  // Arts tabs
   const artsTabs = document.querySelectorAll(".combat-arts-tab");
   artsTabs.forEach(tab => {
     tab.addEventListener("click", () => {
@@ -636,11 +547,10 @@ export function initCombat({ getState, scheduleSave, showRollToast }) {
       tab.classList.add("active");
       const target = tab.dataset.artsTab;
       document.getElementById("combatArtsTabPanelMartial").hidden = target !== "martial";
-      document.getElementById("combatArtsTabPanelWeapon").hidden = target !== "weapon";
+      document.getElementById("combatArtsTabPanelWeapon").hidden  = target !== "weapon";
     });
   });
 
-  // Search bars — re-filter on input without full re-render
   ["combatMartialArtsSearch", "combatWeaponArtsSearch"].forEach(id => {
     document.getElementById(id)?.addEventListener("input", () => {
       const state = _getState();
@@ -649,94 +559,160 @@ export function initCombat({ getState, scheduleSave, showRollToast }) {
     });
   });
 
-  // Roll delegation
+  // ── Click delegation ──────────────────────────────────────────────────────
   const panel = document.getElementById("panel-combat");
-if (panel) {
-  panel.addEventListener("click", e => {
-    const target = e.target.closest("[data-action]");
-    if (!target) return;
-    const action = target.dataset.action;
-    const state = _getState();
-    if (!state) return;
-    const data = computeCombatTabData(state);
+  if (panel) {
+    panel.addEventListener("click", e => {
+      const target = e.target.closest("[data-action]");
+      if (!target) return;
+      const action = target.dataset.action;
+      const state  = _getState();
+      if (!state) return;
+      const data   = computeCombatTabData(state);
 
-    if (action === "rollHit" || action === "rollDamage") {
-      const weaponIndex = parseInt(target.dataset.weaponIndex, 10);
-      if (!Number.isInteger(weaponIndex)) return;
-      const weapon = data.equippedWeapons[weaponIndex];
-      if (!weapon) return;
-      if (action === "rollHit") rollHit(weapon, data, weaponIndex);
-      if (action === "rollDamage") rollDamage(weapon, data);
-    }
-
-    if (action === "rollUnarmedHit" || action === "rollUnarmedDamage") {
-      const unarmedIndex = parseInt(target.dataset.unarmedIndex, 10);
-      if (!Number.isInteger(unarmedIndex)) return;
-      const attack = data.unarmedAttacks[unarmedIndex];
-      if (!attack) return;
-      if (action === "rollUnarmedHit") rollUnarmedHit(attack, unarmedIndex);
-      if (action === "rollUnarmedDamage") rollUnarmedDamage(attack);
-    }
-
-    if (action === "rollPendingDamage") {
-      const key = target.dataset.attackKey;
-      if (!key) return;
-      rollPendingDamage(key, data, state);
-    }
-
-    if (action === "imbueAttack") {
-      const weaponIndex = parseInt(target.dataset.weaponIndex, 10);
-      const unarmedIndex = parseInt(target.dataset.unarmedIndex, 10);
-      let attackName, damageParts, damageBonus, attackKey;
-      if (Number.isInteger(weaponIndex)) {
+      if (action === "rollHit" || action === "rollDamage") {
+        const weaponIndex = parseInt(target.dataset.weaponIndex, 10);
+        if (!Number.isInteger(weaponIndex)) return;
         const weapon = data.equippedWeapons[weaponIndex];
         if (!weapon) return;
-        attackName = weapon.name;
-        damageParts = weapon.weaponDamageParts || [{ count: 1, die: "d6" }];
-        const statKey = weapon.weaponStat || "power";
-        damageBonus = statKey === "speed" ? data.speedLevel
-          : statKey === "technique" ? data.techniqueLevel
-          : data.powerLevel;
-        attackKey = getAttackKey("weapon", weaponIndex);
-      } else if (Number.isInteger(unarmedIndex)) {
+        if (action === "rollHit")    rollHit(weapon, data, weaponIndex);
+        if (action === "rollDamage") rollDamage(weapon, data, weaponIndex);
+      }
+
+      if (action === "rollUnarmedHit" || action === "rollUnarmedDamage") {
+        const unarmedIndex = parseInt(target.dataset.unarmedIndex, 10);
+        if (!Number.isInteger(unarmedIndex)) return;
         const attack = data.unarmedAttacks[unarmedIndex];
         if (!attack) return;
-        attackName = attack.name;
-        damageParts = attack.damageParts;
-        damageBonus = attack.damageBonus;
-        attackKey = getAttackKey("unarmed", unarmedIndex);
-      } else return;
-      rollImbue(attackName, damageParts, damageBonus, data, state, attackKey);
-    }
-  });
+        if (action === "rollUnarmedHit")    rollUnarmedHit(attack, unarmedIndex);
+        if (action === "rollUnarmedDamage") rollUnarmedDamage(attack, unarmedIndex);
+      }
 
-  // Right-click to clear pending effect
-  panel.addEventListener("contextmenu", e => {
-    const target = e.target.closest("[data-action='rollPendingDamage']");
-    if (!target) return;
-    e.preventDefault();
-    const key = target.dataset.attackKey;
-    if (!key) return;
-    _pendingAttackEffects.delete(key);
-    const state = _getState();
-    if (state) renderCombatTabData(computeCombatTabData(state));
-  });
-}
-  
-  // Sub-collapse buttons
-  ["combatAttacksCollapseBtn", "combatArtsCollapseBtn", "combatBasicActionsCollapseBtn", 
-  "combatReactionsCollapseBtn", "combatBasicReactionsCollapseBtn"].forEach(btnId => {
-    const btn = document.getElementById(btnId);
-    const panelId = btnId.replace("CollapseBtn", "Panel");
-    const panel = document.getElementById(panelId);
-    if (!btn || !panel) return;
+      if (action === "rollPendingDamage") {
+        const key = target.dataset.attackKey;
+        if (!key) return;
+        rollPendingDamage(key, data, state);
+      }
+
+      if (action === "imbueAttack") {
+        const weaponIndex  = parseInt(target.dataset.weaponIndex,  10);
+        const unarmedIndex = parseInt(target.dataset.unarmedIndex, 10);
+        let attackName, damageParts, damageBonus, attackKey;
+        if (Number.isInteger(weaponIndex)) {
+          const weapon = data.equippedWeapons[weaponIndex];
+          if (!weapon) return;
+          attackName  = weapon.name;
+          damageParts = weapon.weaponDamageParts || [{ count: 1, die: "d6" }];
+          const sk    = weapon.weaponStat || "power";
+          damageBonus = sk === "speed" ? data.speedLevel : sk === "technique" ? data.techniqueLevel : data.powerLevel;
+          attackKey   = getAttackKey("weapon", weaponIndex);
+        } else if (Number.isInteger(unarmedIndex)) {
+          const attack = data.unarmedAttacks[unarmedIndex];
+          if (!attack) return;
+          attackName  = attack.name;
+          damageParts = attack.damageParts;
+          damageBonus = attack.damageBonus;
+          attackKey   = getAttackKey("unarmed", unarmedIndex);
+        } else return;
+        rollImbue(attackName, damageParts, damageBonus, data, state, attackKey);
+      }
+    });
+
+    // ── Right-click delegation ──────────────────────────────────────────────
+    panel.addEventListener("contextmenu", e => {
+      e.preventDefault();
+      const state = _getState();
+      if (!state) return;
+      const data = computeCombatTabData(state);
+
+      // Clear pending damage (right-click on glowing damage cell)
+      const pendingTarget = e.target.closest("[data-action='rollPendingDamage']");
+      if (pendingTarget) {
+        const key = pendingTarget.dataset.attackKey;
+        if (key) { _pendingAttackEffects.delete(key); renderCombatTabData(computeCombatTabData(state)); }
+        return;
+      }
+
+      // To Hit — roll mode menu (adv/dis) + Add Modifier option
+      const hitTarget = e.target.closest("[data-action='rollHit'],[data-action='rollUnarmedHit']");
+      if (hitTarget) {
+        const action    = hitTarget.dataset.action;
+        const attackKey = hitTarget.dataset.attackKey;
+        openRollModeMenu(e,
+          selectedMode => {
+            if (action === "rollHit") {
+              const weaponIndex = parseInt(hitTarget.dataset.weaponIndex, 10);
+              const weapon = data.equippedWeapons[weaponIndex];
+              if (weapon) rollHit(weapon, data, weaponIndex, selectedMode);
+            } else {
+              const unarmedIndex = parseInt(hitTarget.dataset.unarmedIndex, 10);
+              const attack = data.unarmedAttacks[unarmedIndex];
+              if (attack) rollUnarmedHit(attack, unarmedIndex, selectedMode);
+            }
+          },
+          { onAddModifier: () => { if (attackKey) openDirectModifierPanel("combatAttack", attackKey); } }
+        );
+        return;
+      }
+
+      // Damage — modifier panel only (no roll mode for damage)
+      const damageTarget = e.target.closest("[data-action='rollDamage'],[data-action='rollUnarmedDamage']");
+      if (damageTarget) {
+        const attackKey = damageTarget.dataset.attackKey;
+        if (attackKey) openDirectModifierPanel("combatAttack", attackKey);
+        return;
+      }
+
+      // Imbue button — roll mode menu (adv/dis), one-time
+      const imbueTarget = e.target.closest("[data-action='imbueAttack']");
+      if (imbueTarget) {
+        const weaponIndex  = parseInt(imbueTarget.dataset.weaponIndex,  10);
+        const unarmedIndex = parseInt(imbueTarget.dataset.unarmedIndex, 10);
+        openRollModeMenu(e, selectedMode => {
+          let attackName, damageParts, damageBonus, attackKey;
+          if (Number.isInteger(weaponIndex)) {
+            const weapon = data.equippedWeapons[weaponIndex];
+            if (!weapon) return;
+            attackName  = weapon.name;
+            damageParts = weapon.weaponDamageParts || [{ count: 1, die: "d6" }];
+            const sk    = weapon.weaponStat || "power";
+            damageBonus = sk === "speed" ? data.speedLevel : sk === "technique" ? data.techniqueLevel : data.powerLevel;
+            attackKey   = getAttackKey("weapon", weaponIndex);
+          } else if (Number.isInteger(unarmedIndex)) {
+            const attack = data.unarmedAttacks[unarmedIndex];
+            if (!attack) return;
+            attackName  = attack.name;
+            damageParts = attack.damageParts;
+            damageBonus = attack.damageBonus;
+            attackKey   = getAttackKey("unarmed", unarmedIndex);
+          } else return;
+          rollImbue(attackName, damageParts, damageBonus, data, state, attackKey, selectedMode);
+        });
+        return;
+      }
+
+      // Black Flash box — modifier panel
+      const bfTarget = e.target.closest(".black-flash-box");
+      if (bfTarget) {
+        openDirectModifierPanel("derived", "blackFlashRange");
+      }
+    });
+  }
+
+  ["combatAttacksCollapseBtn", "combatArtsCollapseBtn", "combatBasicActionsCollapseBtn",
+   "combatReactionsCollapseBtn", "combatBasicReactionsCollapseBtn"].forEach(btnId => {
+    const btn      = document.getElementById(btnId);
+    const panelEl  = document.getElementById(btnId.replace("CollapseBtn", "Panel"));
+    if (!btn || !panelEl) return;
     btn.addEventListener("click", () => {
       const isOpen = btn.getAttribute("aria-expanded") === "true";
       btn.setAttribute("aria-expanded", isOpen ? "false" : "true");
-      panel.classList.toggle("collapsed", isOpen);
+      panelEl.classList.toggle("collapsed", isOpen);
     });
   });
 }
+
+// ── ROLL FUNCTIONS ────────────────────────────────────────────────────────────
 
 function rollDice(count, sides) {
   return Array.from({ length: count }, () => Math.floor(Math.random() * sides) + 1);
@@ -748,346 +724,204 @@ function getAttackKey(type, index) {
 
 function getLargestDamageDie(parts) {
   if (!Array.isArray(parts) || !parts.length) return "d6";
-
   let largest = 0;
-
   for (const part of parts) {
     const sides = parseInt(String(part.die).replace("d", ""), 10) || 6;
     if (sides > largest) largest = sides;
   }
-
   return `d${largest}`;
 }
 
-function rollInitiative(data) {
+function rollInitiative(data, rollMode = "normal") {
   if (!_showRollToast) return;
   const diceCount = data.speedLevel;
   if (!diceCount || diceCount < 1) return;
-  const bonus = data.tempoBonus || 0;
-  const rolls = rollDice(diceCount, 6);
-  const total = rolls.reduce((a, b) => a + b, 0) + bonus;
-  const allOnes = rolls.every(r => r === 1);
-  const critStatus = allOnes ? "fail" : total >= diceCount * 6 ? "success" : null;
-  _showRollToast(
-    "Speed",
-    diceCount,
-    rolls,
-    total,
-    critStatus,
-    "Initiative",
-    { skillModifier: bonus },
-    null,
-  );
+  const bonus   = data.tempoBonus || 0;
+  const result  = rollWithMode(diceCount, 6, bonus, rollMode);
+  const allOnes = result.rolls.every(r => r === 1);
+  const critStatus = allOnes ? "fail" : result.total >= diceCount * 6 + bonus ? "success" : null;
+  const breakdown  = buildRollBreakdown({ skillModifier: bonus, die: "d6" }, result, rollMode);
+  _showRollToast("Speed", diceCount, result.rolls, result.total, critStatus,
+    "Initiative", breakdown, rollMode === "normal" ? null : rollMode);
 }
 
-function rollHit(weapon, data, weaponIndex) {
+function rollHit(weapon, data, weaponIndex, rollMode = "normal") {
   if (!_showRollToast) return;
-
-  const isRanged =
-    normalizeWeaponType(weapon.weaponType) === "ranged";
-
-  const diceCount =
-    isRanged ? data.speedLevel : data.powerLevel;
-
-  const bonus =
-    isRanged ? data.precisionBonus : data.combatBonus;
-
-  const statLabel = isRanged ? "Speed" : "Power";
+  const isRanged   = normalizeWeaponType(weapon.weaponType) === "ranged";
+  const diceCount  = isRanged ? data.speedLevel : data.powerLevel;
+  const statLabel  = isRanged ? "Speed" : "Power";
   const skillLabel = isRanged ? "Precision" : "Combat";
-
   if (!diceCount || diceCount < 1) return;
 
-  const rolls = rollDice(diceCount, 6);
+  const attackKey    = getAttackKey("weapon", weaponIndex);
+  const state        = _getState();
+  const hitModBonus  = state ? getCombatAttackBonus(state, attackKey, "hit") : 0;
+  const bonus        = (isRanged ? data.precisionBonus : data.combatBonus) + hitModBonus;
 
-  const total =
-    rolls.reduce((a, b) => a + b, 0) + bonus;
-
-  const allOnes = rolls.every(r => r === 1);
-
-  const critStatus =
-    allOnes
-      ? "fail"
-      : total >= diceCount * 6
-      ? "success"
-      : null;
-
-  const attackKey = getAttackKey("weapon", weaponIndex);
+  const result     = rollWithMode(diceCount, 6, bonus, rollMode);
+  const allOnes    = result.rolls.every(r => r === 1);
+  const critStatus = allOnes ? "fail" : result.total >= diceCount * 6 + bonus ? "success" : null;
 
   if (critStatus === "success") {
     const existing = _pendingAttackEffects.get(attackKey);
-
-    const base = existing || {
-      steps: [],
-    };
-
-    const steps = new Set(base.steps || []);
-
+    const steps    = new Set(existing?.steps || []);
     steps.add("crit");
-
-    _pendingAttackEffects.set(attackKey, {
-      ...base,
+    _pendingAttackEffects.set(attackKey, createPendingEffect({
       steps: [...steps],
-      largestDie: getLargestDamageDie(attack.damageParts),
-    });
-
+      meta:  { ...existing?.meta, largestDie: getLargestDamageDie(weapon.weaponDamageParts || []) },
+    }));
     renderCombatTabData(computeCombatTabData(_getState()));
   }
 
-  _showRollToast(
-    statLabel,
-    diceCount,
-    rolls,
-    total,
-    critStatus,
-    `${weapon.name} — ${skillLabel}`,
-    { skillModifier: bonus },
-    null,
-  );
+  const breakdown = buildRollBreakdown({ skillModifier: bonus, die: "d6" }, result, rollMode);
+  _showRollToast(statLabel, diceCount, result.rolls, result.total, critStatus,
+    `${weapon.name} — ${skillLabel}`, breakdown, rollMode === "normal" ? null : rollMode);
 }
 
-function rollDamage(weapon, data) {
+function rollDamage(weapon, data, weaponIndex) {
   if (!_showRollToast) return;
+  const attackKey      = getAttackKey("weapon", weaponIndex ?? 0);
+  const state          = _getState();
+  const damageModBonus = state ? getCombatAttackBonus(state, attackKey, "damage") : 0;
 
-  const parts =
-    weapon.weaponDamageParts || [{ count: 1, die: "d6" }];
-
+  const parts = weapon.weaponDamageParts || [{ count: 1, die: "d6" }];
   let total = 0;
-
   const allRolls = [];
   const dieGroups = [];
 
   for (const part of parts) {
-    const sides =
-      parseInt(String(part.die).replace("d", ""), 10) || 6;
-
-    const rolls = rollDice(part.count, sides);
-
-    const partTotal =
-      rolls.reduce((a, b) => a + b, 0);
-
+    const sides    = parseInt(String(part.die).replace("d", ""), 10) || 6;
+    const rolls    = rollDice(part.count, sides);
+    const partTotal = rolls.reduce((a, b) => a + b, 0);
     total += partTotal;
-
     allRolls.push(...rolls);
-
-    dieGroups.push({
-      label: `${part.count}${part.die}`,
-      rolls,
-      total: partTotal,
-    });
+    dieGroups.push({ label: `${part.count}${part.die}`, rolls, total: partTotal });
   }
 
-  let statKey = weapon.weaponStat || "power";
+  let statKey   = weapon.weaponStat || "power";
+  let statBonus = statKey === "power" ? data.powerLevel
+    : statKey === "speed" ? data.speedLevel
+    : statKey === "technique" ? (data.techniqueLevel || 0)
+    : data.powerLevel;
 
-  let statBonus = 0;
-
-  if (statKey === "power") {
-    statBonus = data.powerLevel;
-  } else if (statKey === "speed") {
-    statBonus = data.speedLevel;
-  } else if (statKey === "technique") {
-    statBonus = data.techniqueLevel || 0;
-  } else {
-    statBonus = data.powerLevel;
-  }
-
-  total += statBonus;
+  total += statBonus + damageModBonus;
 
   _showRollToast(
     statKey.charAt(0).toUpperCase() + statKey.slice(1),
-    parts[0]?.count || 1,
-    allRolls,
-    total,
-    null,
+    parts[0]?.count || 1, allRolls, total, null,
     `${weapon.name} — Damage`,
-    {
-      skillModifier: statBonus,
-      die: parts[0]?.die || "d6",
-      dieGroups,
-    },
+    { skillModifier: statBonus + damageModBonus, die: parts[0]?.die || "d6", dieGroups },
     null,
   );
 }
 
-function rollUnarmedHit(attack, unarmedIndex) {
+function rollUnarmedHit(attack, unarmedIndex, rollMode = "normal") {
   if (!_showRollToast || !attack.diceCount || attack.diceCount < 1) return;
+  const attackKey    = getAttackKey("unarmed", unarmedIndex);
+  const state        = _getState();
+  const hitModBonus  = state ? getCombatAttackBonus(state, attackKey, "hit") : 0;
+  const bonus        = attack.bonus + hitModBonus;
 
-  const rolls = rollDice(attack.diceCount, 6);
-
-  const total =
-    rolls.reduce((a, b) => a + b, 0) + attack.bonus;
-
-  const allOnes = rolls.every(r => r === 1);
-
-  const critStatus =
-    allOnes
-      ? "fail"
-      : total >= attack.diceCount * 6
-      ? "success"
-      : null;
-
-  const attackKey = getAttackKey("unarmed", unarmedIndex);
+  const result     = rollWithMode(attack.diceCount, 6, bonus, rollMode);
+  const allOnes    = result.rolls.every(r => r === 1);
+  const critStatus = allOnes ? "fail" : result.total >= attack.diceCount * 6 + bonus ? "success" : null;
 
   if (critStatus === "success") {
     const existing = getPendingEffect(attackKey);
-
-    const steps = new Set(existing?.steps || []);
+    const steps    = new Set(existing?.steps || []);
     steps.add("crit");
-
-    _pendingAttackEffects.set(
-      attackKey,
-      createPendingEffect({
-        steps: [...steps],
-        meta: {
-          ...existing?.meta,
-          largestDie: getLargestDamageDie(attack.damageParts),
-          damageParts: attack.damageParts,
-        }
-      })
-    );
-
+    _pendingAttackEffects.set(attackKey, createPendingEffect({
+      steps: [...steps],
+      meta:  { ...existing?.meta, largestDie: getLargestDamageDie(attack.damageParts), damageParts: attack.damageParts },
+    }));
     renderCombatTabData(computeCombatTabData(_getState()));
   }
 
-  _showRollToast(
-    attack.statLabel,
-    attack.diceCount,
-    rolls,
-    total,
-    critStatus,
-    `${attack.name} — Combat`,
-    { skillModifier: attack.bonus },
-    null,
-  );
+  const breakdown = buildRollBreakdown({ skillModifier: bonus, die: "d6" }, result, rollMode);
+  _showRollToast(attack.statLabel, attack.diceCount, result.rolls, result.total, critStatus,
+    `${attack.name} — Combat`, breakdown, rollMode === "normal" ? null : rollMode);
 }
 
-function rollUnarmedDamage(attack) {
+function rollUnarmedDamage(attack, unarmedIndex) {
   if (!_showRollToast) return;
+  const attackKey      = getAttackKey("unarmed", unarmedIndex ?? 0);
+  const state          = _getState();
+  const damageModBonus = state ? getCombatAttackBonus(state, attackKey, "damage") : 0;
 
-  let total = attack.damageBonus;
-
+  let total = attack.damageBonus + damageModBonus;
   const allRolls = [];
   const dieGroups = [];
 
   for (const part of attack.damageParts) {
-    const sides =
-      parseInt(String(part.die).replace("d", ""), 10) || 4;
-
-    const rolls = rollDice(part.count, sides);
-
-    const partTotal =
-      rolls.reduce((a, b) => a + b, 0);
-
+    const sides    = parseInt(String(part.die).replace("d", ""), 10) || 4;
+    const rolls    = rollDice(part.count, sides);
+    const partTotal = rolls.reduce((a, b) => a + b, 0);
     total += partTotal;
-
     allRolls.push(...rolls);
-
-    dieGroups.push({
-      label: `${part.count}${part.die}`,
-      rolls,
-      total: partTotal,
-    });
+    dieGroups.push({ label: `${part.count}${part.die}`, rolls, total: partTotal });
   }
 
   _showRollToast(
-    attack.statLabel,
-    attack.damageParts[0]?.count || 1,
-    allRolls,
-    total,
-    null,
+    attack.statLabel, attack.damageParts[0]?.count || 1, allRolls, total, null,
     `${attack.name} — Damage`,
-    {
-      skillModifier: attack.damageBonus,
-      die: attack.damageParts[0]?.die || "d4",
-      dieGroups,
-    },
+    { skillModifier: attack.damageBonus + damageModBonus, die: attack.damageParts[0]?.die || "d4", dieGroups },
     null,
   );
 }
 
-function rollImbue(attackName, damageParts, damageBonus, data, state, attackKey) {
+function rollImbue(attackName, damageParts, damageBonus, data, state, attackKey, rollMode = "normal") {
   if (!_showRollToast) return;
   const { techniqueLevel, imbueDC, maxImbueStacks, talentBonus, blackFlashMin } = data;
   const diceCount = techniqueLevel;
   if (!diceCount || diceCount < 1) return;
 
-  const rawRolls = rollDice(diceCount, 6);
-  const naturalTotal = rawRolls.reduce((a, b) => a + b, 0);
+  const result       = rollWithMode(diceCount, 6, 0, rollMode);
+  const rawRolls     = result.rolls;
+  const naturalTotal = result.total;
   const totalWithBonus = naturalTotal + talentBonus;
   const isBlackFlash = blackFlashMin !== null && naturalTotal >= blackFlashMin;
-  const dcMet = isBlackFlash || totalWithBonus >= imbueDC;
+  const dcMet        = isBlackFlash || totalWithBonus >= imbueDC;
   const excessOverDC = Math.max(0, totalWithBonus - imbueDC);
   const stacksAvailable = isBlackFlash ? 0 : Math.min(Math.floor(excessOverDC / 2), maxImbueStacks);
 
   if (isBlackFlash) {
     const existing = getPendingEffect(attackKey);
-
-    const steps = new Set(existing?.steps || []);
-
-    // Black Flash overrides everything imbue-related
+    const steps    = new Set(existing?.steps || []);
     steps.delete("imbue");
     steps.add("blackflash");
-
-    _pendingAttackEffects.set(
-      attackKey,
-      createPendingEffect({
-        steps: [...steps],
-        meta: {
-          ...existing?.meta,
-          damageParts,
-          damageBonus,
-          imbueStr: undefined,
-          stacks: 0
-        }
-      })
-    );
-
+    _pendingAttackEffects.set(attackKey, createPendingEffect({
+      steps: [...steps],
+      meta:  { ...existing?.meta, damageParts, damageBonus, imbueStr: undefined, stacks: 0 },
+    }));
     renderCombatTabData(computeCombatTabData(state));
-
-    _showRollToast(
-      "Technique",
-      diceCount,
-      rawRolls,
-      naturalTotal,
-      "success",
-      `${attackName} — ✦ BLACK FLASH ✦`,
-      { skillModifier: 0, die: "d6" },
-      null,
-    );
-
+    const breakdown = buildRollBreakdown({ skillModifier: 0, die: "d6" }, result, rollMode);
+    _showRollToast("Technique", diceCount, rawRolls, naturalTotal, "success",
+      `${attackName} — ✦ BLACK FLASH ✦`, breakdown, rollMode === "normal" ? null : rollMode);
     return;
   }
 
-  // Show success toast then prompt for stacks
-  _showRollToast(
-    "Technique", diceCount, rawRolls, totalWithBonus, null,
-    `${attackName} — Imbue Success (DC ${imbueDC})`,
-    { skillModifier: talentBonus, die: "d6" }, null,
-  );
+  const breakdown = buildRollBreakdown({ skillModifier: talentBonus, die: "d6" }, result, rollMode);
+  _showRollToast("Technique", diceCount, rawRolls, totalWithBonus, null,
+    `${attackName} — Imbue Success (DC ${imbueDC})`, breakdown, rollMode === "normal" ? null : rollMode);
 
   promptImbueStacks({
     attackName, damageParts, damageBonus,
-    imbueBase: data.imbue.die,
-    stacksAvailable, maxImbueStacks,
+    imbueBase: data.imbue.die, stacksAvailable, maxImbueStacks,
     currentCE: parseInt(state?.ceCurrent, 10) || 0,
-    state, data, attackKey,
-    rawRolls, totalWithBonus, imbueDC, talentBonus, diceCount,
+    state, data, attackKey, rawRolls, totalWithBonus, imbueDC, talentBonus, diceCount,
   });
 }
 
 function rollImbueDie(dieStr) {
-  // Parse "1d4", "1d4+2", "2d4"
-  const plusMatch = dieStr.match(/^(\d+)d(\d+)\+(\d+)$/);
+  const plusMatch  = dieStr.match(/^(\d+)d(\d+)\+(\d+)$/);
   const basicMatch = dieStr.match(/^(\d+)d(\d+)$/);
   if (plusMatch) {
-    const count = parseInt(plusMatch[1]);
-    const sides = parseInt(plusMatch[2]);
-    const bonus = parseInt(plusMatch[3]);
+    const count = parseInt(plusMatch[1]), sides = parseInt(plusMatch[2]), bonus = parseInt(plusMatch[3]);
     const rolls = rollDice(count, sides);
     return { total: rolls.reduce((a, b) => a + b, 0) + bonus, rolls, bonus, dieStr };
   }
   if (basicMatch) {
-    const count = parseInt(basicMatch[1]);
-    const sides = parseInt(basicMatch[2]);
+    const count = parseInt(basicMatch[1]), sides = parseInt(basicMatch[2]);
     const rolls = rollDice(count, sides);
     return { total: rolls.reduce((a, b) => a + b, 0), rolls, bonus: 0, dieStr };
   }
@@ -1095,14 +929,12 @@ function rollImbueDie(dieStr) {
 }
 
 function promptImbueStacks(ctx) {
-  const { attackName, stacksAvailable, maxImbueStacks, currentCE,
-          state, imbueBase, attackKey } = ctx;
-
+  const { attackName, stacksAvailable, maxImbueStacks, currentCE, state, imbueBase, attackKey } = ctx;
   document.getElementById("combatImbuePrompt")?.remove();
   const maxAffordable = Math.min(stacksAvailable, Math.floor(currentCE / 3), maxImbueStacks);
 
   const prompt = document.createElement("div");
-  prompt.id = "combatImbuePrompt";
+  prompt.id    = "combatImbuePrompt";
   prompt.className = "combat-imbue-prompt";
   prompt.innerHTML = `
     <div class="combat-imbue-prompt-inner">
@@ -1115,19 +947,15 @@ function promptImbueStacks(ctx) {
           <span class="combat-imbue-prompt-label">Add stacks? Beat DC by ${ctx.totalWithBonus - ctx.imbueDC} · ${maxAffordable} available · 3 CE each</span>
           <div class="combat-imbue-stack-btns">
             ${Array.from({ length: maxAffordable }, (_, i) => i + 1).map(n => `
-              <button type="button" class="combat-imbue-stack-btn" data-stacks="${n}">
-                +${n} (${n * 3} CE)
-              </button>
+              <button type="button" class="combat-imbue-stack-btn" data-stacks="${n}">+${n} (${n * 3} CE)</button>
             `).join("")}
           </div>
-        </div>
-      ` : ""}
+        </div>` : ""}
       <div class="combat-imbue-prompt-actions">
         <button type="button" class="combat-imbue-confirm-btn" data-stacks="0">No stacks</button>
         <button type="button" class="combat-imbue-cancel-btn">Cancel</button>
       </div>
-    </div>
-  `;
+    </div>`;
 
   const confirm = (stacks) => {
     const ceCost = stacks * 3;
@@ -1138,28 +966,14 @@ function promptImbueStacks(ctx) {
       if (ceEl) ceEl.value = String(newCE);
       if (typeof _scheduleSave === "function") _scheduleSave();
     }
-
-    // Build imbue string for display
-    const stackDice = stacks > 0 ? `+${stacks}d4` : "";
     const imbueStr = stacks > 0 ? `${imbueBase}+${stacks}d4` : imbueBase;
-
     const existing = getPendingEffect(attackKey);
-
-    const steps = new Set(existing?.steps || []);
+    const steps    = new Set(existing?.steps || []);
     steps.add("imbue");
-
-    _pendingAttackEffects.set(
-      attackKey,
-      createPendingEffect({
-        steps: [...steps],
-        meta: {
-          ...existing?.meta,
-          imbueStr,
-          stacks,
-        }
-      })
-    );
-
+    _pendingAttackEffects.set(attackKey, createPendingEffect({
+      steps: [...steps],
+      meta:  { ...existing?.meta, imbueStr, stacks },
+    }));
     renderCombatTabData(computeCombatTabData(state));
     prompt.remove();
   };
@@ -1168,51 +982,8 @@ function promptImbueStacks(ctx) {
     btn.addEventListener("click", () => confirm(parseInt(btn.dataset.stacks, 10) || 0));
   });
   prompt.querySelector(".combat-imbue-confirm-btn").addEventListener("click", () => confirm(0));
-  prompt.querySelector(".combat-imbue-cancel-btn").addEventListener("click", () => prompt.remove());
-
+  prompt.querySelector(".combat-imbue-cancel-btn").addEventListener("click",  () => prompt.remove());
   document.getElementById("panel-combat")?.appendChild(prompt);
-}
-
-function finalizeImbue(ctx, stacks) {
-  const { attackName, damageParts, damageBonus, imbueRoll, data, diceCount, rawRolls, totalWithBonus, talentBonus } = ctx;
-
-  // Roll stack dice
-  let stackTotal = 0;
-  const stackRolls = [];
-  for (let i = 0; i < stacks; i++) {
-    const r = rollDice(1, 4);
-    stackRolls.push(...r);
-    stackTotal += r[0];
-  }
-
-  // Roll weapon damage
-  let weaponDamage = damageBonus;
-  const weaponRolls = [];
-  damageParts.forEach(part => {
-    const sides = parseInt(String(part.die).replace("d", ""), 10) || 6;
-    const rolls = rollDice(part.count, sides);
-    weaponRolls.push(...rolls);
-    weaponDamage += rolls.reduce((a, b) => a + b, 0);
-  });
-
-  const imbueDamage = imbueRoll.total + stackTotal;
-  const total = weaponDamage + imbueDamage;
-
-  const stackStr = stacks > 0
-    ? ` + ${stacks} stack${stacks > 1 ? "s" : ""} [${stackRolls.join(", ")}] (${stackTotal})`
-    : "";
-  const label = `${attackName} — Imbued Damage · Imbue: ${imbueRoll.dieStr} (${imbueRoll.total})${stackStr}`;
-
-  _showRollToast(
-    "Damage",
-    damageParts[0]?.count || 1,
-    weaponRolls,
-    total,
-    null,
-    label,
-    { skillModifier: imbueDamage, die: damageParts[0]?.die || "d6" },
-    null,
-  );
 }
 
 function rollPendingDamage(key, data, state) {
@@ -1221,91 +992,48 @@ function rollPendingDamage(key, data, state) {
   const index = parseInt(indexStr, 10);
 
   let attackName, damageParts, damageBonus;
-
   if (type === "weapon") {
     const weapon = data.equippedWeapons[index];
     if (!weapon) return;
-
-    attackName = weapon.name;
+    attackName  = weapon.name;
     damageParts = weapon.weaponDamageParts || [{ count: 1, die: "d6" }];
-
-    const statKey = weapon.weaponStat || "power";
-    damageBonus =
-      statKey === "speed"
-        ? data.speedLevel
-        : statKey === "technique"
-        ? data.techniqueLevel
-        : data.powerLevel;
-
+    const sk    = weapon.weaponStat || "power";
+    damageBonus = sk === "speed" ? data.speedLevel : sk === "technique" ? data.techniqueLevel : data.powerLevel;
   } else {
     const attack = data.unarmedAttacks[index];
     if (!attack) return;
-
-    attackName = attack.name;
+    attackName  = attack.name;
     damageParts = attack.damageParts;
     damageBonus = attack.damageBonus;
   }
 
-  // ── BASE ROLL ─────────────────────────────────────────────
-  let baseTotal = damageBonus;
+  const damageModBonus = state ? getCombatAttackBonus(state, key, "damage") : 0;
+  let baseTotal = damageBonus + damageModBonus;
   const baseRolls = [];
   const dieGroups = [];
 
   for (const part of damageParts) {
-    const sides = parseInt(String(part.die).replace("d", ""), 10) || 6;
-    const rolls = rollDice(part.count, sides);
-
+    const sides    = parseInt(String(part.die).replace("d", ""), 10) || 6;
+    const rolls    = rollDice(part.count, sides);
     const partTotal = rolls.reduce((a, b) => a + b, 0);
-
     baseTotal += partTotal;
     baseRolls.push(...rolls);
-
-    dieGroups.push({
-      label: `${part.count}${part.die}`,
-      rolls,
-      total: partTotal,
-    });
+    dieGroups.push({ label: `${part.count}${part.die}`, rolls, total: partTotal });
   }
 
-  // ── NO EFFECT ─────────────────────────────────────────────
   if (!effect) {
-    _showRollToast(
-      "Damage",
-      damageParts[0]?.count || 1,
-      baseRolls,
-      baseTotal,
-      null,
-      `${attackName} — Damage`,
-      { skillModifier: damageBonus, dieGroups },
-      null
-    );
+    _showRollToast("Damage", damageParts[0]?.count || 1, baseRolls, baseTotal, null,
+      `${attackName} — Damage`, { skillModifier: damageBonus + damageModBonus, dieGroups }, null);
     return;
   }
 
-  // ── EFFECT PIPELINE (THE ONLY SYSTEM NOW) ────────────────
   const extraGroups = [...dieGroups];
+  const finalTotal  = applyEffectsPipeline(baseTotal, effect, extraGroups, data);
 
-  let finalTotal = applyEffectsPipeline(
-    baseTotal,
-    effect,
-    extraGroups,
-    data
-  );
-
-  _showRollToast(
-    "Damage",
-    damageParts[0]?.count || 1,
-    baseRolls,
-    finalTotal,
-    null,
+  _showRollToast("Damage", damageParts[0]?.count || 1, baseRolls, finalTotal, null,
     `${attackName} — ${effect.steps?.join(" + ") || "Enhanced"} Damage`,
-    {
-      skillModifier: damageBonus,
-      die: damageParts[0]?.die || "d6",
-      dieGroups: extraGroups,
-    },
-    null
-  );
+    { skillModifier: damageBonus + damageModBonus, die: damageParts[0]?.die || "d6", dieGroups: extraGroups },
+    null);
 
   _pendingAttackEffects.delete(key);
   renderCombatTabData(computeCombatTabData(state));

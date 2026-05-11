@@ -24,6 +24,7 @@ const DIRECT_DERIVED_LABELS = {
   aptitudeBonus: "Aptitude Bonus",
   xpThreshold:        "Sorcerer XP Threshold",
   techniqueRollBonus: "CT Application Roll Bonus",
+  blackFlashRange:    "Black Flash Range",
 };
 
 function getState() {
@@ -99,6 +100,13 @@ function getDirectModifierTargetLabel(targetType, targetKey) {
     return `${parsed.skillName} (${parsed.statLabel})`;
   }
   if (targetType === "derived")      return DIRECT_DERIVED_LABELS[targetKey] || "Derived Field";
+  if (targetType === "combatAttack") {
+    const source = ""; // label shown by caller with source suffix
+    const [atype, aidx] = String(targetKey).split("-");
+    const attackNum = (parseInt(aidx, 10) + 1) || 1;
+    const typeLabel = atype === "weapon" ? "Weapon" : "Unarmed";
+    return `${typeLabel} Attack ${attackNum}`;
+  }
 
   return "Modifier Target";
 }
@@ -419,6 +427,14 @@ function getDirectModifierTargetValues(state, targetType, targetKey, effects) {
       return getDirectModifierSummaryDelta(state, targetType, targetKey, baseValue);
     }
 
+    // blackFlashRange: base is techniqueLevel * 4 + 4 (or 0 if out of range)
+    if (targetKey === "blackFlashRange") {
+      const effects    = computeActiveModifierEffects(state);
+      const techLevel  = Math.max(0, parseStatScore(state?.stats?.technique?.score) + (effects?.statBonuses?.technique || 0));
+      const baseValue  = (techLevel >= 2 && techLevel <= 7) ? (techLevel * 4 + 4) : 0;
+      return getDirectModifierSummaryDelta(state, targetType, targetKey, baseValue);
+    }
+
     let baseValue = 0;
     if (targetKey === "hpMax") {
       const powerLevel = getEffectiveStatLevel(state, effects, "power");
@@ -440,6 +456,11 @@ function getDirectModifierTargetValues(state, targetType, targetKey, effects) {
       baseValue = Math.max(0, getDerivedOverride(state, "movement") ?? baseValue);
     }
     return getDirectModifierSummaryDelta(state, targetType, targetKey, baseValue);
+  }
+
+  // combatAttack: hit or damage flat bonus per attack
+  if (targetType === "combatAttack") {
+    return { baseValue: 0, totalValue: 0, deltaValue: 0 };
   }
 
   return { baseValue: 0, totalValue: 0, deltaValue: 0 };
@@ -532,7 +553,7 @@ function renderDirectModifierPanel() {
   }).join("") + addRow;
 }
 
-function openDirectModifierPanel(targetType, targetKey) {
+export function openDirectModifierPanel(targetType, targetKey) {
   const panel           = document.getElementById("sheetModifierPanel");
   const statModeWrap    = document.getElementById("sheetModifierStatTargetModeWrap");
   const statModeSelect  = document.getElementById("sheetModifierStatTargetMode");
@@ -711,7 +732,8 @@ function initDirectModifierUI() {
       if (!_activeDirectModifierTarget ||
           _activeDirectModifierTarget.targetType === "subskill" ||
           _activeDirectModifierTarget.targetType === "derived"  ||
-          _activeDirectModifierTarget.targetType === "techniqueApp") return;
+          _activeDirectModifierTarget.targetType === "techniqueApp" ||
+          _activeDirectModifierTarget.targetType === "combatAttack") return;
       const nextType = statModeSelect.value === "statRoll" ? "statRoll" : "stat";
       _activeDirectModifierTarget.targetType = nextType;
       _activeDirectModifierTarget.label      = getDirectModifierTargetLabel(nextType, _activeDirectModifierTarget.targetKey);

@@ -4,7 +4,7 @@ const STAT_DEFS = [...CENTER_STATS, ...RIGHT_STATS];
 const STAT_KEYS = new Set(STAT_DEFS.map(def => def.key));
 const STAT_LABELS = Object.fromEntries(STAT_DEFS.map(def => [def.key, def.label.charAt(0) + def.label.slice(1).toLowerCase()]));
 const SKILLS_BY_STAT = Object.fromEntries(STAT_DEFS.map(def => [def.key, [...def.skills]]));
-const DIRECT_DERIVED_KEYS = new Set(["hpMax", "ceMax", "ac", "movement", "aptitudeBonus", "xpThreshold", "techniqueRollBonus"]);
+const DIRECT_DERIVED_KEYS = new Set(["hpMax", "ceMax", "ac", "movement", "aptitudeBonus", "xpThreshold", "techniqueRollBonus", "blackFlashRange"]);
 const DIRECT_OPERATIONS = new Set(["add", "multiply", "divide"]);
 
 // Valid source tags for techniqueApp modifiers.
@@ -57,6 +57,11 @@ function isValidTechniqueAppKey(targetKey) {
   return Number.isInteger(n) && n >= 0 && String(n) === String(targetKey).trim();
 }
 
+// combatAttack targetKey is "unarmed-N" or "weapon-N"
+function isValidCombatAttackKey(targetKey) {
+  return /^(unarmed|weapon)-\d+$/.test(String(targetKey).trim());
+}
+
 export function normalizeDirectModifierList(rawList) {
   if (!Array.isArray(rawList)) return [];
 
@@ -69,14 +74,15 @@ export function normalizeDirectModifierList(rawList) {
         : "add";
       const source = String(entry?.source || "").trim().slice(0, 120);
 
-      const validTypes = ["stat", "statRoll", "subskill", "derived", "techniqueApp"];
+      const validTypes = ["stat", "statRoll", "subskill", "derived", "techniqueApp", "combatAttack"];
       if (!validTypes.includes(targetType))                                    return null;
       if (!targetKey)                                                          return null;
       if (targetType === "stat"         && !STAT_KEYS.has(targetKey))          return null;
       if (targetType === "statRoll"     && !STAT_KEYS.has(targetKey))          return null;
       if (targetType === "subskill"     && !isValidSubskillKey(targetKey))     return null;
       if (targetType === "derived"      && !DIRECT_DERIVED_KEYS.has(targetKey))return null;
-      if (targetType === "techniqueApp" && !isValidTechniqueAppKey(targetKey)) return null;
+      if (targetType === "techniqueApp"  && !isValidTechniqueAppKey(targetKey))  return null;
+      if (targetType === "combatAttack"  && !isValidCombatAttackKey(targetKey))  return null;
 
       // advantage / disadvantage are boolean flags — bypass the zero-rejection
       // inside parseDirectModifierValue and always store value: 1.
@@ -289,4 +295,44 @@ export function getEffectiveTechniqueRollBonus(state) {
   const mods = normalizeDirectModifierList(state?.directModifiers || [])
     .filter(e => e.targetType === "derived" && e.targetKey === "techniqueRollBonus");
   return Math.round(applyDirectModifiers(0, mods));
+}
+
+// ── Combat Attack modifier helpers ───────────────────────────────────────────
+
+/**
+ * All persisted direct modifiers for a specific attack (e.g. "unarmed-0", "weapon-1").
+ * source should be "hit" or "damage".
+ */
+export function getCombatAttackModifiers(state, attackKey, source) {
+  return normalizeDirectModifierList(state?.directModifiers || [])
+    .filter(e => e.targetType === "combatAttack" && e.targetKey === attackKey &&
+      (source == null || e.source === source));
+}
+
+/**
+ * True if the attack has any active hit or damage modifiers.
+ */
+export function hasCombatAttackModifiers(state, attackKey) {
+  return normalizeDirectModifierList(state?.directModifiers || [])
+    .some(e => e.targetType === "combatAttack" && e.targetKey === attackKey);
+}
+
+/**
+ * Flat bonus to apply on top of a hit or damage roll for a specific attack.
+ */
+export function getCombatAttackBonus(state, attackKey, source) {
+  const mods = getCombatAttackModifiers(state, attackKey, source);
+  return Math.round(applyDirectModifiers(0, mods));
+}
+
+/**
+ * Effective Black Flash range incorporating derived/blackFlashRange modifiers.
+ * Base is the computed range (techniqueLevel * 4 + 4), or null if out of range.
+ */
+export function getEffectiveBlackFlashRange(state, baseRange) {
+  if (baseRange === null) return null;
+  const mods = normalizeDirectModifierList(state?.directModifiers || [])
+    .filter(e => e.targetType === "derived" && e.targetKey === "blackFlashRange");
+  if (!mods.length) return baseRange;
+  return Math.max(0, Math.round(applyDirectModifiers(baseRange, mods)));
 }
