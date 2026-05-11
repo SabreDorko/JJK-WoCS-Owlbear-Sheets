@@ -981,7 +981,7 @@ function renderBenefits(state) {
 
   const aptitudeInstructionLines = [...new Set(slots.map(slot => String(slot?.ruleText || "").trim()).filter(Boolean))];
   const aptitudeInstructionMarkup = aptitudeInstructionLines.length
-    ? `<div class="techniques-muted">${aptitudeInstructionLines.map(line => escapeHtml(line)).join("<br>")}</div>`
+    ? `<div class="techniques-muted">${escapeHtml(aptitudeInstructionLines[0])}</div>`
     : "";
 
   const aptitudeMarkup = slots.length

@@ -3965,6 +3965,18 @@
       gap: 11px;
     }
 
+    /* ── INITIATIVE & BLACK FLASH ───────────────────────────── */
+    #combatInitiativeValue, #combatBlackFlashValue, .black-flash-box {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 32px;
+      width: 100%;
+      box-sizing: border-box;
+      flex: 1 1 auto;
+      text-align: center;
+    }
+
     /* ── HEADER STATS ────────────────────────────────────── */
     .combat-header-grid {
       display: grid;
