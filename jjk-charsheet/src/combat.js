@@ -570,6 +570,7 @@ export function initCombat({ getState, scheduleSave, showRollToast }) {
       if (!state) return;
       const data   = computeCombatTabData(state);
 
+
       if (action === "rollHit" || action === "rollDamage") {
         const weaponIndex = parseInt(target.dataset.weaponIndex, 10);
         if (!Number.isInteger(weaponIndex)) return;
@@ -633,11 +634,22 @@ export function initCombat({ getState, scheduleSave, showRollToast }) {
         return;
       }
 
+
       // To Hit — roll mode menu (adv/dis) + Add Modifier option
       const hitTarget = e.target.closest("[data-action='rollHit'],[data-action='rollUnarmedHit']");
       if (hitTarget) {
         const action    = hitTarget.dataset.action;
         const attackKey = hitTarget.dataset.attackKey;
+        let attackName = "Attack";
+        if (action === "rollHit") {
+          const weaponIndex = parseInt(hitTarget.dataset.weaponIndex, 10);
+          const weapon = data.equippedWeapons[weaponIndex];
+          if (weapon) attackName = weapon.name;
+        } else {
+          const unarmedIndex = parseInt(hitTarget.dataset.unarmedIndex, 10);
+          const attack = data.unarmedAttacks[unarmedIndex];
+          if (attack) attackName = attack.name;
+        }
         openRollModeMenu(e,
           selectedMode => {
             if (action === "rollHit") {
@@ -650,7 +662,10 @@ export function initCombat({ getState, scheduleSave, showRollToast }) {
               if (attack) rollUnarmedHit(attack, unarmedIndex, selectedMode);
             }
           },
-          { onAddModifier: () => { if (attackKey) openDirectModifierPanel("combatAttack", attackKey); } }
+          { onAddModifier: () => {
+              if (attackKey) openDirectModifierPanel("combatAttack", attackKey, "hit", attackName);
+            }
+          }
         );
         return;
       }
@@ -659,7 +674,17 @@ export function initCombat({ getState, scheduleSave, showRollToast }) {
       const damageTarget = e.target.closest("[data-action='rollDamage'],[data-action='rollUnarmedDamage']");
       if (damageTarget) {
         const attackKey = damageTarget.dataset.attackKey;
-        if (attackKey) openDirectModifierPanel("combatAttack", attackKey);
+        let attackName = "Attack";
+        if (damageTarget.dataset.weaponIndex !== undefined) {
+          const weaponIndex = parseInt(damageTarget.dataset.weaponIndex, 10);
+          const weapon = data.equippedWeapons[weaponIndex];
+          if (weapon) attackName = weapon.name;
+        } else if (damageTarget.dataset.unarmedIndex !== undefined) {
+          const unarmedIndex = parseInt(damageTarget.dataset.unarmedIndex, 10);
+          const attack = data.unarmedAttacks[unarmedIndex];
+          if (attack) attackName = attack.name;
+        }
+        if (attackKey) openDirectModifierPanel("combatAttack", attackKey, "damage", attackName);
         return;
       }
 

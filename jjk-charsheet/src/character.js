@@ -508,7 +508,11 @@ function renderDirectModifierPanel() {
   const { targetType, targetKey, label } = _activeDirectModifierTarget;
   const effects = computeActiveModifierEffects(state);
   const totals  = getDirectModifierTargetValues(state, targetType, targetKey, effects);
-  const entries = getTargetDirectModifiers(state, targetType, targetKey);
+  let entries = getTargetDirectModifiers(state, targetType, targetKey);
+  // For combatAttack, filter by hitOrDamage if present
+  if (targetType === "combatAttack" && _activeDirectModifierTarget.hitOrDamage) {
+    entries = entries.filter(e => e.source === _activeDirectModifierTarget.hitOrDamage);
+  }
 
   const headingEl = document.getElementById("sheetModifierTargetLabel");
   const baseEl    = document.getElementById("sheetModifierBaseValue");
@@ -553,19 +557,27 @@ function renderDirectModifierPanel() {
   }).join("") + addRow;
 }
 
-export function openDirectModifierPanel(targetType, targetKey) {
+// Accepts optional hitOrDamage ("hit" or "damage") and attackName for combatAttack
+export function openDirectModifierPanel(targetType, targetKey, hitOrDamage = null, attackName = null) {
   const panel           = document.getElementById("sheetModifierPanel");
   const statModeWrap    = document.getElementById("sheetModifierStatTargetModeWrap");
   const statModeSelect  = document.getElementById("sheetModifierStatTargetMode");
   if (!panel) return;
 
   const resolvedType = targetType === "statRoll" ? "statRoll" : targetType;
+  let label = getDirectModifierTargetLabel(resolvedType, targetKey);
+  if (resolvedType === "combatAttack" && hitOrDamage && attackName) {
+    label = hitOrDamage === "hit"
+      ? `Edit To Hit Modifiers for ${attackName}`
+      : `Edit Damage Modifiers for ${attackName}`;
+  }
   _activeDirectModifierTarget = {
     targetType: resolvedType,
     targetKey,
-    label: getDirectModifierTargetLabel(resolvedType, targetKey),
+    hitOrDamage,
+    attackName,
+    label,
   };
-
 
   const isStatTarget = resolvedType === "stat" || resolvedType === "statRoll";
   if (statModeWrap)   statModeWrap.hidden    = !isStatTarget;
@@ -588,9 +600,13 @@ function addDirectModifierFromForm() {
   const operationInput = document.getElementById("sheetModifierOperationInput");
   if (!valueInput || !sourceInput || !operationInput) return;
 
-  const { targetType, targetKey } = _activeDirectModifierTarget;
+  const { targetType, targetKey, hitOrDamage } = _activeDirectModifierTarget;
   const operation = operationInput.value || "add";
-  const source    = sourceInput.value.trim();
+  let source = sourceInput.value.trim();
+  // For combatAttack, force source to hitOrDamage if present
+  if (targetType === "combatAttack" && hitOrDamage) {
+    source = hitOrDamage;
+  }
 
   // techniqueApp advantage / disadvantage are stored as boolean flags.
   // Accept "advantage" / "disadvantage" as the source field and store value 1.
