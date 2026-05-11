@@ -909,6 +909,7 @@ function rollImbue(attackName, damageParts, damageBonus, data, state, attackKey,
   const excessOverDC = Math.max(0, totalWithBonus - imbueDC);
   const stacksAvailable = isBlackFlash ? 0 : Math.min(Math.floor(excessOverDC / 2), maxImbueStacks);
 
+
   if (isBlackFlash) {
     const existing = getPendingEffect(attackKey);
     const steps    = new Set(existing?.steps || []);
@@ -925,6 +926,7 @@ function rollImbue(attackName, damageParts, damageBonus, data, state, attackKey,
     return;
   }
 
+  // For normal Imbue, show the bonus in the breakdown and total
   const breakdown = buildRollBreakdown({ skillModifier: talentBonus, die: "d6" }, result, rollMode);
   _showRollToast("Technique", diceCount, rawRolls, totalWithBonus, null,
     `${attackName} — Imbue Success (DC ${imbueDC})`, breakdown, rollMode === "normal" ? null : rollMode);
