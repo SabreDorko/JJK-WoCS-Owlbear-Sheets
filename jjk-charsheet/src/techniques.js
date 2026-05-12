@@ -296,7 +296,12 @@ function getScaledApplicationValues(app) {
 
 function getScalingSummary(app) {
   if (!app.scalingEnabled) return "Not scaling";
-  return `+${app.scalingCeStep} CE / +${app.scalingDcStep} DC per step`;
+  let diceSummary = "";
+  if (Array.isArray(app.scalingDamageParts) && app.scalingDamageParts.length) {
+    diceSummary = app.scalingDamageParts.map(p => `${p.count > 1 ? p.count : ''}${p.die}`).join(' + ');
+    diceSummary = diceSummary ? `, adds ${diceSummary} per step` : "";
+  }
+  return `+${app.scalingCeStep} CE / +${app.scalingDcStep} DC per step${diceSummary}`;
 }
 
 // ─── Cast logic ────────────────────────────────────────────────────────────────
@@ -333,9 +338,20 @@ function performApplicationCast(state, _techniqueIndex, applicationIndex) {
     return;
   }
 
-  const damageParts = Array.isArray(normalized.damageParts) && normalized.damageParts.length
+  const baseDamageParts = Array.isArray(normalized.damageParts) && normalized.damageParts.length
     ? normalized.damageParts
-    : [{ count: 1, die: "d6" }];
+    : [];
+  // Scaling damage: add scalingDamageParts * currentStep
+  const scalingDamageParts = Array.isArray(normalized.scalingDamageParts) && normalized.scalingDamageParts.length
+    ? normalized.scalingDamageParts
+    : [];
+  let damageParts = [...baseDamageParts];
+  if (normalized.scalingEnabled && normalized.currentStep > 0 && scalingDamageParts.length) {
+    for (let i = 0; i < normalized.currentStep; i++) {
+      damageParts = damageParts.concat(scalingDamageParts);
+    }
+  }
+  if (!damageParts.length) damageParts = [{ count: 1, die: "d6" }];
 
   let outputBonus = 0;
   let outputBreakdown = null;
@@ -509,6 +525,7 @@ function createDefaultApplication(index) {
     damageParts: [],
     addOutput: false,
     addTechniqueLevel: false,
+    scalingDamageParts: [],
   };
 }
 
@@ -536,13 +553,16 @@ function normalizeApplication(raw, index) {
   let damageParts = Array.isArray(raw?.damageParts)
     ? raw.damageParts.map(p => ({ count: parseNonNegativeInt(p.count ?? 1), die: String(p.die || "").trim() })).filter(p => p.die && parseInt(p.count) > 0)
     : [];
+  let scalingDamageParts = Array.isArray(raw?.scalingDamageParts)
+    ? raw.scalingDamageParts.map(p => ({ count: parseNonNegativeInt(p.count ?? 1), die: String(p.die || "").trim() })).filter(p => p.die && parseInt(p.count) > 0)
+    : [];
   const addOutput = Boolean(raw?.addOutput);
   const addTechniqueLevel = Boolean(raw?.addTechniqueLevel);
   return {
     title: title || fallbackTitle, description, effect, ceCost, dc,
     rangeType, rangeValue, aoeShape, aoeSize,
     scalingEnabled, scalingCeStep, scalingDcStep, currentStep,
-    damageParts, addOutput, addTechniqueLevel,
+    damageParts, scalingDamageParts, addOutput, addTechniqueLevel,
   };
 }
 
@@ -910,6 +930,24 @@ function renderExpandedCard(normalized, idx) {
       <button type="button" class="inventory-mini-btn" data-app-add-damage="${idx}" title="Add Damage Die">+ Add</button>
     `;
 
+  // Scaling damage dice UI
+  let scalingDamageRows = "";
+  if (normalized.scalingEnabled) {
+    scalingDamageRows = (Array.isArray(normalized.scalingDamageParts) && normalized.scalingDamageParts.length ? normalized.scalingDamageParts : [])
+      .map((part, i) => `
+        <div style="display:flex;align-items:center;gap:4px;">
+          <input type="number" min="1" step="1" class="meta-input" style="width:36px;" data-app-scaling-damage-count="${idx}:${i}" value="${part.count}" title="Number of dice per step" />
+          <span>d</span>
+          <select class="meta-select" style="width:44px;" data-app-scaling-damage-die="${idx}:${i}" title="Die type">
+            ${allowedDice.map(d => `<option value="d${d}"${String(part.die).toLowerCase() === `d${d}` ? ' selected' : ''}>d${d}</option>`).join("")}
+          </select>
+          <button type="button" class="inventory-mini-btn danger" data-app-remove-scaling-damage="${idx}:${i}" title="Remove">&times;</button>
+        </div>
+      `).join("") + `
+        <button type="button" class="inventory-mini-btn" data-app-add-scaling-damage="${idx}" title="Add Scaling Damage Die">+ Add Scaling Die</button>
+      `;
+  }
+
   return `
     <article class="techniques-app-card techniques-app-card--editing" data-app-idx="${idx}">
       <div class="techniques-app-edit-grid">
@@ -942,6 +980,12 @@ function renderExpandedCard(normalized, idx) {
         <span class="field-label">Damage Dice</span>
         <div style="display:flex;flex-direction:column;gap:2px;">${damageRows}</div>
       </label>
+      ${normalized.scalingEnabled ? `
+      <label class="techniques-field">
+        <span class="field-label">Scaling Damage (per step)</span>
+        <div style="display:flex;flex-direction:column;gap:2px;">${scalingDamageRows}</div>
+      </label>
+      ` : ""}
       <label class="techniques-field techniques-field--checkbox" for="appCardAddOutput${idx}">
         <span class="field-label">Add Output Bonus</span>
         <input id="appCardAddOutput${idx}" class="techniques-checkbox" type="checkbox" data-app-add-output-inline="${idx}"${normalized.addOutput ? " checked" : ""} />
@@ -1654,33 +1698,49 @@ export function initTechniques({ getState: getStateFn, scheduleSave: scheduleSav
         const idx = parseNonNegativeInt(damageTrigger.dataset.appDamage);
         const app = state.techniques.applications[idx];
         const normalized = normalizeApplication(app, idx);
-        // Roll all damage parts
-        const damageParts = Array.isArray(normalized.damageParts) && normalized.damageParts.length
+        // Compose damage parts including scaling, but combine like dice
+        const baseDamageParts = Array.isArray(normalized.damageParts) && normalized.damageParts.length
           ? normalized.damageParts
-          : [{ count: 1, die: "d6" }];
+          : [];
+        const scalingDamageParts = Array.isArray(normalized.scalingDamageParts) && normalized.scalingDamageParts.length
+          ? normalized.scalingDamageParts
+          : [];
+        // Aggregate dice by die type
+        const diceMap = new Map();
+        // Add base damage
+        for (const part of baseDamageParts) {
+          if (!part.die) continue;
+          const key = part.die.toLowerCase();
+          diceMap.set(key, (diceMap.get(key) || 0) + parseNonNegativeInt(part.count));
+        }
+        // Add scaling damage (multiplied by currentStep)
+        if (normalized.scalingEnabled && normalized.currentStep > 0 && scalingDamageParts.length) {
+          for (const part of scalingDamageParts) {
+            if (!part.die) continue;
+            const key = part.die.toLowerCase();
+            diceMap.set(key, (diceMap.get(key) || 0) + parseNonNegativeInt(part.count) * normalized.currentStep);
+          }
+        }
+        // Build combined damageParts array
+        let damageParts = Array.from(diceMap.entries())
+          .filter(([_, count]) => count > 0)
+          .map(([die, count]) => ({ count, die }));
+        if (!damageParts.length) damageParts = [{ count: 1, die: "d6" }];
+
         let outputBonus = 0;
         let outputBreakdown = null;
         let outputRolls = [];
-
         if (normalized.addOutput) {
           const outputLevel = Math.max(1, Math.min(3, parseInt(state.outputLevel, 10) || 1));
-
           if (outputLevel === 1) {
-            outputRolls.push(Math.floor(Math.random() * 4) + 1);
-
-            outputBonus = outputRolls.reduce((a, b) => a + b, 0);
-            outputBreakdown = "1d4";
+            outputBonus = Math.floor(Math.random() * 4) + 1; outputBreakdown = "1d4";
           }
           else if (outputLevel === 2) {
-            outputRolls.push(Math.floor(Math.random() * 4) + 1);
-
-            outputBonus = outputRolls.reduce((a, b) => a + b, 0) + 2;
-            outputBreakdown = "1d4+2";
+            outputBonus = Math.floor(Math.random() * 4) + 1 + 2; outputBreakdown = "1d4+2";
           }
           else {
             outputRolls.push(Math.floor(Math.random() * 4) + 1);
             outputRolls.push(Math.floor(Math.random() * 4) + 1);
-
             outputBonus = outputRolls.reduce((a, b) => a + b, 0);
             outputBreakdown = "2d4";
           }
@@ -1699,7 +1759,6 @@ export function initTechniques({ getState: getStateFn, scheduleSave: scheduleSav
           rolls: part.rolls,
           total: part.total
         }));
-
         if (normalized.addOutput && outputBonus) {
           dieGroups.push({
             label: `Output (${outputBreakdown})`,
@@ -1707,7 +1766,6 @@ export function initTechniques({ getState: getStateFn, scheduleSave: scheduleSav
             total: outputBonus
           });
         }
-
         if (normalized.addTechniqueLevel && techniqueLevelBonus) {
           dieGroups.push({
             label: `Technique Level`,
@@ -1715,7 +1773,6 @@ export function initTechniques({ getState: getStateFn, scheduleSave: scheduleSav
             total: techniqueLevelBonus
           });
         }
-
         const breakdown = {
           skillModifier: 0,
           die: damageResults[0]?.die || "d6",
@@ -1745,6 +1802,23 @@ export function initTechniques({ getState: getStateFn, scheduleSave: scheduleSav
         return;
       }
 
+      // Inline scaling damage dice editing
+      const addScalingDamageTrigger = e.target?.closest?.("[data-app-add-scaling-damage]");
+      if (addScalingDamageTrigger) {
+        const state = getState();
+        if (!state) return;
+        ensureTechniquesState(state);
+        const idx = parseNonNegativeInt(addScalingDamageTrigger.dataset.appAddScalingDamage);
+        if (state.techniques.applications[idx]) {
+          if (!Array.isArray(state.techniques.applications[idx].scalingDamageParts))
+            state.techniques.applications[idx].scalingDamageParts = [{ count: 1, die: "d6" }];
+          state.techniques.applications[idx].scalingDamageParts.push({ count: 1, die: "d6" });
+          refreshApplicationCards(state);
+          scheduleSave();
+        }
+        return;
+      }
+
       const removeDamageTrigger = e.target?.closest?.("[data-app-remove-damage]");
       if (removeDamageTrigger) {
         const state = getState();
@@ -1754,14 +1828,32 @@ export function initTechniques({ getState: getStateFn, scheduleSave: scheduleSav
         const appIdx = parseNonNegativeInt(appIdxStr);
         const partIdx = parseNonNegativeInt(partIdxStr);
         const app = state.techniques.applications[appIdx];
-        if (app && Array.isArray(app.damageParts) && app.damageParts.length > 1) {
+        if (app && Array.isArray(app.damageParts) && app.damageParts.length > 0) {
           app.damageParts.splice(partIdx, 1);
           refreshApplicationCards(state);
           scheduleSave();
         }
         return;
       }
+
+      const removeScalingDamageTrigger = e.target?.closest?.("[data-app-remove-scaling-damage]");
+      if (removeScalingDamageTrigger) {
+        const state = getState();
+        if (!state) return;
+        ensureTechniquesState(state);
+        const [appIdxStr, partIdxStr] = removeScalingDamageTrigger.dataset.appRemoveScalingDamage.split(":");
+        const appIdx = parseNonNegativeInt(appIdxStr);
+        const partIdx = parseNonNegativeInt(partIdxStr);
+        const app = state.techniques.applications[appIdx];
+        if (app && Array.isArray(app.scalingDamageParts) && app.scalingDamageParts.length > 0) {
+          app.scalingDamageParts.splice(partIdx, 1);
+          refreshApplicationCards(state);
+          scheduleSave();
+        }
+        return;
+      }
     });
+
 
     summaryGrid.addEventListener("input", e => {
       const state = getState();
@@ -1789,6 +1881,31 @@ export function initTechniques({ getState: getStateFn, scheduleSave: scheduleSav
         if (app && Array.isArray(app.damageParts) && app.damageParts[partIdx]) {
           const raw = e.target.value.replace(/[^0-9]/g, "") || "6";
           app.damageParts[partIdx].die = `d${raw}`;
+          scheduleSave();
+        }
+        return;
+      }
+
+      // Scaling damage part inline editing
+      if (ds.appScalingDamageCount !== undefined) {
+        const [appIdxStr, partIdxStr] = ds.appScalingDamageCount.split(":");
+        const appIdx = parseNonNegativeInt(appIdxStr);
+        const partIdx = parseNonNegativeInt(partIdxStr);
+        const app = state.techniques.applications[appIdx];
+        if (app && Array.isArray(app.scalingDamageParts) && app.scalingDamageParts[partIdx]) {
+          app.scalingDamageParts[partIdx].count = Math.max(1, parseInt(e.target.value, 10) || 1);
+          scheduleSave();
+        }
+        return;
+      }
+      if (ds.appScalingDamageDie !== undefined) {
+        const [appIdxStr, partIdxStr] = ds.appScalingDamageDie.split(":");
+        const appIdx = parseNonNegativeInt(appIdxStr);
+        const partIdx = parseNonNegativeInt(partIdxStr);
+        const app = state.techniques.applications[appIdx];
+        if (app && Array.isArray(app.scalingDamageParts) && app.scalingDamageParts[partIdx]) {
+          const raw = e.target.value.replace(/[^0-9]/g, "") || "6";
+          app.scalingDamageParts[partIdx].die = `d${raw}`;
           scheduleSave();
         }
         return;
