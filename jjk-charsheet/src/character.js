@@ -1,3 +1,5 @@
+// Export roll/stat helpers for techniques.js
+export { getEffectiveStatLevel, getSubskillValue, buildComparedBreakdown, rollWithMode };
 // Returns the fully computed value for a subskill (statKey, skillIndex) using the current state
 // This is the value that should be used for combat, initiative, etc.
 import { ARCHETYPES, CENTER_STATS, RIGHT_STATS } from "./state/store.js";

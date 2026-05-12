@@ -2204,16 +2204,16 @@
     .techniques-app-edit-grid .techniques-field {
       margin-bottom: 0;
     }
-    .techniques-app-card-footer {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      flex-wrap: wrap;
-      gap: 6px;
-      margin-top: 8px;
-      padding-top: 6px;
-      position: relative;
-    }
+      .techniques-app-card-footer {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 4px;
+        margin-top: 8px;
+        padding-top: 6px;
+        position: relative;
+      }
     .techniques-app-card-footer::before {
       content: "";
       position: absolute;
@@ -2223,6 +2223,11 @@
       height: 1px;
       background: linear-gradient(to right, transparent, var(--border-strong) 18%, var(--border-strong) 82%, transparent);
       pointer-events: none;
+    }
+    .techniques-app-footer-right {
+      display: flex;
+      align-items: center;
+      gap: 4px;
     }
     .techniques-app-stepper {
       display: inline-flex;
