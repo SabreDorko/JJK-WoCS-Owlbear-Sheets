@@ -506,7 +506,7 @@ function createDefaultApplication(index) {
     scalingCeStep: 0,
     scalingDcStep: 0,
     currentStep: 0,
-    damageParts: [{ count: 1, die: "d6" }],
+    damageParts: [],
     addOutput: false,
     addTechniqueLevel: false,
   };
@@ -534,9 +534,8 @@ function normalizeApplication(raw, index) {
   const scalingDcStep = parseNonNegativeInt(raw?.scalingDcStep);
   const currentStep = scalingEnabled ? parseNonNegativeInt(raw?.currentStep) : 0;
   let damageParts = Array.isArray(raw?.damageParts)
-    ? raw.damageParts.map(p => ({ count: parseNonNegativeInt(p.count ?? 1), die: String(p.die || "d6").trim() }))
-    : [{ count: 1, die: "d6" }];
-  if (!damageParts.length) damageParts = [{ count: 1, die: "d6" }];
+    ? raw.damageParts.map(p => ({ count: parseNonNegativeInt(p.count ?? 1), die: String(p.die || "").trim() })).filter(p => p.die && parseInt(p.count) > 0)
+    : [];
   const addOutput = Boolean(raw?.addOutput);
   const addTechniqueLevel = Boolean(raw?.addTechniqueLevel);
   return {
@@ -897,7 +896,7 @@ function renderViewCard(state, app, idx) {
 
 function renderExpandedCard(normalized, idx) {
   const allowedDice = [4, 6, 8, 10, 12, 20];
-  const damageRows = (Array.isArray(normalized.damageParts) ? normalized.damageParts : [{ count: 1, die: "d6" }])
+  const damageRows = (Array.isArray(normalized.damageParts) && normalized.damageParts.length ? normalized.damageParts : [])
     .map((part, i) => `
       <div style="display:flex;align-items:center;gap:4px;">
         <input type="number" min="1" step="1" class="meta-input" style="width:36px;" data-app-damage-count="${idx}:${i}" value="${part.count}" title="Number of dice" />
