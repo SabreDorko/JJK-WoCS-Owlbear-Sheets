@@ -113,7 +113,7 @@
           <div class="vitals-col">
 
             <!-- Health -->
-            <div class="vital-box" id="hpVitalBox">
+            <div class="character-vital-box" id="hpVitalBox">
               <span class="vital-label">Health</span>
               <div class="hp-row">
                 <input class="hp-input" id="hpCurrent" placeholder="0" type="number" min="0" />
@@ -122,8 +122,9 @@
               </div>
             </div>
 
+
             <!-- Cursed Energy -->
-            <div class="vital-box" id="ceVitalBox">
+            <div class="character-vital-box" id="ceVitalBox">
               <span class="vital-label">Cursed Energy</span>
               <div class="hp-row">
                 <input class="hp-input" id="ceCurrent" placeholder="0" type="number" min="0" />
@@ -132,8 +133,10 @@
               </div>
             </div>
 
+
+
             <!-- Armor Class -->
-            <div class="vital-box" id="acVitalBox">
+            <div class="character-vital-box" id="acVitalBox">
               <div class="shield-wrap">
                 <svg viewBox="0 0 60 68" fill="none" xmlns="http://www.w3.org/2000/svg">
                   <path d="M30 4L5 13V36C5 50 17 62 30 66C43 62 55 50 55 36V13L30 4Z" stroke="#1a1410"
@@ -152,7 +155,7 @@
             </div>
 
             <!-- Movement -->
-            <div class="vital-box" id="movementVitalBox">
+            <div class="character-vital-box" id="movementVitalBox">
               <span class="vital-label">Movement</span>
               <div class="move-row">
                 <input class="move-input" id="moveInput" placeholder="—" />
@@ -459,19 +462,22 @@
         <div class="combat-shell">
 
           <div class="combat-header-grid" style="grid-template-columns: 1fr 1fr 1fr auto;">
-            <div class="vital-box black-flash-box">
-              <span class="vital-label black-flash-label" style="display:block;">Black Flash</span>
-              <div class="black-flash-value" id="combatBlackFlashValue">—</div>
-              <span class="vital-label black-flash-label" style="display:block; margin-top:2px;">Range</span>
+            <!-- Black Flash -->
+            <div class="character-vital-box black-flash-box" style="padding-top:2px;padding-bottom:2px;">
+              <div class="black-flash-label" style="color:var(--accent);font-size:11px;letter-spacing:1.5px;text-transform:uppercase;margin-top:2px;margin-bottom:0;">Black Flash</div>
+              <div class="black-flash-value" id="combatBlackFlashValue" style="font-size:24px;font-weight:600;color:#110d0a;line-height:1;min-height:24px;margin-top:0;margin-bottom:0;">—</div>
+              <div class="black-flash-label" style="color:var(--accent);font-size:11px;letter-spacing:1.5px;text-transform:uppercase;margin-top:2px;margin-bottom:0;">Range</div>
             </div>
-            <div class="combat-header-field">
-              <span class="combat-label">Initiative</span>
-              <div class="combat-value" id="combatInitiativeValue">—</div>
+            <!-- Initiative -->
+            <div class="vital-box" style="display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:6px 0 2px 0;min-width:110px;">
+              <span class="combat-label" style="margin-bottom:0.5em;margin-top:0.1em;">Initiative</span>
+              <div class="combat-value" id="combatInitiativeValue" style="margin-top:-4px;margin-bottom:0;">—</div>
             </div>
-            <div class="vital-box combat-imbue-field">
-              <div class="combat-imbue-split">
-                <div class="combat-imbue-left">
-                  <span class="vital-label">Imbue</span>
+            <!-- Imbue -->
+            <div class="vital-box combat-imbue-field" style="padding-top:0px;padding-bottom:0.5px;">
+              <div class="combat-imbue-split" style="min-height:28px;">
+                <div class="combat-imbue-left" style="min-width:52px;">
+                  <span class="vital-label" style="margin-bottom:0;">Imbue</span>
                   <input type="number" id="combatImbueInput" class="combat-imbue-input" min="1" max="3" value="1" />
                 </div>
                 <div class="combat-imbue-right">
@@ -685,6 +691,7 @@
           </div>
 
           <div class="jujutsu-subpanel active" id="jujutsuSubpanelTechnique" data-subpanel="technique" role="tabpanel">
+
             <div id="techniqueSummaryCard">
               <div class="technique-summary-header">
                 <div>
@@ -694,7 +701,11 @@
                 <button class="technique-edit-icon-btn" id="techniqueEditBtn" type="button" aria-label="Edit Technique"
                   title="Edit Technique">&#9998;</button>
               </div>
-              <div class="technique-xp-threshold" id="techniqueXpThreshold" style="display:none;"></div>
+              <div class="techniques-vitals-grid">
+                <div id="techniqueXpThresholdCard" class="vital-box"></div>
+                <div id="techniqueCeCard" class="vital-box"></div>
+                <div id="techniqueOutputCard" class="vital-box"></div>
+              </div>
               <div class="techniques-app-card-grid" id="techniqueApplicationsSummary"></div>
               <div class="technique-summary-footer" id="techniqueSummaryFooter" style="display:none;">
                 <button class="inventory-mini-btn inventory-yen-adjust-btn" id="techniqueAddAppSummaryBtn" type="button"

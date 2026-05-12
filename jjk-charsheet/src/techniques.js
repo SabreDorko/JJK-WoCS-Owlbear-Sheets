@@ -1,3 +1,59 @@
+// Render Output, CE, and XP Threshold as cards in the Techniques tab
+function renderTechniqueOutputCard(state) {
+  const el = document.getElementById("techniqueOutputCard");
+  if (!el) return;
+  const outputLevel = Math.max(1, Math.min(3, parseInt(state.outputLevel, 10) || 1));
+  let die = "1d4";
+  if (outputLevel === 2) die = "1d4+2";
+  if (outputLevel === 3) die = "2d4";
+  el.innerHTML = `
+    <div class="combat-imbue-split" style="min-height:48px;">
+      <div class="combat-imbue-left" style="min-width:52px;">
+        <span class="vital-label" style="margin-bottom:2px;">Output</span>
+        <input id="techniqueOutputInput" class="combat-imbue-input" type="number" min="1" max="3" value="${outputLevel}" />
+      </div>
+      <div class="combat-imbue-right">
+        <span id="techniqueOutputDie" class="combat-imbue-die">${die}</span>
+      </div>
+    </div>
+  `;
+  const input = el.querySelector("#techniqueOutputInput");
+  if (input) {
+    input.addEventListener("change", () => {
+      const val = Math.max(1, Math.min(3, parseInt(input.value, 10) || 1));
+      state.outputLevel = val;
+      renderTechniqueOutputCard(state);
+      if (typeof _scheduleSave === "function") _scheduleSave();
+    });
+  }
+}
+
+function renderTechniqueCeCard(state) {
+  const el = document.getElementById("techniqueCeCard");
+  if (!el) return;
+  const ceCurrent = parseInt(state.ceCurrent, 10) || 0;
+  const ceMax     = parseInt(state.ceMax,     10) || 0;
+  el.innerHTML = `
+    <div class="vital-label">Cursed Energy</div>
+    <div style="font-size:18px;font-weight:600;">${ceCurrent} <span style="color:var(--ink-faint);">/</span> ${ceMax}</div>
+  `;
+}
+
+function renderTechniqueXpThresholdCard(state) {
+  const el = document.getElementById("techniqueXpThresholdCard");
+  if (!el) return;
+  const techScore   = parseNonNegativeInt(state?.stats?.technique?.score);
+  const xpThreshold = getEffectiveXpThreshold(state, techScore);
+  const hasModifiers = normalizeDirectModifierList(state?.directModifiers || [])
+    .some(e => e.targetType === "derived" && e.targetKey === "xpThreshold");
+  const sorcererXp = state.xp || 0;
+  el.innerHTML = `
+    <div class="black-flash-label" style="color:var(--ink);font-size:11px;letter-spacing:1.5px;text-transform:uppercase;margin-top:2px">Sorcerer XP</div>
+    <div class="black-flash-value" style="font-size:24px;font-weight:600;color:#110d0a;line-height:1;min-height:24px;">${xpThreshold}${hasModifiers ? " ✦" : ""}</div>
+    <div class="black-flash-label" style="color:var(--ink);font-size:11px;letter-spacing:1.5px;text-transform:uppercase;margin-top:2px;">Threshold</div>
+  `;
+}
+
 import { computeActiveModifierEffects, getRollModifierSources, normalizeDirectModifierList, applyDirectModifiers, getTechniqueAppModifiers, getTechniqueAppModifierBySource, getEffectiveXpThreshold, getEffectiveTechniqueRollBonus } from "./modifiers.js";
 import { openRollModeMenu } from "./character.js";
 
@@ -65,8 +121,6 @@ function syncTechniqueThresholdLine(state) {
 
 // ─── App modifier reading helpers ──────────────────────────────────────────────
 
-// Source is stored as "typeTag" or "typeTag — user note".
-// These helpers match by prefix so both formats work.
 function appModsBySourceType(state, appIndex, typeTag) {
   return getTechniqueAppModifiers(state, appIndex)
     .filter(e => e.source === typeTag || e.source.startsWith(typeTag + " — "));
@@ -98,13 +152,11 @@ function getAppRollBonusOverride(state, appIndex) {
   return Math.round(applyDirectModifiers(0, mods));
 }
 
-
 // Sets advantage/disadvantage/normal in state.directModifiers for an app,
 // then immediately fires the cast. "normal" clears both flags without persisting one.
 function castWithRollMode(state, appIndex, rollMode) {
   if (!state) return;
 
-  // Remove any existing advantage/disadvantage flags for this app
   state.directModifiers = (state.directModifiers || []).filter(e =>
     !(e.targetType === "techniqueApp" &&
       e.targetKey  === String(appIndex) &&
@@ -112,7 +164,6 @@ function castWithRollMode(state, appIndex, rollMode) {
        e.source === "disadvantage" || e.source.startsWith("disadvantage — ")))
   );
 
-  // Add the new flag (unless normal — normal just clears both)
   if (rollMode === "advantage" || rollMode === "disadvantage") {
     state.directModifiers.push({
       id:         `direct_mod_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
@@ -159,7 +210,6 @@ function performApplicationCast(state, _techniqueIndex, applicationIndex) {
   const techScore   = parseNonNegativeInt(state?.stats?.technique?.score);
   const ceCurrent   = parseNonNegativeInt(state.ceCurrent);
 
-  // Effective values after modifiers
   const xpThreshold = getEffectiveXpThreshold(state, techScore);
   const ceCost      = getAppCeCostOverride(state, applicationIndex, scaled.ceCost);
   const dc          = getAppDcOverride(state, applicationIndex, scaled.dc);
@@ -179,74 +229,39 @@ function performApplicationCast(state, _techniqueIndex, applicationIndex) {
     return;
   }
 
-  // Talent roll
-  const talentSkillIndex = 3;
-  const talentAptitude   = state?.stats?.technique?.skills?.[talentSkillIndex]?.aptitude || 0;
-  const diceCount        = Math.max(1, techScore);
-  const talentBonus      = talentAptitude > 0 ? 2 : 0;
-  const effects          = computeActiveModifierEffects(state);
-  const baseRollBonus    = effects?.rollBonuses?.technique || 0;
-  const extraRollBonus   = getAppRollBonusOverride(state, applicationIndex);
-  const totalRollBonus   = baseRollBonus + extraRollBonus;
+  const damageParts = Array.isArray(normalized.damageParts) && normalized.damageParts.length
+    ? normalized.damageParts
+    : [{ count: 1, die: "d6" }];
 
-  function computeTotal(rolls) {
-    return rolls.reduce((a, b) => a + b, 0) + talentBonus + totalRollBonus;
+  let outputBonus = 0;
+  let outputBreakdown = null;
+  if (normalized.addOutput) {
+    const outputLevel = Math.max(1, Math.min(3, parseInt(state.outputLevel, 10) || 1));
+    if (outputLevel === 1) { outputBonus = Math.floor(Math.random() * 6) + 1; outputBreakdown = "1d6"; }
+    else if (outputLevel === 2) { outputBonus = Math.floor(Math.random() * 6) + 1 + 2; outputBreakdown = "1d6+2"; }
+    else { outputBonus = Math.floor(Math.random() * 6) + 1 + Math.floor(Math.random() * 6) + 1; outputBreakdown = "2d6"; }
   }
+  const techniqueLevelBonus = normalized.addTechniqueLevel ? techScore : 0;
 
-  const firstRolls  = Array.from({ length: diceCount }, () => Math.floor(Math.random() * 6) + 1);
-  const firstTotal  = computeTotal(firstRolls);
+  const damageResults = damageParts.map(part => {
+    const dieMatch = String(part.die).match(/d(\d+)/i);
+    const sides = dieMatch ? parseInt(dieMatch[1], 10) : 6;
+    const rolls = Array.from({ length: part.count }, () => Math.floor(Math.random() * sides) + 1);
+    return { ...part, sides, rolls, total: rolls.reduce((a, b) => a + b, 0) };
+  });
+  const damageTotal = damageResults.reduce((sum, r) => sum + r.total, 0) + outputBonus + techniqueLevelBonus;
 
-  let rolls, total, selectedRollIndex, secondRolls = null, secondTotal = null;
-
-  if (rollMode === "advantage" || rollMode === "disadvantage") {
-    secondRolls        = Array.from({ length: diceCount }, () => Math.floor(Math.random() * 6) + 1);
-    secondTotal        = computeTotal(secondRolls);
-    selectedRollIndex  = rollMode === "advantage"
-      ? (firstTotal >= secondTotal ? 0 : 1)
-      : (firstTotal <= secondTotal ? 0 : 1);
-    rolls = selectedRollIndex === 0 ? firstRolls : secondRolls;
-    total = selectedRollIndex === 0 ? firstTotal : secondTotal;
-  } else {
-    rolls             = firstRolls;
-    total             = firstTotal;
-    selectedRollIndex = 0;
-  }
-
-  const maxPossible = diceCount * 6 + talentBonus + totalRollBonus;
-  const allOnes     = rolls.every(r => r === 1);
-
-  let rollStatus;
-  if (allOnes) {
-    rollStatus = "fail";
-  } else if (total >= dc) {
-    rollStatus = total >= maxPossible ? "success" : "pass";
-  } else {
-    rollStatus = "miss";
-  }
-
-  // Build breakdown for the toast (mirrors character.js buildComparedBreakdown shape)
-  const baseBreakdown = {
-    skillModifier:   talentBonus,
-    equipmentBonuses: getRollModifierSources(state, "technique"),
-    die:             "d6",
-    ...(extraRollBonus !== 0 ? { overrideBonus: extraRollBonus } : {}),
+  const breakdown = {
+    damageParts: damageResults.map(r => ({ count: r.count, die: r.die, rolls: r.rolls, total: r.total })),
+    output: normalized.addOutput ? { value: outputBonus, breakdown: outputBreakdown } : null,
+    techniqueLevel: normalized.addTechniqueLevel ? techScore : null,
+    total: damageTotal,
   };
 
-  const breakdown = (rollMode === "advantage" || rollMode === "disadvantage")
-    ? {
-        ...baseBreakdown,
-        rollMode,
-        comparedRolls:     [firstRolls, secondRolls],
-        comparedTotals:    [firstTotal, secondTotal],
-        selectedRollIndex,
-      }
-    : baseBreakdown;
-
   if (_showRollToast) {
-    _showRollToast(label, diceCount, rolls, total, rollStatus, "Talent", breakdown, rollMode === "normal" ? null : rollMode);
+    _showRollToast(label + " (Damage)", null, null, damageTotal, null, "Damage", breakdown, null);
   }
 
-  // Deduct CE and reset step
   state.ceCurrent = String(Math.max(0, ceCurrent - ceCost));
   if (normalized.scalingEnabled && normalized.currentStep > 0) {
     state.techniques.applications[applicationIndex].currentStep = 0;
@@ -292,24 +307,24 @@ function syncApplicationButtonStates(state) {
     const card = summaryGrid.querySelector(`[data-app-idx="${idx}"]`);
     if (!card || card.classList.contains("techniques-app-card--editing")) return;
 
-    const normalized = normalizeApplication(app, idx);
-    const scaled     = getScaledApplicationValues(normalized);
-    const button     = card.querySelector(`[data-app-cast="${idx}"]`);
-    const costValue  = card.querySelector(`[data-app-metric-cost-value="${idx}"]`);
-    const dcValue    = card.querySelector(`[data-app-metric-dc-value="${idx}"]`);
+    const normalized   = normalizeApplication(app, idx);
+    const scaled       = getScaledApplicationValues(normalized);
+    const button       = card.querySelector(`[data-app-cast="${idx}"]`);
+    const costValue    = card.querySelector(`[data-app-metric-cost-value="${idx}"]`);
+    const dcValue      = card.querySelector(`[data-app-metric-dc-value="${idx}"]`);
     const scalingValue = card.querySelector(`[data-app-scaling-summary="${idx}"]`);
-    const stepLabel  = card.querySelector(`[data-app-step-label="${idx}"]`);
-    const stepDown   = card.querySelector(`[data-app-step-down="${idx}"]`);
+    const stepLabel    = card.querySelector(`[data-app-step-label="${idx}"]`);
+    const stepDown     = card.querySelector(`[data-app-step-down="${idx}"]`);
 
     const displayCost = getAppCeCostOverride(state, idx, scaled.ceCost);
     const displayDc   = getAppDcOverride(state, idx, scaled.dc);
     const btnState    = getApplicationButtonState(state, idx);
 
-    if (costValue)   costValue.textContent   = displayCost > 0 ? String(displayCost) : "-";
-    if (dcValue)     dcValue.textContent     = displayDc   > 0 ? String(displayDc)   : "-";
-    if (scalingValue)scalingValue.textContent= getScalingSummary(normalized);
-    if (stepLabel)   stepLabel.textContent   = `Step ${scaled.currentStep}`;
-    if (stepDown)    stepDown.disabled       = scaled.currentStep <= 0;
+    if (costValue)    costValue.textContent    = displayCost > 0 ? String(displayCost) : "-";
+    if (dcValue)      dcValue.textContent      = displayDc   > 0 ? String(displayDc)   : "-";
+    if (scalingValue) scalingValue.textContent = getScalingSummary(normalized);
+    if (stepLabel)    stepLabel.textContent    = `Step ${scaled.currentStep}`;
+    if (stepDown)     stepDown.disabled        = scaled.currentStep <= 0;
 
     if (button) {
       button.classList.toggle("techniques-app-cast-btn--auto-pass",   btnState.isAutoPass);
@@ -317,12 +332,11 @@ function syncApplicationButtonStates(state) {
       button.classList.toggle("techniques-app-cast-btn--disadvantage",btnState.rollMode === "disadvantage");
       button.disabled = btnState.disabled;
       button.title    = btnState.tooltip;
-      const star = btnState.isAutoPass              ? "✦ " : "";
+      const star = btnState.isAutoPass                  ? "✦ " : "";
       const adv  = btnState.rollMode === "advantage"    ? "⬆ " :
                    btnState.rollMode === "disadvantage" ? "⬇ " : "";
       button.textContent = `${star}${adv}Use`;
     }
-
   });
 }
 
@@ -353,6 +367,9 @@ function createDefaultApplication(index) {
     scalingCeStep: 0,
     scalingDcStep: 0,
     currentStep: 0,
+    damageParts: [{ count: 1, die: "d6" }],
+    addOutput: false,
+    addTechniqueLevel: false,
   };
 }
 
@@ -377,7 +394,18 @@ function normalizeApplication(raw, index) {
   const scalingCeStep  = parseNonNegativeInt(raw?.scalingCeStep);
   const scalingDcStep  = parseNonNegativeInt(raw?.scalingDcStep);
   const currentStep    = scalingEnabled ? parseNonNegativeInt(raw?.currentStep) : 0;
-  return { title: title || fallbackTitle, description, effect, ceCost, dc, rangeType, rangeValue, aoeShape, aoeSize, scalingEnabled, scalingCeStep, scalingDcStep, currentStep };
+  let damageParts = Array.isArray(raw?.damageParts)
+    ? raw.damageParts.map(p => ({ count: parseNonNegativeInt(p.count ?? 1), die: String(p.die || "d6").trim() }))
+    : [{ count: 1, die: "d6" }];
+  if (!damageParts.length) damageParts = [{ count: 1, die: "d6" }];
+  const addOutput         = Boolean(raw?.addOutput);
+  const addTechniqueLevel = Boolean(raw?.addTechniqueLevel);
+  return {
+    title: title || fallbackTitle, description, effect, ceCost, dc,
+    rangeType, rangeValue, aoeShape, aoeSize,
+    scalingEnabled, scalingCeStep, scalingDcStep, currentStep,
+    damageParts, addOutput, addTechniqueLevel,
+  };
 }
 
 function getAoeShapeLabel(shape) {
@@ -415,8 +443,8 @@ function ensureTechniquesState(state) {
   if (!Array.isArray(techniques.bindingVows))  techniques.bindingVows  = [];
 
   if (!techniques.applications.length) {
-    const legacyCt     = Array.isArray(techniques.ctAbilities)     ? techniques.ctAbilities     : [];
-    const legacyDomain = Array.isArray(techniques.domainAbilities)  ? techniques.domainAbilities  : [];
+    const legacyCt     = Array.isArray(techniques.ctAbilities)    ? techniques.ctAbilities    : [];
+    const legacyDomain = Array.isArray(techniques.domainAbilities) ? techniques.domainAbilities : [];
     const legacy = [...legacyCt, ...legacyDomain]
       .map(v => String(v || "").trim()).filter(Boolean)
       .map((title, idx) => ({ title: title || `Application ${idx + 1}`, description: "" }));
@@ -430,9 +458,9 @@ function ensureTechniquesState(state) {
     techniques.applications = [createDefaultApplication(0)];
   }
 
-  techniques.noCtPath          = String(techniques.noCtPath          || "");
-  techniques.notes             = String(techniques.notes             || "");
-  techniques.bindingVowsNotes  = String(techniques.bindingVowsNotes  || "");
+  techniques.noCtPath         = String(techniques.noCtPath         || "");
+  techniques.notes            = String(techniques.notes            || "");
+  techniques.bindingVowsNotes = String(techniques.bindingVowsNotes || "");
 
   if (!techniques.bindingVows.length && techniques.bindingVowsNotes.trim()) {
     techniques.bindingVows = [{ title: "Vow 1", benefits: techniques.bindingVowsNotes.trim(), conditions: "" }];
@@ -547,7 +575,6 @@ function repositionTechniquesFloatingMenus() {
     const idx  = parseNonNegativeInt(menu.dataset.techDeleteIdx);
 
     let anchor = null;
-    const mode = "left-corner";
     if (kind === "inline-app" && _pendingInlineApplicationDeleteAnchor?.idx === idx) {
       anchor = _pendingInlineApplicationDeleteAnchor;
     } else if (kind === "editor-app" && _pendingEditorApplicationDeleteAnchor?.idx === idx) {
@@ -566,8 +593,8 @@ function repositionTechniquesFloatingMenus() {
       menu.style.transformOrigin = "bottom left";
 
       let rect = menu.getBoundingClientRect();
-      const minLeft    = viewportPad;
-      const maxLeft    = window.innerWidth - viewportPad - rect.width;
+      const minLeft     = viewportPad;
+      const maxLeft     = window.innerWidth - viewportPad - rect.width;
       const clampedLeft = clamp(rect.left, minLeft, Math.max(minLeft, maxLeft));
       if (clampedLeft !== rect.left) {
         menu.style.left = `${Math.round(anchor.x + (clampedLeft - rect.left))}px`;
@@ -585,33 +612,34 @@ function repositionTechniquesFloatingMenus() {
       menu.style.bottom = menu.style.marginLeft = menu.style.transform = menu.style.transformOrigin = "";
     menu.classList.remove("confirm-below", "confirm-align-left", "confirm-align-right");
     const rect = menu.getBoundingClientRect();
-    if (rect.top   < viewportPad)                          menu.classList.add("confirm-below");
-    if (rect.right > window.innerWidth - viewportPad)      menu.classList.add("confirm-align-left");
-    if (rect.left  < viewportPad)                          menu.classList.add("confirm-align-right");
+    if (rect.top   < viewportPad)                     menu.classList.add("confirm-below");
+    if (rect.right > window.innerWidth - viewportPad) menu.classList.add("confirm-align-left");
+    if (rect.left  < viewportPad)                     menu.classList.add("confirm-align-right");
   });
 }
 
 // ─── Render: view card (collapsed) ────────────────────────────────────────────
 
 function renderViewCard(state, app, idx) {
-  const normalized   = normalizeApplication(app, idx);
-  const scaled       = getScaledApplicationValues(normalized);
-  const displayCost  = getAppCeCostOverride(state, idx, scaled.ceCost);
-  const displayDc    = getAppDcOverride(state, idx, scaled.dc);
-  const costText     = displayCost > 0 ? String(displayCost) : "-";
-  const dcText       = displayDc   > 0 ? String(displayDc)   : "-";
-  const range        = getRangeSummary(normalized);
-  const effectText   = normalized.effect      || "No effect listed.";
-  const description  = normalized.description || "No description yet.";
-  const btnState     = getApplicationButtonState(state, idx);
+  const normalized  = normalizeApplication(app, idx);
+  const scaled      = getScaledApplicationValues(normalized);
+  const displayCost = getAppCeCostOverride(state, idx, scaled.ceCost);
+  const displayDc   = getAppDcOverride(state, idx, scaled.dc);
+  const costText    = displayCost > 0 ? String(displayCost) : "-";
+  const dcText      = displayDc   > 0 ? String(displayDc)   : "-";
+  const range       = getRangeSummary(normalized);
+  const effectText  = normalized.effect      || "No effect listed.";
+  const description = normalized.description || "No description yet.";
+  const btnState    = getApplicationButtonState(state, idx);
+
   const btnClasses = [
     "techniques-app-cast-btn",
-    btnState.isAutoPass                    ? "techniques-app-cast-btn--auto-pass"    : "",
-    btnState.rollMode === "advantage"      ? "techniques-app-cast-btn--advantage"    : "",
-    btnState.rollMode === "disadvantage"   ? "techniques-app-cast-btn--disadvantage" : "",
+    btnState.isAutoPass                  ? "techniques-app-cast-btn--auto-pass"    : "",
+    btnState.rollMode === "advantage"    ? "techniques-app-cast-btn--advantage"    : "",
+    btnState.rollMode === "disadvantage" ? "techniques-app-cast-btn--disadvantage" : "",
   ].filter(Boolean).join(" ");
 
-  const star = btnState.isAutoPass              ? "✦ " : "";
+  const star = btnState.isAutoPass                  ? "✦ " : "";
   const adv  = btnState.rollMode === "advantage"    ? "⬆ " :
                btnState.rollMode === "disadvantage" ? "⬇ " : "";
 
@@ -643,6 +671,18 @@ function renderViewCard(state, app, idx) {
 // ─── Render: expanded edit card ────────────────────────────────────────────────
 
 function renderExpandedCard(normalized, idx) {
+  const damageRows = (Array.isArray(normalized.damageParts) ? normalized.damageParts : [{ count: 1, die: "d6" }])
+    .map((part, i) => `
+      <div style="display:flex;align-items:center;gap:4px;">
+        <input type="number" min="1" step="1" class="meta-input" style="width:36px;" data-app-damage-count="${idx}:${i}" value="${part.count}" title="Number of dice" />
+        <span>d</span>
+        <input type="text" class="meta-input" style="width:36px;" data-app-damage-die="${idx}:${i}" value="${String(part.die).replace(/^d/i, '')}" title="Die type (e.g. 6 for d6)" />
+        <button type="button" class="inventory-mini-btn danger" data-app-remove-damage="${idx}:${i}" title="Remove">&times;</button>
+      </div>
+    `).join("") + `
+      <button type="button" class="inventory-mini-btn" data-app-add-damage="${idx}" title="Add Damage Die">+ Add</button>
+    `;
+
   return `
     <article class="techniques-app-card techniques-app-card--editing" data-app-idx="${idx}">
       <div class="techniques-app-edit-grid">
@@ -671,6 +711,18 @@ function renderExpandedCard(normalized, idx) {
         <span class="field-label">DC / Step</span>
         <input id="appCardScalingDc${idx}" class="meta-input techniques-app-card-field" type="number" min="0" step="1" inputmode="numeric" data-app-scaling-dc-inline="${idx}" value="${normalized.scalingDcStep || 0}" />
       </label>` : ""}
+      <label class="techniques-field">
+        <span class="field-label">Damage Dice</span>
+        <div style="display:flex;flex-direction:column;gap:2px;">${damageRows}</div>
+      </label>
+      <label class="techniques-field techniques-field--checkbox" for="appCardAddOutput${idx}">
+        <span class="field-label">Add Output Bonus</span>
+        <input id="appCardAddOutput${idx}" class="techniques-checkbox" type="checkbox" data-app-add-output-inline="${idx}"${normalized.addOutput ? " checked" : ""} />
+      </label>
+      <label class="techniques-field techniques-field--checkbox" for="appCardAddTechniqueLevel${idx}">
+        <span class="field-label">Add Technique Level</span>
+        <input id="appCardAddTechniqueLevel${idx}" class="techniques-checkbox" type="checkbox" data-app-add-technique-level-inline="${idx}"${normalized.addTechniqueLevel ? " checked" : ""} />
+      </label>
       <label class="techniques-field" for="appCardRangeType${idx}">
         <span class="field-label">Range Type</span>
         <select id="appCardRangeType${idx}" class="meta-select techniques-app-card-field" data-app-range-type-inline="${idx}">
@@ -926,7 +978,23 @@ export function updateTechniquesDerivedUI(stateArg = null) {
   const typeEl = document.getElementById("techniqueTypeSummary");
   if (typeEl) typeEl.innerHTML = `<em>${getTechniqueTypeText(state.techniques.mode)}</em>`;
 
-  syncTechniqueThresholdLine(state);
+  const showVitals  = state.techniques.mode !== "none";
+  const outputCard  = document.getElementById("techniqueOutputCard");
+  const ceCard      = document.getElementById("techniqueCeCard");
+  const xpCard      = document.getElementById("techniqueXpThresholdCard");
+  if (outputCard) outputCard.style.display = showVitals ? "" : "none";
+  if (ceCard)     ceCard.style.display     = showVitals ? "" : "none";
+  if (xpCard)     xpCard.style.display     = showVitals ? "" : "none";
+  if (showVitals) {
+    renderTechniqueOutputCard(state);
+    renderTechniqueCeCard(state);
+    renderTechniqueXpThresholdCard(state);
+  } else {
+    if (outputCard) outputCard.innerHTML = "";
+    if (ceCard)     ceCard.innerHTML     = "";
+    if (xpCard)     xpCard.innerHTML     = "";
+  }
+
   renderApplicationsSummary(state);
 
   const hasActiveTechnique = state.techniques.mode !== "none";
@@ -948,10 +1016,10 @@ export function applyTechniquesStateToUI() {
 
   ensureTechniquesState(state);
 
-  const mode      = state.techniques.mode;
-  const modeCt    = document.getElementById("techniqueModeCt");
+  const mode       = state.techniques.mode;
+  const modeCt     = document.getElementById("techniqueModeCt");
   const modeDomain = document.getElementById("techniqueModeDomain");
-  const modeNone  = document.getElementById("techniqueModeNone");
+  const modeNone   = document.getElementById("techniqueModeNone");
   if (modeCt)     modeCt.checked     = mode === "ct";
   if (modeDomain) modeDomain.checked = mode === "domain";
   if (modeNone)   modeNone.checked   = mode === "none";
@@ -991,12 +1059,12 @@ function cancelTechniqueEditing() {
   const state = getState();
   if (!state) return;
   restoreEditSnapshot(state, _editSnapshot);
-  _isEditing = false;
+  _isEditing  = false;
   _editorStep = "mode";
-  _pendingNewApplicationIndex = null;
+  _pendingNewApplicationIndex          = null;
   _pendingInlineApplicationDeleteIndex = _pendingInlineApplicationDeleteAnchor = null;
   _pendingEditorApplicationDeleteIndex = _pendingEditorApplicationDeleteAnchor = null;
-  _pendingVowDeleteIndex = _pendingVowDeleteAnchor = null;
+  _pendingVowDeleteIndex               = _pendingVowDeleteAnchor               = null;
   _expandedAppIndices.clear();
   refreshCharacterStats();
   applyTechniquesStateToUI();
@@ -1025,12 +1093,12 @@ function saveTechniqueEditing() {
   const state = getState();
   if (!state) return;
   ensureTechniquesState(state);
-  _isEditing = false;
+  _isEditing  = false;
   _editorStep = "mode";
-  _pendingNewApplicationIndex = null;
+  _pendingNewApplicationIndex          = null;
   _pendingInlineApplicationDeleteIndex = _pendingInlineApplicationDeleteAnchor = null;
   _pendingEditorApplicationDeleteIndex = _pendingEditorApplicationDeleteAnchor = null;
-  _pendingVowDeleteIndex = _pendingVowDeleteAnchor = null;
+  _pendingVowDeleteIndex               = _pendingVowDeleteAnchor               = null;
   _editSnapshot = null;
   refreshCharacterStats();
   applyTechniquesStateToUI();
@@ -1040,10 +1108,10 @@ function saveTechniqueEditing() {
 // ─── Init ──────────────────────────────────────────────────────────────────────
 
 export function initTechniques({ getState: getStateFn, scheduleSave: scheduleSaveFn, refreshCharacterStats: refreshCharacterStatsFn, showRollToast: showRollToastFn }) {
-  _getState             = getStateFn;
-  _scheduleSave         = scheduleSaveFn;
+  _getState              = getStateFn;
+  _scheduleSave          = scheduleSaveFn;
   _refreshCharacterStats = refreshCharacterStatsFn;
-  _showRollToast        = showRollToastFn;
+  _showRollToast         = showRollToastFn;
 
   if (_initialized) { applyTechniquesStateToUI(); return; }
 
@@ -1116,7 +1184,7 @@ export function initTechniques({ getState: getStateFn, scheduleSave: scheduleSav
       const idx = parseNonNegativeInt(card.dataset.appIdx);
 
       const castBtn = e.target?.closest?.("[data-app-cast]");
-      if (!castBtn) return; // ignore right-clicks anywhere else on the card
+      if (!castBtn) return;
 
       const state = getState();
       if (!state) return;
@@ -1176,10 +1244,10 @@ export function initTechniques({ getState: getStateFn, scheduleSave: scheduleSav
 
       const removeTrigger = e.target?.closest?.("[data-app-remove-inline]");
       if (removeTrigger) {
-        const state      = getState();
+        const state     = getState();
         if (!state) return;
         ensureTechniquesState(state);
-        const removeIdx  = parseNonNegativeInt(removeTrigger.dataset.appRemoveInline);
+        const removeIdx = parseNonNegativeInt(removeTrigger.dataset.appRemoveInline);
         state.techniques.applications.splice(removeIdx, 1);
         state.techniques.applications = state.techniques.applications.map((e, i) => normalizeApplication(e, i));
         if (_pendingNewApplicationIndex !== null) _pendingNewApplicationIndex = null;
@@ -1191,7 +1259,7 @@ export function initTechniques({ getState: getStateFn, scheduleSave: scheduleSav
 
       const stepDownTrigger = e.target?.closest?.("[data-app-step-down]");
       if (stepDownTrigger) {
-        const state = getState();
+        const state      = getState();
         if (!state) return;
         const idx        = parseNonNegativeInt(stepDownTrigger.dataset.appStepDown);
         const normalized = normalizeApplication(state.techniques.applications[idx], idx);
@@ -1205,7 +1273,7 @@ export function initTechniques({ getState: getStateFn, scheduleSave: scheduleSav
 
       const stepUpTrigger = e.target?.closest?.("[data-app-step-up]");
       if (stepUpTrigger) {
-        const state = getState();
+        const state      = getState();
         if (!state) return;
         const idx        = parseNonNegativeInt(stepUpTrigger.dataset.appStepUp);
         const normalized = normalizeApplication(state.techniques.applications[idx], idx);
@@ -1225,6 +1293,40 @@ export function initTechniques({ getState: getStateFn, scheduleSave: scheduleSav
         performApplicationCast(state, 0, idx);
         syncApplicationButtonStates(state);
       }
+
+      // Inline damage dice editing
+      const addDamageTrigger = e.target?.closest?.("[data-app-add-damage]");
+      if (addDamageTrigger) {
+        const state = getState();
+        if (!state) return;
+        ensureTechniquesState(state);
+        const idx = parseNonNegativeInt(addDamageTrigger.dataset.appAddDamage);
+        if (state.techniques.applications[idx]) {
+          if (!Array.isArray(state.techniques.applications[idx].damageParts))
+            state.techniques.applications[idx].damageParts = [{ count: 1, die: "d6" }];
+          state.techniques.applications[idx].damageParts.push({ count: 1, die: "d6" });
+          refreshApplicationCards(state);
+          scheduleSave();
+        }
+        return;
+      }
+
+      const removeDamageTrigger = e.target?.closest?.("[data-app-remove-damage]");
+      if (removeDamageTrigger) {
+        const state = getState();
+        if (!state) return;
+        ensureTechniquesState(state);
+        const [appIdxStr, partIdxStr] = removeDamageTrigger.dataset.appRemoveDamage.split(":");
+        const appIdx  = parseNonNegativeInt(appIdxStr);
+        const partIdx = parseNonNegativeInt(partIdxStr);
+        const app     = state.techniques.applications[appIdx];
+        if (app && Array.isArray(app.damageParts) && app.damageParts.length > 1) {
+          app.damageParts.splice(partIdx, 1);
+          refreshApplicationCards(state);
+          scheduleSave();
+        }
+        return;
+      }
     });
 
     summaryGrid.addEventListener("input", e => {
@@ -1232,6 +1334,32 @@ export function initTechniques({ getState: getStateFn, scheduleSave: scheduleSav
       if (!state) return;
       ensureTechniquesState(state);
       const ds = e.target?.dataset || {};
+
+      // Damage part inline editing
+      if (ds.appDamageCount !== undefined) {
+        const [appIdxStr, partIdxStr] = ds.appDamageCount.split(":");
+        const appIdx  = parseNonNegativeInt(appIdxStr);
+        const partIdx = parseNonNegativeInt(partIdxStr);
+        const app     = state.techniques.applications[appIdx];
+        if (app && Array.isArray(app.damageParts) && app.damageParts[partIdx]) {
+          app.damageParts[partIdx].count = Math.max(1, parseInt(e.target.value, 10) || 1);
+          scheduleSave();
+        }
+        return;
+      }
+      if (ds.appDamageDie !== undefined) {
+        const [appIdxStr, partIdxStr] = ds.appDamageDie.split(":");
+        const appIdx  = parseNonNegativeInt(appIdxStr);
+        const partIdx = parseNonNegativeInt(partIdxStr);
+        const app     = state.techniques.applications[appIdx];
+        if (app && Array.isArray(app.damageParts) && app.damageParts[partIdx]) {
+          const raw = e.target.value.replace(/[^0-9]/g, "") || "6";
+          app.damageParts[partIdx].die = `d${raw}`;
+          scheduleSave();
+        }
+        return;
+      }
+
       const inlineMap = {
         appTitleInline:     (idx, v) => { if (state.techniques.applications[idx]) state.techniques.applications[idx].title       = String(v || ""); },
         appDescInline:      (idx, v) => { if (state.techniques.applications[idx]) state.techniques.applications[idx].description = String(v || ""); },
@@ -1269,7 +1397,7 @@ export function initTechniques({ getState: getStateFn, scheduleSave: scheduleSav
         if (state.techniques.applications[idx]) {
           state.techniques.applications[idx].rangeType = String(e.target.value || "self").toLowerCase();
           if (state.techniques.applications[idx].rangeType !== "range") state.techniques.applications[idx].rangeValue = "";
-          if (state.techniques.applications[idx].rangeType !== "aoe")   state.techniques.applications[idx].aoeSize = "";
+          if (state.techniques.applications[idx].rangeType !== "aoe")   state.techniques.applications[idx].aoeSize   = "";
           refreshApplicationCards(state);
         }
         scheduleSave(); return;
@@ -1280,7 +1408,21 @@ export function initTechniques({ getState: getStateFn, scheduleSave: scheduleSav
           state.techniques.applications[idx].aoeShape = String(e.target.value || "cone").toLowerCase();
           refreshApplicationCards(state);
         }
-        scheduleSave();
+        scheduleSave(); return;
+      }
+      if (ds.appAddOutputInline !== undefined) {
+        const idx = parseNonNegativeInt(ds.appAddOutputInline);
+        if (state.techniques.applications[idx]) {
+          state.techniques.applications[idx].addOutput = Boolean(e.target.checked);
+        }
+        scheduleSave(); return;
+      }
+      if (ds.appAddTechniqueLevelInline !== undefined) {
+        const idx = parseNonNegativeInt(ds.appAddTechniqueLevelInline);
+        if (state.techniques.applications[idx]) {
+          state.techniques.applications[idx].addTechniqueLevel = Boolean(e.target.checked);
+        }
+        scheduleSave(); return;
       }
     });
   }
@@ -1372,7 +1514,7 @@ export function initTechniques({ getState: getStateFn, scheduleSave: scheduleSav
         if (state.techniques.applications[idx]) {
           state.techniques.applications[idx].rangeType = String(e.target.value || "self").toLowerCase();
           if (state.techniques.applications[idx].rangeType !== "range") state.techniques.applications[idx].rangeValue = "";
-          if (state.techniques.applications[idx].rangeType !== "aoe")   state.techniques.applications[idx].aoeSize = "";
+          if (state.techniques.applications[idx].rangeType !== "aoe")   state.techniques.applications[idx].aoeSize   = "";
           renderApplicationsEditor(state);
         }
       }
@@ -1427,7 +1569,7 @@ export function initTechniques({ getState: getStateFn, scheduleSave: scheduleSav
   const addBindingVowBtn = document.getElementById("addBindingVowBtn");
   if (addBindingVowBtn) {
     addBindingVowBtn.addEventListener("click", () => {
-      const state = getState();
+      const state    = getState();
       if (!state) return;
       ensureTechniquesState(state);
       const newIndex = state.techniques.bindingVows.length;
@@ -1453,16 +1595,16 @@ export function initTechniques({ getState: getStateFn, scheduleSave: scheduleSav
       if (!state) return;
       ensureTechniquesState(state);
       const ds = e.target?.dataset || {};
-      if (ds.vowTitle     !== undefined && state.techniques.bindingVows[parseNonNegativeInt(ds.vowTitle)])      state.techniques.bindingVows[parseNonNegativeInt(ds.vowTitle)].title      = String(e.target.value || "");
-      if (ds.vowBenefits  !== undefined && state.techniques.bindingVows[parseNonNegativeInt(ds.vowBenefits)])   state.techniques.bindingVows[parseNonNegativeInt(ds.vowBenefits)].benefits  = String(e.target.value || "");
-      if (ds.vowConditions !== undefined && state.techniques.bindingVows[parseNonNegativeInt(ds.vowConditions)])state.techniques.bindingVows[parseNonNegativeInt(ds.vowConditions)].conditions = String(e.target.value || "");
+      if (ds.vowTitle      !== undefined && state.techniques.bindingVows[parseNonNegativeInt(ds.vowTitle)])      state.techniques.bindingVows[parseNonNegativeInt(ds.vowTitle)].title      = String(e.target.value || "");
+      if (ds.vowBenefits   !== undefined && state.techniques.bindingVows[parseNonNegativeInt(ds.vowBenefits)])   state.techniques.bindingVows[parseNonNegativeInt(ds.vowBenefits)].benefits   = String(e.target.value || "");
+      if (ds.vowConditions !== undefined && state.techniques.bindingVows[parseNonNegativeInt(ds.vowConditions)]) state.techniques.bindingVows[parseNonNegativeInt(ds.vowConditions)].conditions = String(e.target.value || "");
       scheduleSave();
     });
 
     bindingVowsList.addEventListener("click", e => {
       const removeTrigger = e.target?.closest?.("[data-vow-remove]");
       if (!removeTrigger || removeTrigger.dataset.vowRemove === undefined) return;
-      const state = getState();
+      const state     = getState();
       if (!state) return;
       ensureTechniquesState(state);
       const removeIdx = parseNonNegativeInt(removeTrigger.dataset.vowRemove);

@@ -1,3 +1,24 @@
+
+/* Character Vitals Box (used for HP, CE, AC, Movement, Black Flash) */
+.character-vital-box {
+  border: 1.5px solid var(--ink);
+  padding: 5px 9px 5px;
+  position: relative;
+  background: var(--parchment);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  height: 100%;
+}
+.character-vital-box::after {
+  content: '';
+  position: absolute;
+  top: 2px; left: 2px; right: 2px; bottom: 2px;
+  border: 0.5px solid var(--border);
+  pointer-events: none;
+}
 /* ── NOTES SEARCH & PIN ── */
 .notes-search-row {
   margin-bottom: 8px;
@@ -816,13 +837,15 @@
 
     .vital-box {
       border: 1.5px solid var(--ink);
-      padding: 7px 9px 8px;
+      padding: 0;
       position: relative;
       background: var(--parchment);
       display: flex;
       flex-direction: column;
       align-items: center;
+      justify-content: center;
       text-align: center;
+      height: 100%;
     }
     .vital-box::after {
       content: '';
@@ -917,6 +940,8 @@
     .black-flash-box {
       border-color: rgba(139, 26, 26, 0.75);
       background: linear-gradient(180deg, #f0ebe0 0%, #ebe2d2 100%);
+      padding-top: 4px;
+      padding-bottom: 4px;
     }
     .black-flash-label {
       color: var(--accent);
@@ -1443,6 +1468,24 @@
     }
 
     /* ── TECHNIQUES TAB ── */
+    .techniques-vitals-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+    .techniques-vitals-card {
+      border: 1px solid var(--border-strong);
+      background: rgba(240, 235, 224, 0.75);
+      border-radius: 6px;
+      padding: 8px 6px 6px 6px;
+      min-height: 60px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+    }
     .jujutsu-shell {
       display: flex;
       flex-direction: column;
@@ -4023,7 +4066,18 @@
     /* ── IMBUE BOX ───────────────────────────────────────── */
     .combat-imbue-field {
       padding: 0;
+      background: var(--parchment);
+      border: 1.5px solid var(--ink);
+      position: relative;
       overflow: hidden;
+      height: 100%;
+    }
+    .combat-imbue-field::after {
+      content: '';
+      position: absolute;
+      top: 2px; left: 2px; right: 2px; bottom: 2px;
+      border: 0.5px solid var(--border);
+      pointer-events: none;
     }
 
     .combat-imbue-split {
@@ -4039,7 +4093,7 @@
       align-items: center;
       justify-content: center;
       gap: 4px;
-      padding: 7px 8px;
+      padding: 6px 8px 5px 11px;
       background: var(--parchment-dark);
       border-right: 1.5px solid var(--ink);
       flex: 0 0 auto;
