@@ -174,7 +174,7 @@
         </div><!-- /main-body -->
       </div><!-- /character panel -->
 
-      <!-- ══ PLACEHOLDER TABS ══ -->
+      <!-- ══ INVENTORY TAB ══ -->
       <div class="tab-panel" id="panel-inventory">
         <div class="inventory-layout">
           <div class="inventory-main-col">
@@ -461,7 +461,36 @@
       <div class="tab-panel" id="panel-combat">
         <div class="combat-shell">
 
-          <div class="combat-header-grid" style="grid-template-columns: 1fr 1fr 1fr auto;">
+
+          <!-- New row for HP, CE, AC -->
+          <div class="combat-header-grid" style="grid-template-columns: 1fr 1fr 1fr; margin-bottom: 0.5em;">
+            <!-- HP -->
+            <div class="vital-box" id="hpVitalBox" style="display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:6px 0 2px 0;">
+              <span class="combat-label" style="margin-bottom:0.5em;margin-top:0.1em;">HP</span>
+              <div class="combat-value" style="margin-top:-4px;margin-bottom:0;">
+                <input type="number" id="combatHpCurrentInput" class="hp-input" min="0" />
+                <span class="hp-sep">/</span>
+                <span id="combatHpMaxValue" class="hp-input" style="border:none;background:transparent;width:auto;">—</span>
+              </div>
+            </div>
+            <!-- CE -->
+            <div class="vital-box" id="ceVitalBox" style="display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:6px 0 2px 0;">
+              <span class="combat-label" style="margin-bottom:0.5em;margin-top:0.1em;">CE</span>
+              <div class="combat-value" style="margin-top:-4px;margin-bottom:0;">
+                <input type="number" id="combatCeCurrentInput" class="hp-input" min="0" />
+                <span class="hp-sep">/</span>
+                <span id="combatCeMaxValue" class="hp-input" style="border:none;background:transparent;width:auto;">—</span>
+              </div>
+            </div>
+            <!-- AC -->
+            <div class="vital-box" id="acVitalBox" style="display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:6px 0 2px 0;">
+              <span class="combat-label" style="margin-bottom:0.5em;margin-top:0.1em;">AC</span>
+              <div class="combat-value" id="combatAcValue" style="margin-top:-4px;margin-bottom:0;">—</div>
+            </div>
+          </div>
+
+          <!-- Second row for Black Flash, Initiative, Imbue -->
+          <div class="combat-header-grid" style="grid-template-columns: 1fr 1fr 1fr;">
             <!-- Black Flash -->
             <div class="character-vital-box black-flash-box" style="padding-top:2px;padding-bottom:2px;">
               <div class="black-flash-label" style="color:var(--accent);font-size:11px;letter-spacing:1.5px;text-transform:uppercase;margin-top:2px;margin-bottom:0;">Black Flash</div>

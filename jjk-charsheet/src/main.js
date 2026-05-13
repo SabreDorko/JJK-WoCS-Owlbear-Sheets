@@ -16,7 +16,7 @@ import {
 } from "./state/runtime.js";
 
 import { initInventory, renderInventory } from "./inventory.js";
-import { initCombat, computeCombatTabData, renderCombatTabData } from "./combat.js";
+import { initCombat, computeCombatTabData, renderCombatTabData, refreshCombatTab } from "./combat.js";
 import {
   initCharacter,
   applyCharacterStateToUI,
@@ -58,6 +58,13 @@ let localPlayerId = null;
 let localPlayerName = "";
 let obrReady = false;
 let _lastSaveTooltip = "No save yet.";
+
+// Expose for combat tab input handlers
+if (typeof window !== 'undefined') {
+  window.scheduleSave = scheduleSave;
+  window.refreshCombatTab = refreshCombatTab;
+  window.applyCharacterStateToUI = applyCharacterStateToUI;
+}
 
 function formatSavedAt(savedAt) {
   const parsed = parseInt(savedAt, 10);
@@ -193,6 +200,7 @@ async function init() {
     scheduleSave,
     showRollToast,
     refreshCombatTab: () => renderCombatTabData(computeCombatTabData(state)),
+    refreshCombatTab,
   });
 
   initTechniques({

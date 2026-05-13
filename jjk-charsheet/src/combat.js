@@ -265,6 +265,18 @@ export function computeCombatTabData(state) {
       equippedWeapons.some(w => w.weaponType === weaponType);
   });
 
+
+  // AC calculation: techniqueLevel + speedLevel + effects.acBonus, then apply direct modifiers
+  let baseAc = techniqueLevel + speedLevel + (effects.acBonus || 0);
+  if (typeof window !== 'undefined' && window.applyDirectModifiersForTarget) {
+    baseAc = window.applyDirectModifiersForTarget(state, "derived", "ac", baseAc);
+  } else if (typeof require !== 'undefined') {
+    try {
+      const { applyDirectModifiersForTarget } = require("./character.js");
+      baseAc = applyDirectModifiersForTarget(state, "derived", "ac", baseAc);
+    } catch {}
+  }
+
   return {
     actions, reactions, tempoBonus, combatBonus, precisionBonus,
     powerLevel, speedLevel, techniqueLevel, imbue,
@@ -273,6 +285,11 @@ export function computeCombatTabData(state) {
     blackFlashRange: blackFlashRange ?? '—',
     blackFlashMin: blackFlashRange,
     archetypeFeatures: computeArchetypeFeatures(state),
+    hpCurrent: parseInt(state?.hpCurrent, 10) || 0,
+    hpMax:     parseInt(state?.hpMax,     10) || 0,
+    ceCurrent: parseInt(state?.ceCurrent, 10) || 0,
+    ceMax:     parseInt(state?.ceMax,     10) || 0,
+    ac: baseAc,
     state,
   };
 }
@@ -346,7 +363,55 @@ export function renderCombatTabData(data) {
   }
 
   filterAndRenderArts(data);
+  renderCombatHpCe(data);
   renderArchetypeFeatures(data);
+}
+
+function renderCombatHpCe(data) {
+  // HP
+  const hpCurrentInput = document.getElementById("combatHpCurrentInput");
+  const hpMaxValue = document.getElementById("combatHpMaxValue");
+  if (hpCurrentInput) {
+    hpCurrentInput.value = data.hpCurrent;
+    hpCurrentInput.max = data.hpMax;
+    hpCurrentInput.addEventListener("change", function onHpChange() {
+      const val = Math.max(0, Math.min(parseInt(hpCurrentInput.value, 10) || 0, data.hpMax));
+      if (data.state && val !== data.state.hpCurrent) {
+        data.state.hpCurrent = val;
+        if (typeof window.scheduleSave === "function") window.scheduleSave();
+        if (typeof window.refreshCombatTab === "function") window.refreshCombatTab();
+        if (typeof window.applyCharacterStateToUI === "function") window.applyCharacterStateToUI();
+      }
+    }, { once: true });
+  }
+  if (hpMaxValue) hpMaxValue.textContent = data.hpMax;
+
+  // CE
+  const ceCurrentInput = document.getElementById("combatCeCurrentInput");
+  const ceMaxValue = document.getElementById("combatCeMaxValue");
+  if (ceCurrentInput) {
+    ceCurrentInput.value = data.ceCurrent;
+    ceCurrentInput.max = data.ceMax;
+    ceCurrentInput.addEventListener("change", function onCeChange() {
+      const val = Math.max(0, Math.min(parseInt(ceCurrentInput.value, 10) || 0, data.ceMax));
+      if (data.state && val !== data.state.ceCurrent) {
+        data.state.ceCurrent = val;
+        if (typeof window.scheduleSave === "function") window.scheduleSave();
+        if (typeof window.refreshCombatTab === "function") window.refreshCombatTab();
+        if (typeof window.applyCharacterStateToUI === "function") window.applyCharacterStateToUI();
+      }
+    }, { once: true });
+  }
+  if (ceMaxValue) ceMaxValue.textContent = data.ceMax;
+
+  // AC
+  const acEl = document.getElementById("combatAcValue");
+  if (acEl) acEl.textContent = `${data.ac}`;
+
+  // Add modifier badge for AC if available (character.js helper)
+  if (typeof window !== 'undefined' && window.updateDerivedModifierBadges) {
+    window.updateDerivedModifierBadges(data.state);
+  }
 }
 
 function renderArchetypeFeatures(data) {
@@ -574,6 +639,11 @@ function renderAttackRow(weapon, index, data) {
 let _getState    = null;
 let _scheduleSave = null;
 let _showRollToast = null;
+
+export function refreshCombatTab() {
+  const state = _getState?.();
+  if (state) renderCombatTabData(computeCombatTabData(state));
+}
 
 export function initCombat({ getState, scheduleSave, showRollToast }) {
   _getState      = getState;

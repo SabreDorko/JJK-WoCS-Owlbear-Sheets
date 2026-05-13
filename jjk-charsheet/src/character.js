@@ -16,7 +16,13 @@ let _pendingRollModeAction = null;
 let _pendingRollModeModifierAction = null;
 let _activeDirectModifierTarget = null;
 let _editingDirectModifierId = null;
+
 let _refreshCombatTab = null;
+// Expose badge and modifier helpers globally for combat.js rendering
+if (typeof window !== 'undefined') {
+  window.updateDerivedModifierBadges = updateDerivedModifierBadges;
+  window.applyDirectModifiersForTarget = applyDirectModifiersForTarget;
+}
 
 const DIRECT_DERIVED_LABELS = {
   hpMax:         "Max HP",
@@ -1308,8 +1314,24 @@ function toggleSecondArchetype() {
 function bindField(id, stateKey) {
   const el = document.getElementById(id);
   if (!el) return;
-  el.addEventListener("input",  e => { const state = getState(); if (!state) return; state[stateKey] = e.target.value; scheduleSave(); });
-  el.addEventListener("change", e => { const state = getState(); if (!state) return; state[stateKey] = e.target.value; scheduleSave(); });
+  el.addEventListener("input",  e => {
+    const state = getState();
+    if (!state) return;
+    state[stateKey] = e.target.value;
+    scheduleSave();
+    if ((stateKey === "hpCurrent" || stateKey === "ceCurrent") && typeof _refreshCombatTab === "function") {
+      _refreshCombatTab();
+    }
+  });
+  el.addEventListener("change", e => {
+    const state = getState();
+    if (!state) return;
+    state[stateKey] = e.target.value;
+    scheduleSave();
+    if ((stateKey === "hpCurrent" || stateKey === "ceCurrent") && typeof _refreshCombatTab === "function") {
+      _refreshCombatTab();
+    }
+  });
 }
 
 function syncHP() {
