@@ -16,7 +16,11 @@ import {
 } from "./state/runtime.js";
 
 import { initInventory, renderInventory } from "./inventory.js";
-import { initCombat, computeCombatTabData, renderCombatTabData, refreshCombatTab } from "./combat.js";
+import {
+  initCombat,
+  computeCombatTabData,
+  renderCombatTabData,
+  refreshCombatTab } from "./combat.js";
 import {
   initCharacter,
   applyCharacterStateToUI,
@@ -208,6 +212,8 @@ async function init() {
     scheduleSave,
     refreshCharacterStats: applyCharacterStateToUI,
     showRollToast,
+    refreshCombatTab: () => renderCombatTabData(computeCombatTabData(state)),
+    refreshCombatTab,
   });
 
   initArchetype({

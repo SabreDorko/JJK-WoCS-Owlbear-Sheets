@@ -10,6 +10,7 @@ import {
 } from "./weapons.js";
 import { computeActiveModifierEffects, getCombatAttackModifiers, getCombatAttackBonus, hasCombatAttackModifiers, getEffectiveBlackFlashRange } from "./modifiers.js";
 import { getComputedSubskillValue, openRollModeMenu, openModifierContextMenu, openDirectModifierPanel } from "./character.js";
+import { computeCombatApplications, castApplicationFromCombat, rollApplicationDamageForCombat, stepApplicationForCombat } from "./techniques.js";
 
 const _pendingAttackEffects = new Map();
 
@@ -285,6 +286,7 @@ export function computeCombatTabData(state) {
     blackFlashRange: blackFlashRange ?? '—',
     blackFlashMin: blackFlashRange,
     archetypeFeatures: computeArchetypeFeatures(state),
+    techniqueApplications: computeCombatApplications(state),
     hpCurrent: parseInt(state?.hpCurrent, 10) || 0,
     hpMax:     parseInt(state?.hpMax,     10) || 0,
     ceCurrent: parseInt(state?.ceCurrent, 10) || 0,
@@ -363,8 +365,80 @@ export function renderCombatTabData(data) {
   }
 
   filterAndRenderArts(data);
+  renderCombatTechniqueApplications(data);
   renderCombatHpCe(data);
   renderArchetypeFeatures(data);
+}
+
+function renderCombatTechniqueApplications(data) {
+  const el        = document.getElementById("combatTechniqueAppsList");
+  const subheader = document.getElementById("combatCtAppsSubheader");
+  const headerRow = document.getElementById("combatCtAppsHeaderRow");
+  if (!el) return;
+
+  const apps = data.techniqueApplications || [];
+  const show = apps.length > 0;
+  if (subheader) subheader.style.display = show ? "" : "none";
+  if (headerRow) headerRow.style.display = show ? "" : "none";
+  if (!apps.length) { el.innerHTML = ""; return; }
+
+  // Merge dice of same type: [{count:1,die:"d8"},{count:1,die:"d8"}] → "2d8"
+  function mergeDice(parts) {
+    const map = {};
+    for (const p of parts) map[p.die] = (map[p.die] || 0) + Number(p.count);
+    return Object.entries(map).map(([die, cnt]) => `${cnt}${die}`).join("+");
+  }
+
+  el.innerHTML = apps.map(app => {
+    // DC cell — red (accent) normally, blue for autopass
+    const starIcon = app.isAutoPass ? "✦ " : "";
+    const modeIcon = app.rollMode === "advantage" ? "⬆ " : app.rollMode === "disadvantage" ? "⬇ " : "";
+    const dcClass  = `combat-attack-hit combat-attack-rollable combat-ct-dc${app.isAutoPass ? " combat-ct-dc--autopass" : ""}`;
+
+    // Damage — base + cumulative scaling per step
+    // Step 0: "1d6"  Step 1: "1d6+1d8"  Step 2: "1d6+2d8"
+    const baseParts  = app.damageParts        || [];
+    const scaleParts = app.scalingDamageParts || [];
+    let cumulative = [...baseParts];
+    for (let s = 0; s < app.currentStep; s++) cumulative = cumulative.concat(scaleParts);
+    const damageDisplay = mergeDice(cumulative) || "—";
+
+    // Step spinbox — compact ◂ N ▸ inline
+    const stepHtml = app.scalingEnabled
+      ? `<div class="combat-ct-spinbox">
+           <button type="button" class="combat-ct-spin-btn" data-ct-step-down="${app.idx}"
+             ${app.currentStep <= 0 ? "disabled" : ""}>◂</button>
+           <span class="combat-ct-spin-val">${app.currentStep}</span>
+           <button type="button" class="combat-ct-spin-btn" data-ct-step-up="${app.idx}">▸</button>
+         </div>`
+      : `<span class="combat-attack-type">—</span>`;
+
+    const descLine = app.effect
+      ? `<div class="combat-ct-effect-inline">${escapeHtml(app.effect)}</div>` : "";
+
+    return `
+      <div class="combat-attack-row combat-ct-app-row">
+        <div class="combat-attack-name-wrap">
+          <button type="button" class="combat-ct-app-name"
+            data-ct-goto="${app.idx}" title="View in Jujutsu tab">${escapeHtml(app.title)}</button>
+          ${descLine}
+        </div>
+        <span class="combat-attack-type">${app.ceCost > 0 ? app.ceCost + " CE" : "Free"}</span>
+        <span class="combat-attack-range">${escapeHtml(app.rangeSummary)}</span>
+        <div class="${dcClass}"
+          data-ct-cast="${app.idx}"
+          title="${escapeHtml(app.tooltip)}"
+          style="cursor:${app.isDisabled ? "not-allowed" : "pointer"};opacity:${app.isDisabled ? "0.4" : "1"};">
+          ${starIcon}${modeIcon}${app.dc}
+        </div>
+        <div class="combat-attack-damage combat-attack-rollable"
+          data-ct-damage="${app.idx}"
+          title="Click to roll damage">
+          ${escapeHtml(damageDisplay)}
+        </div>
+        ${stepHtml}
+      </div>`;
+  }).join("");
 }
 
 function renderCombatHpCe(data) {
@@ -842,6 +916,50 @@ export function initCombat({ getState, scheduleSave, showRollToast }) {
       panelEl.classList.toggle("collapsed", isOpen);
     });
   });
+
+  // ── Cursed Technique Applications ─────────────────────────────────────────
+  const ctList = document.getElementById("combatTechniqueAppsList");
+  if (ctList) {
+    ctList.addEventListener("click", e => {
+      const state = _getState();
+      if (!state) return;
+
+      // Step buttons — check first so they don't bubble to cast/damage
+      const stepDown = e.target.closest("[data-ct-step-down]");
+      if (stepDown) {
+        stepApplicationForCombat(state, parseInt(stepDown.dataset.ctStepDown, 10), -1);
+        renderCombatTabData(computeCombatTabData(state));
+        return;
+      }
+      const stepUp = e.target.closest("[data-ct-step-up]");
+      if (stepUp) {
+        stepApplicationForCombat(state, parseInt(stepUp.dataset.ctStepUp, 10), 1);
+        renderCombatTabData(computeCombatTabData(state));
+        return;
+      }
+
+      // DC cast cell
+      const castEl = e.target.closest("[data-ct-cast]");
+      if (castEl) {
+        castApplicationFromCombat(state, parseInt(castEl.dataset.ctCast, 10));
+        renderCombatTabData(computeCombatTabData(state));
+        return;
+      }
+
+      // Damage cell
+      const dmgEl = e.target.closest("[data-ct-damage]");
+      if (dmgEl) {
+        rollApplicationDamageForCombat(state, parseInt(dmgEl.dataset.ctDamage, 10));
+        return;
+      }
+
+      // Name → Jujutsu tab
+      const gotoBtn = e.target.closest("[data-ct-goto]");
+      if (gotoBtn) {
+        document.querySelector(".tab[data-tab='jujutsu']")?.click();
+      }
+    });
+  }
 }
 
 // ── ROLL FUNCTIONS ────────────────────────────────────────────────────────────

@@ -1,4 +1,3 @@
-
 /* Character Vitals Box (used for HP, CE, AC, Movement, Black Flash) */
 .character-vital-box {
   border: 1.5px solid var(--ink);
@@ -4475,6 +4474,66 @@
       color: var(--ink-faint);
       display: block;
       margin-top: 3px;
+    }
+
+    /* ── CURSED TECHNIQUE APPLICATION ROWS ──────────────────── */
+    .combat-ct-header-row,
+    .combat-ct-app-row {
+      grid-template-columns: 1.8fr 0.6fr 0.7fr 0.6fr 1.5fr auto;
+    }
+
+    .combat-ct-app-name {
+      background: none;
+      border: none;
+      padding: 0;
+      font-family: 'Crimson Text', serif;
+      font-size: 14px;
+      font-style: italic;
+      color: var(--ink);
+      cursor: pointer;
+      text-align: left;
+      text-decoration: none;
+    }
+    .combat-ct-app-name:hover { color: var(--accent); text-decoration: underline dotted; }
+
+    /* DC — accent (red) by default, blue only on autopass */
+    .combat-ct-dc { color: var(--accent); }
+    .combat-ct-dc:hover { text-decoration: underline dotted; }
+    .combat-ct-dc--autopass { color: #1a5f7a; }
+
+    /* Step spinbox */
+    .combat-ct-spinbox {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+    }
+    .combat-ct-spin-btn {
+      background: none;
+      border: none;
+      padding: 0 2px;
+      font-size: 10px;
+      color: var(--ink-faint);
+      cursor: pointer;
+      line-height: 1;
+    }
+    .combat-ct-spin-btn:hover:not(:disabled) { color: var(--ink); }
+    .combat-ct-spin-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+    .combat-ct-spin-val {
+      font-family: 'Cinzel', serif;
+      font-size: 10px;
+      color: var(--ink);
+      min-width: 12px;
+      text-align: center;
+    }
+
+    /* Effect sub-line */
+    .combat-ct-effect-inline {
+      font-family: 'Crimson Text', serif;
+      font-size: 11px;
+      color: var(--ink-faint);
+      font-style: italic;
+      line-height: 1.25;
+      margin-top: 1px;
     }
 
     /* ── COLLAPSIBLE BOXES ───────────────────────────────── */

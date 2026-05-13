@@ -71,6 +71,7 @@ let _getState = null;
 let _scheduleSave = null;
 let _refreshCharacterStats = null;
 let _showRollToast = null;
+let _refreshCombatTab = null;
 let _initialized = false;
 let _isEditing = false;
 let _editorStep = "mode";
@@ -1389,6 +1390,7 @@ export function applyTechniquesStateToUI() {
   setModeUI(mode);
   updateTechniquesDerivedUI(state);
   setEditorVisibility();
+  if (_refreshCombatTab) _refreshCombatTab();
 }
 
 // ─── Editing lifecycle ─────────────────────────────────────────────────────────
@@ -1450,15 +1452,97 @@ function saveTechniqueEditing() {
   refreshCharacterStats();
   applyTechniquesStateToUI();
   scheduleSave();
+  if (typeof window.refreshCombatTab === "function") window.refreshCombatTab();
+}
+
+// ─── Combat tab integration ────────────────────────────────────────────────────
+
+export function computeCombatApplications(state) {
+  if (!state) return [];
+  ensureTechniquesState(state);
+  const apps = Array.isArray(state.techniques?.applications) ? state.techniques.applications : [];
+
+  return apps
+    .map((raw, idx) => {
+      const app = normalizeApplication(raw, idx);
+      const hasDamage = Array.isArray(app.damageParts) && app.damageParts.some(p => p.die && parseInt(p.count) > 0);
+      if (!hasDamage) return null;
+
+      const scaled   = getScaledApplicationValues(app);
+      const ceCost   = getAppCeCostOverride(state, idx, scaled.ceCost);
+      const dc       = getAppDcOverride(state, idx, scaled.dc);
+      const btnState = getApplicationButtonState(state, idx);
+
+      let rangeSummary;
+      if      (app.rangeType === "melee") rangeSummary = "Melee";
+      else if (app.rangeType === "range") rangeSummary = app.rangeValue || "—";
+      else if (app.rangeType === "aoe")   rangeSummary = `${getAoeShapeLabel(app.aoeShape)} ${app.aoeSize || ""}`.trim();
+      else                                rangeSummary = "Self";
+
+      return {
+        idx,
+        title:              app.title,
+        effect:             app.effect,
+        ceCost,
+        dc,
+        rangeSummary,
+        damageParts:        app.damageParts        || [],
+        scalingDamageParts: app.scalingDamageParts || [],
+        scalingEnabled:     !!app.scalingEnabled,
+        currentStep:        scaled.currentStep,
+        isAutoPass:         btnState.isAutoPass,
+        isDisabled:         btnState.disabled,
+        rollMode:           btnState.rollMode,
+        tooltip:            btnState.tooltip,
+      };
+    })
+    .filter(Boolean);
+}
+
+export function castApplicationFromCombat(state, appIndex) {
+  if (!state) return;
+  ensureTechniquesState(state);
+  const app = state.techniques?.applications?.[appIndex];
+  if (!app) return;
+  const normalized  = normalizeApplication(app, appIndex);
+  const scaled      = getScaledApplicationValues(normalized);
+  const techScore   = parseNonNegativeInt(state?.stats?.technique?.score);
+  const xpThreshold = getEffectiveXpThreshold(state, techScore);
+  const dc          = getAppDcOverride(state, appIndex, scaled.dc);
+  if (xpThreshold > 0 && dc >= xpThreshold) {
+    performApplicationTalentCheck(state, 0, appIndex);
+  } else {
+    performApplicationCast(state, 0, appIndex);
+  }
+  syncApplicationButtonStates(state);
+  if (_refreshCombatTab) _refreshCombatTab();
+}
+
+export function rollApplicationDamageForCombat(state, appIndex) {
+  if (!state) return;
+  // aggregateDice:true merges same-die groups in the toast
+  rollDamageForApplication(state, appIndex, { aggregateDice: true });
+}
+
+export function stepApplicationForCombat(state, appIndex, delta) {
+  if (!state) return;
+  ensureTechniquesState(state);
+  const app = state.techniques?.applications?.[appIndex];
+  if (!app || !app.scalingEnabled) return;
+  app.currentStep = Math.max(0, parseNonNegativeInt(app.currentStep) + delta);
+  syncApplicationButtonStates(state);
+  if (_refreshCombatTab) _refreshCombatTab();
+  if (_scheduleSave) _scheduleSave();
 }
 
 // ─── Init ──────────────────────────────────────────────────────────────────────
 
-export function initTechniques({ getState: getStateFn, scheduleSave: scheduleSaveFn, refreshCharacterStats: refreshCharacterStatsFn, showRollToast: showRollToastFn }) {
+export function initTechniques({ getState: getStateFn, scheduleSave: scheduleSaveFn, refreshCharacterStats: refreshCharacterStatsFn, showRollToast: showRollToastFn, refreshCombatTab: refreshCombatTabFn = null }) {
   _getState = getStateFn;
   _scheduleSave = scheduleSaveFn;
   _refreshCharacterStats = refreshCharacterStatsFn;
   _showRollToast = showRollToastFn;
+  _refreshCombatTab = refreshCombatTabFn;
 
   if (_initialized) { applyTechniquesStateToUI(); return; }
 
@@ -1594,7 +1678,10 @@ export function initTechniques({ getState: getStateFn, scheduleSave: scheduleSav
         _expandedAppIndices.delete(idx);
         if (_pendingNewApplicationIndex === idx) _pendingNewApplicationIndex = null;
         const state = getState();
-        if (state) refreshApplicationCards(state);
+        if (state) {
+          refreshApplicationCards(state);
+          if (typeof window.refreshCombatTab === "function") window.refreshCombatTab();
+        }
         return;
       }
 
@@ -1641,6 +1728,7 @@ export function initTechniques({ getState: getStateFn, scheduleSave: scheduleSav
           state.techniques.applications[idx].currentStep = Math.max(0, normalized.currentStep - 1);
           syncApplicationButtonStates(state);
           scheduleSave();
+          if (typeof window.refreshCombatTab === "function") window.refreshCombatTab();
         }
         return;
       }
@@ -1655,6 +1743,7 @@ export function initTechniques({ getState: getStateFn, scheduleSave: scheduleSav
           state.techniques.applications[idx].currentStep = normalized.currentStep + 1;
           syncApplicationButtonStates(state);
           scheduleSave();
+          if (typeof window.refreshCombatTab === "function") window.refreshCombatTab();
         }
         return;
       }
@@ -1807,6 +1896,7 @@ export function initTechniques({ getState: getStateFn, scheduleSave: scheduleSav
         if (app && Array.isArray(app.scalingDamageParts) && app.scalingDamageParts[partIdx]) {
           app.scalingDamageParts[partIdx].count = Math.max(1, parseInt(e.target.value, 10) || 1);
           scheduleSave();
+          if (typeof window.refreshCombatTab === "function") window.refreshCombatTab();
         }
         return;
       }
@@ -1819,6 +1909,7 @@ export function initTechniques({ getState: getStateFn, scheduleSave: scheduleSav
           const raw = e.target.value.replace(/[^0-9]/g, "") || "6";
           app.scalingDamageParts[partIdx].die = `d${raw}`;
           scheduleSave();
+          if (typeof window.refreshCombatTab === "function") window.refreshCombatTab();
         }
         return;
       }
@@ -1834,10 +1925,15 @@ export function initTechniques({ getState: getStateFn, scheduleSave: scheduleSav
         appAoeSizeInline: (idx, v) => { if (state.techniques.applications[idx]) state.techniques.applications[idx].aoeSize = String(v || "").trim(); },
         appEffectInline: (idx, v) => { if (state.techniques.applications[idx]) state.techniques.applications[idx].effect = String(v || ""); },
       };
+      let scalingChanged = false;
       for (const [key, handler] of Object.entries(inlineMap)) {
-        if (ds[key] !== undefined) handler(parseNonNegativeInt(ds[key]), e.target.value);
+        if (ds[key] !== undefined) {
+          handler(parseNonNegativeInt(ds[key]), e.target.value);
+          if (key === "appScalingCeInline" || key === "appScalingDcInline") scalingChanged = true;
+        }
       }
       scheduleSave();
+      if (scalingChanged && typeof window.refreshCombatTab === "function") window.refreshCombatTab();
     });
 
     summaryGrid.addEventListener("change", e => {
@@ -1852,6 +1948,7 @@ export function initTechniques({ getState: getStateFn, scheduleSave: scheduleSav
           state.techniques.applications[idx].scalingEnabled = Boolean(e.target.checked);
           if (!state.techniques.applications[idx].scalingEnabled) state.techniques.applications[idx].currentStep = 0;
           refreshApplicationCards(state);
+          if (typeof window.refreshCombatTab === "function") window.refreshCombatTab();
         }
         scheduleSave(); return;
       }
