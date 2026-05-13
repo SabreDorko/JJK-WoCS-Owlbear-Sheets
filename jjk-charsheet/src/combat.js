@@ -396,12 +396,38 @@ function renderCombatTechniqueApplications(data) {
     const dcClass  = `combat-attack-hit combat-attack-rollable combat-ct-dc${app.isAutoPass ? " combat-ct-dc--autopass" : ""}`;
 
     // Damage — base + cumulative scaling per step
-    // Step 0: "1d6"  Step 1: "1d6+1d8"  Step 2: "1d6+2d8"
     const baseParts  = app.damageParts        || [];
     const scaleParts = app.scalingDamageParts || [];
     let cumulative = [...baseParts];
     for (let s = 0; s < app.currentStep; s++) cumulative = cumulative.concat(scaleParts);
-    const damageDisplay = mergeDice(cumulative) || "—";
+
+
+    // Output and Technique Level bonuses (full formula)
+    let outputFormula = "";
+    let outputLevel = 1;
+    let hasOutput = false;
+    let hasTL = false;
+    let techScore = 0;
+    const state = typeof window !== 'undefined' && window._getState ? window._getState() : null;
+    if (state && state.techniques && Array.isArray(state.techniques.applications)) {
+      const raw = state.techniques.applications[app.idx];
+      if (raw && raw.addOutput) {
+        hasOutput = true;
+        outputLevel = Math.max(1, Math.min(3, parseInt(state.outputLevel, 10) || 1));
+        if (outputLevel === 1) outputFormula = "1d4";
+        else if (outputLevel === 2) outputFormula = "1d4+2";
+        else outputFormula = "2d4";
+      }
+      if (raw && raw.addTechniqueLevel) {
+        hasTL = true;
+        techScore = parseInt(state?.stats?.technique?.score, 10) || 0;
+      }
+    }
+    // Build full damage formula
+    let damageDisplay = mergeDice(cumulative);
+    if (hasOutput) damageDisplay += (damageDisplay ? " + " : "") + outputFormula;
+    if (hasTL) damageDisplay += (damageDisplay ? " + " : "") + `TL(${techScore})`;
+    damageDisplay = damageDisplay || "—";
 
     // Step spinbox — compact ◂ N ▸ inline
     const stepHtml = app.scalingEnabled

@@ -472,8 +472,8 @@ function rollDamageForApplication(state, applicationIndex, { aggregateDice = fal
   let outputBonus = 0, outputBreakdown = null, outputRolls = [];
   if (normalized.addOutput) {
     const outputLevel = Math.max(1, Math.min(3, parseInt(state.outputLevel, 10) || 1));
-    if (outputLevel === 1)      { outputBonus = Math.floor(Math.random() * 4) + 1;         outputBreakdown = "1d4"; }
-    else if (outputLevel === 2) { outputBonus = Math.floor(Math.random() * 4) + 1 + 2;     outputBreakdown = "1d4+2"; }
+    if (outputLevel === 1)      { outputBonus = Math.floor(Math.random() * 4) + 1;         outputBreakdown = "1d4"; outputRolls = [outputBonus]; }
+    else if (outputLevel === 2) { outputBonus = Math.floor(Math.random() * 4) + 1 + 2;     outputBreakdown = "1d4+2"; outputRolls = [outputBonus - 2, 2]; }
     else {
       outputRolls = [Math.floor(Math.random() * 4) + 1, Math.floor(Math.random() * 4) + 1];
       outputBonus = outputRolls.reduce((a, b) => a + b, 0);
@@ -490,8 +490,13 @@ function rollDamageForApplication(state, applicationIndex, { aggregateDice = fal
   const damageTotal = damageResults.reduce((sum, r) => sum + r.total, 0) + outputBonus + techniqueLevelBonus;
 
   const dieGroups = damageResults.map(r => ({ label: `${r.count}${r.die}`, rolls: r.rolls, total: r.total }));
-  if (normalized.addOutput && outputBonus)           dieGroups.push({ label: `Output (${outputBreakdown})`, rolls: outputRolls, total: outputBonus });
-  if (normalized.addTechniqueLevel && techniqueLevelBonus) dieGroups.push({ label: "Technique Level", rolls: [`+${techScore}`], total: techniqueLevelBonus });
+  // Show Output and Technique Level bonuses as separate lines in the breakdown
+  if (normalized.addOutput && outputBonus) {
+    dieGroups.push({ label: `Output (${outputBreakdown})`, rolls: outputRolls, total: outputBonus });
+  }
+  if (normalized.addTechniqueLevel && techniqueLevelBonus) {
+    dieGroups.push({ label: "Technique Level", rolls: [`+${techScore}`], total: techniqueLevelBonus });
+  }
 
   const breakdown = { skillModifier: 0, die: damageResults[0]?.die || "d6", dieGroups, total: damageTotal };
 
