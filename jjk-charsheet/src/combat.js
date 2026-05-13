@@ -438,7 +438,7 @@ function renderCombatTechniqueApplications(data) {
            <span class="combat-ct-spin-val">${app.currentStep}</span>
            <button type="button" class="combat-ct-spin-btn" data-ct-step-up="${app.idx}">▸</button>
          </div>`
-      : `<span class="combat-ct-spinbox" style="display:inline-block;min-width:56px;text-align:center;margin-left:-4px;"></span>`;
+      : `<span class="combat-ct-spinbox" style="display:inline-block;min-width:56px;text-align:center;margin-left:18px;"></span>`;
 
     const descLine = app.effect
       ? `<div class="combat-ct-effect-inline">${escapeHtml(app.effect)}</div>` : "";
