@@ -429,7 +429,8 @@ function renderCombatTechniqueApplications(data) {
     if (hasTL) damageDisplay += (damageDisplay ? " + " : "") + `TL(${techScore})`;
     damageDisplay = damageDisplay || "—";
 
-    // Step spinbox — compact ◂ N ▸ inline
+
+    // Step spinbox or centered placeholder for non-scaling
     const stepHtml = app.scalingEnabled
       ? `<div class="combat-ct-spinbox">
            <button type="button" class="combat-ct-spin-btn" data-ct-step-down="${app.idx}"
@@ -437,7 +438,7 @@ function renderCombatTechniqueApplications(data) {
            <span class="combat-ct-spin-val">${app.currentStep}</span>
            <button type="button" class="combat-ct-spin-btn" data-ct-step-up="${app.idx}">▸</button>
          </div>`
-      : `<span class="combat-attack-type">—</span>`;
+      : `<span class="combat-ct-spinbox" style="display:inline-block;min-width:56px;text-align:center;"></span>`;
 
     const descLine = app.effect
       ? `<div class="combat-ct-effect-inline">${escapeHtml(app.effect)}</div>` : "";
