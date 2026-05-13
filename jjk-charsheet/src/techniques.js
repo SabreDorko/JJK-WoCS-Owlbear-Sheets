@@ -106,6 +106,9 @@ function refreshCharacterStats() {
 function syncCeCurrentField(value) {
   const ceCurrentInput = document.getElementById("ceCurrent");
   if (ceCurrentInput) ceCurrentInput.value = String(value ?? "");
+  // Keep the techniques-panel CE card in sync without a full re-render
+  const state = getState();
+  if (state) renderTechniqueCeCard(state);
 }
 
 function syncTechniqueThresholdLine(state) {
@@ -358,7 +361,6 @@ function performApplicationTalentCheck(state, _techniqueIndex, applicationIndex)
     state.ceCurrent = String(Math.max(0, ceCurrent - ceCost));
     syncCeCurrentField(state.ceCurrent);
     syncTechniqueThresholdLine(state);
-    if (typeof refreshCharacterStats === "function") refreshCharacterStats();
     scheduleSave();
     const container = document.getElementById("rollToastContainer");
     if (container) {
@@ -413,7 +415,6 @@ function performApplicationTalentCheck(state, _techniqueIndex, applicationIndex)
   state.ceCurrent = String(Math.max(0, ceCurrent - ceCost));
   syncCeCurrentField(state.ceCurrent);
   syncTechniqueThresholdLine(state);
-  if (typeof refreshCharacterStats === "function") refreshCharacterStats();
   scheduleSave();
 
   if (_showRollToast) {
