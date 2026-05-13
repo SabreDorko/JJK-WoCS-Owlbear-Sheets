@@ -1,97 +1,3 @@
-// ─── Talent Check Roll Logic ────────────────────────────────────────────────
-// This function rolls talent check for the application, applies bonuses, and shows the result.
-function performApplicationTalentCheck(state, _techniqueIndex, applicationIndex) {
-  if (!state) return;
-  ensureTechniquesState(state);
-
-  const app           = state.techniques.applications[applicationIndex];
-  const techniqueName = state.ct || "Technique";
-  if (!app) return;
-
-  const normalized  = normalizeApplication(app, applicationIndex);
-  const scaled      = getScaledApplicationValues(normalized);
-  const currentEffects = computeActiveModifierEffects(state);
-  // Technique stat key is always 'technique', Talent is skill index 3
-  const statKey = 'technique';
-  const skillIndex = 3;
-  // n = effective stat level (number of dice)
-  const n = getEffectiveStatLevel(state, currentEffects, statKey);
-  if (!n || n < 1) return;
-  // subskillBonus = effective Talent bonus
-  const subskillBonus = getSubskillValue(state, currentEffects, statKey, skillIndex);
-  // statRollBonus = any direct roll bonuses for the stat
-  const statRollBonus = currentEffects?.rollBonuses?.[statKey] || 0;
-  // techniqueRollBonus = any global technique roll bonus
-  const techniqueRollBonus = getEffectiveTechniqueRollBonus(state, applicationIndex);
-  // DC and CE cost
-  const xpThreshold = getEffectiveXpThreshold(state, n);
-  const dc = getAppDcOverride(state, applicationIndex, scaled.dc);
-  const ceCurrent = parseNonNegativeInt(state.ceCurrent);
-  const ceCost = getAppCeCostOverride(state, applicationIndex, scaled.ceCost);
-  // Roll mode
-  const rollMode = getAppRollMode(state, applicationIndex);
-  // Roll dice
-  const rollResult = rollWithMode(
-    n,
-    rolls => rolls.reduce((a, b) => a + b, 0) + subskillBonus + statRollBonus + techniqueRollBonus,
-    rollMode
-  );
-  const rolls = rollResult.rolls;
-  const total = rollResult.total;
-  const maxPossible = n * 6 + subskillBonus + statRollBonus + techniqueRollBonus;
-  const allOnes = rolls.every(r => r === 1);
-  // Pass/fail logic: pass if total >= dc
-  const passed = total >= dc;
-  // Set critStatus for toast: 'pass', 'fail', or null
-  let critStatus = null;
-  if (allOnes) critStatus = "fail"; // This will show as Critical Fail in the toast
-  else if (!passed) critStatus = "miss"; // This will show as Fail in the toast
-  else if (passed) critStatus = "pass";
-  // Build breakdown
-  const passFailText = passed ? "PASS" : "FAIL";
-  const baseBreakdown = {
-    skillModifier: subskillBonus,
-    statRollBonus,
-    techniqueRollBonus,
-    die: "d6",
-    total,
-    dc,
-    passFailText,
-    critStatus
-  };
-  const breakdown = buildComparedBreakdown(
-    baseBreakdown,
-    rollMode,
-    rollResult.firstRolls, rollResult.firstTotal,
-    rollResult.secondRolls, rollResult.secondTotal,
-    rollResult.selectedRollIndex
-  );
-  // Always reduce CE
-  state.ceCurrent = String(Math.max(0, ceCurrent - ceCost));
-  syncCeCurrentField(state.ceCurrent);
-  syncTechniqueThresholdLine(state);
-  if (typeof refreshCharacterStats === "function") refreshCharacterStats();
-  scheduleSave();
-  // Show result
-  if (_showRollToast) {
-    // 'fail' for normal fails, 'fail' for critStatus unless allOnes (then 'fail' means crit fail)
-    let toastStatus = null;
-    if (allOnes) toastStatus = "fail"; // This will show as Critical Fail in the toast
-    else if (!passed) toastStatus = "miss"; // This will show as Fail in the toast
-    else if (passed) toastStatus = "pass";
-    // Clean, minimal title: just Technique › Title
-    _showRollToast(
-      `${techniqueName} › ${normalized.title}`,
-      n,
-      rolls,
-      total,
-      toastStatus,
-      "Talent Check",
-      breakdown,
-      rollMode
-    );
-  }
-}
 // Render Output, CE, and XP Threshold as cards in the Techniques tab
 function renderTechniqueOutputCard(state) {
   const el = document.getElementById("techniqueOutputCard");
@@ -256,33 +162,6 @@ function getAppRollBonusOverride(state, appIndex) {
   return Math.round(applyDirectModifiers(0, mods));
 }
 
-// Sets advantage/disadvantage/normal in state.directModifiers for an app,
-// then immediately fires the cast. "normal" clears both flags without persisting one.
-function castWithRollMode(state, appIndex, rollMode) {
-  if (!state) return;
-
-  state.directModifiers = (state.directModifiers || []).filter(e =>
-    !(e.targetType === "techniqueApp" &&
-      e.targetKey === String(appIndex) &&
-      (e.source === "advantage" || e.source.startsWith("advantage — ") ||
-        e.source === "disadvantage" || e.source.startsWith("disadvantage — ")))
-  );
-
-  if (rollMode === "advantage" || rollMode === "disadvantage") {
-    state.directModifiers.push({
-      id: `direct_mod_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-      targetType: "techniqueApp",
-      targetKey: String(appIndex),
-      operation: "add",
-      value: 1,
-      source: rollMode,
-    });
-  }
-
-  performApplicationCast(state, 0, appIndex);
-  syncApplicationButtonStates(state);
-}
-
 // ─── Application value helpers ─────────────────────────────────────────────────
 
 function getScaledApplicationValues(app) {
@@ -335,6 +214,27 @@ function performApplicationCast(state, _techniqueIndex, applicationIndex) {
     syncCeCurrentField(state.ceCurrent);
     syncTechniqueThresholdLine(state);
     scheduleSave();
+    // Show custom blue auto-pass toast using crit toast structure
+    const container = document.getElementById("rollToastContainer");
+    if (container) {
+      const toast = document.createElement("div");
+      toast.className = "roll-toast auto-pass";
+      toast.style.background = "#dee5df";
+      toast.style.border = "1px solid #1a5f7a";
+      toast.innerHTML = `
+        <div class=\"roll-toast-title\">${techniqueName} › ${normalized.title} (Cast)</div>
+        <div class=\"roll-toast-body\"><div style=\"color:#1a4a8b;font-family:'Cinzel',serif;font-size:10px;margin-top:3px;\">✦ PASS (Sorcerer XP Threshold)</div></div>
+      `;
+      container.appendChild(toast);
+      requestAnimationFrame(() => toast.classList.add("show"));
+      while (container.children.length > 5) {
+        container.removeChild(container.firstElementChild);
+      }
+      setTimeout(() => {
+        toast.classList.remove("show");
+        setTimeout(() => toast.remove(), 220);
+      }, 4200);
+    }
     return;
   }
 
@@ -425,6 +325,181 @@ function performApplicationCast(state, _techniqueIndex, applicationIndex) {
   syncTechniqueThresholdLine(state);
   scheduleSave();
 }
+
+// ─── Talent check roll ─────────────────────────────────────────────────────────
+
+function performApplicationTalentCheck(state, _techniqueIndex, applicationIndex) {
+  if (!state) return;
+  ensureTechniquesState(state);
+
+  const app = state.techniques.applications[applicationIndex];
+  const techniqueName = state.ct || "Technique";
+  if (!app) return;
+
+  const normalized  = normalizeApplication(app, applicationIndex);
+  const scaled      = getScaledApplicationValues(normalized);
+  const currentEffects = computeActiveModifierEffects(state);
+  const statKey = 'technique';
+  const skillIndex = 3;
+  const n = getEffectiveStatLevel(state, currentEffects, statKey);
+  if (!n || n < 1) return;
+
+  const subskillBonus     = getSubskillValue(state, currentEffects, statKey, skillIndex);
+  const statRollBonus     = currentEffects?.rollBonuses?.[statKey] || 0;
+  const techniqueRollBonus = getEffectiveTechniqueRollBonus(state, applicationIndex);
+  const xpThreshold       = getEffectiveXpThreshold(state, n);
+  const dc                = getAppDcOverride(state, applicationIndex, scaled.dc);
+  const ceCurrent         = parseNonNegativeInt(state.ceCurrent);
+  const ceCost            = getAppCeCostOverride(state, applicationIndex, scaled.ceCost);
+  const rollMode          = getAppRollMode(state, applicationIndex);
+
+  // Auto-pass: DC < XP Threshold
+  if (xpThreshold > 0 && dc < xpThreshold) {
+    state.ceCurrent = String(Math.max(0, ceCurrent - ceCost));
+    syncCeCurrentField(state.ceCurrent);
+    syncTechniqueThresholdLine(state);
+    if (typeof refreshCharacterStats === "function") refreshCharacterStats();
+    scheduleSave();
+    const container = document.getElementById("rollToastContainer");
+    if (container) {
+      const toast = document.createElement("div");
+      toast.className = "roll-toast auto-pass";
+      toast.style.background = '#dee5df';
+      toast.style.border = '1px solid #1a5f7a';
+      toast.innerHTML = `
+        <div class="roll-toast-title">${techniqueName} › ${normalized.title} (Cast)</div>
+        <div class="roll-toast-body"><div style="color:#1a4a8b;font-family:'Cinzel',serif;font-size:10px;margin-top:3px;">✦ PASS (Sorcerer XP Threshold)</div></div>
+      `;
+      container.appendChild(toast);
+      requestAnimationFrame(() => toast.classList.add("show"));
+      while (container.children.length > 5) container.removeChild(container.firstElementChild);
+      setTimeout(() => { toast.classList.remove("show"); setTimeout(() => toast.remove(), 220); }, 4200);
+    }
+    return;
+  }
+
+  const rollResult = rollWithMode(
+    n,
+    rolls => rolls.reduce((a, b) => a + b, 0) + subskillBonus + statRollBonus + techniqueRollBonus,
+    rollMode
+  );
+  const rolls    = rollResult.rolls;
+  const total    = rollResult.total;
+  const allOnes  = rolls.every(r => r === 1);
+  const passed   = total >= dc;
+
+  let critStatus = null;
+  if (allOnes)      critStatus = "fail";
+  else if (passed)  critStatus = "pass";
+
+  const baseBreakdown = {
+    skillModifier: subskillBonus,
+    statRollBonus,
+    techniqueRollBonus,
+    die: "d6",
+    total,
+    dc,
+    passFailText: passed ? "PASS" : "FAIL",
+    critStatus,
+  };
+  const breakdown = buildComparedBreakdown(
+    baseBreakdown,
+    rollMode,
+    rollResult.firstRolls, rollResult.firstTotal,
+    rollResult.secondRolls, rollResult.secondTotal,
+    rollResult.selectedRollIndex
+  );
+
+  state.ceCurrent = String(Math.max(0, ceCurrent - ceCost));
+  syncCeCurrentField(state.ceCurrent);
+  syncTechniqueThresholdLine(state);
+  if (typeof refreshCharacterStats === "function") refreshCharacterStats();
+  scheduleSave();
+
+  if (_showRollToast) {
+    let toastStatus = null;
+    if (allOnes)       toastStatus = "fail";
+    else if (!passed)  toastStatus = "miss";
+    else               toastStatus = "pass";
+    _showRollToast(
+      `${techniqueName} › ${normalized.title}`,
+      n, rolls, total, toastStatus,
+      "Talent Check", breakdown, rollMode
+    );
+  }
+}
+
+// ─── Damage roll (shared) ──────────────────────────────────────────────────────
+
+function rollDamageForApplication(state, applicationIndex, { aggregateDice = false } = {}) {
+  const app = state.techniques.applications[applicationIndex];
+  if (!app) return;
+  const normalized    = normalizeApplication(app, applicationIndex);
+  const techScore     = parseNonNegativeInt(state?.stats?.technique?.score);
+  const techniqueName = state.ct || "Technique";
+  const scaled        = getScaledApplicationValues(normalized);
+  const label = `${techniqueName} › ${normalized.title}${scaled.currentStep > 0 ? ` (Step ${scaled.currentStep})` : ""}`;
+
+  const baseParts    = Array.isArray(normalized.damageParts) && normalized.damageParts.length ? normalized.damageParts : [];
+  const scalingParts = Array.isArray(normalized.scalingDamageParts) && normalized.scalingDamageParts.length ? normalized.scalingDamageParts : [];
+
+  let damageParts;
+  if (aggregateDice) {
+    // Aggregate by die type (used by the standalone Damage button)
+    const diceMap = new Map();
+    for (const p of baseParts) {
+      if (!p.die) continue;
+      diceMap.set(p.die.toLowerCase(), (diceMap.get(p.die.toLowerCase()) || 0) + parseNonNegativeInt(p.count));
+    }
+    if (normalized.scalingEnabled && normalized.currentStep > 0) {
+      for (const p of scalingParts) {
+        if (!p.die) continue;
+        diceMap.set(p.die.toLowerCase(), (diceMap.get(p.die.toLowerCase()) || 0) + parseNonNegativeInt(p.count) * normalized.currentStep);
+      }
+    }
+    damageParts = Array.from(diceMap.entries()).filter(([, c]) => c > 0).map(([die, count]) => ({ count, die }));
+  } else {
+    // Preserve order (used by auto-pass cast)
+    damageParts = [...baseParts];
+    if (normalized.scalingEnabled && normalized.currentStep > 0 && scalingParts.length) {
+      for (let i = 0; i < normalized.currentStep; i++) damageParts = damageParts.concat(scalingParts);
+    }
+  }
+  if (!damageParts.length) damageParts = [{ count: 1, die: "d6" }];
+
+  let outputBonus = 0, outputBreakdown = null, outputRolls = [];
+  if (normalized.addOutput) {
+    const outputLevel = Math.max(1, Math.min(3, parseInt(state.outputLevel, 10) || 1));
+    if (outputLevel === 1)      { outputBonus = Math.floor(Math.random() * 4) + 1;         outputBreakdown = "1d4"; }
+    else if (outputLevel === 2) { outputBonus = Math.floor(Math.random() * 4) + 1 + 2;     outputBreakdown = "1d4+2"; }
+    else {
+      outputRolls = [Math.floor(Math.random() * 4) + 1, Math.floor(Math.random() * 4) + 1];
+      outputBonus = outputRolls.reduce((a, b) => a + b, 0);
+      outputBreakdown = "2d4";
+    }
+  }
+  const techniqueLevelBonus = normalized.addTechniqueLevel ? techScore : 0;
+
+  const damageResults = damageParts.map(part => {
+    const sides = parseInt(String(part.die).match(/d(\d+)/i)?.[1] ?? "6", 10);
+    const rolls  = Array.from({ length: part.count }, () => Math.floor(Math.random() * sides) + 1);
+    return { ...part, sides, rolls, total: rolls.reduce((a, b) => a + b, 0) };
+  });
+  const damageTotal = damageResults.reduce((sum, r) => sum + r.total, 0) + outputBonus + techniqueLevelBonus;
+
+  const dieGroups = damageResults.map(r => ({ label: `${r.count}${r.die}`, rolls: r.rolls, total: r.total }));
+  if (normalized.addOutput && outputBonus)           dieGroups.push({ label: `Output (${outputBreakdown})`, rolls: outputRolls, total: outputBonus });
+  if (normalized.addTechniqueLevel && techniqueLevelBonus) dieGroups.push({ label: "Technique Level", rolls: [`+${techScore}`], total: techniqueLevelBonus });
+
+  const breakdown = { skillModifier: 0, die: damageResults[0]?.die || "d6", dieGroups, total: damageTotal };
+
+  if (_showRollToast) {
+    _showRollToast(aggregateDice ? normalized.title : label + " (Damage)", null, null, damageTotal, null, "Damage", breakdown, null);
+  }
+
+  return { damageTotal, breakdown };
+}
+
 
 function getApplicationButtonState(state, applicationIndex) {
   if (!state) return { disabled: false, isAutoPass: false, rollMode: "normal", tooltip: "Cast" };
@@ -1451,11 +1526,11 @@ export function initTechniques({ getState: getStateFn, scheduleSave: scheduleSav
     // RIGHT-CLICK on XP Threshold card → adjust modifiers
     const thresholdCard = document.getElementById("techniqueXpThresholdCard");
 
-    if (thresholdCard){
+    if (thresholdCard) {
       thresholdCard.addEventListener("contextmenu", event =>
-      openModifierContextMenu(event, "derived", "xpThreshold")
-    );
-  }
+        openModifierContextMenu(event, "derived", "xpThreshold")
+      );
+    }
 
     // RIGHT-CLICK on Use button → roll mode menu (advantage / disadvantage / normal)
     summaryGrid.addEventListener("contextmenu", e => {
@@ -1584,110 +1659,30 @@ export function initTechniques({ getState: getStateFn, scheduleSave: scheduleSav
       }
 
 
-
       // Handle Use (cast) button
       const castTrigger = e.target?.closest?.("[data-app-cast]");
       if (castTrigger) {
         const state = getState();
         if (!state) return;
+        ensureTechniquesState(state);
         const idx = parseNonNegativeInt(castTrigger.dataset.appCast);
-        performApplicationTalentCheck(state, 0, idx);
+        const app = state.techniques.applications[idx];
+        if (app) {
+          const normalized  = normalizeApplication(app, idx);
+          const scaled      = getScaledApplicationValues(normalized);
+          const techScore   = parseNonNegativeInt(state?.stats?.technique?.score);
+          const xpThreshold = getEffectiveXpThreshold(state, techScore);
+          const dc          = getAppDcOverride(state, idx, scaled.dc);
+          if (xpThreshold > 0 && dc >= xpThreshold) {
+            // DC meets or exceeds threshold — roll talent check
+            performApplicationTalentCheck(state, 0, idx);
+          } else {
+            // DC below threshold (auto-pass) — cast normally
+            performApplicationCast(state, 0, idx);
+          }
+        }
         syncApplicationButtonStates(state);
         return;
-      }
-
-      // ─── Talent Check Roll Logic ────────────────────────────────────────────────
-      // This function rolls talent check for the application, applies bonuses, and shows the result.
-      function performApplicationTalentCheck(state, _techniqueIndex, applicationIndex) {
-        if (!state) return;
-        ensureTechniquesState(state);
-
-        const app           = state.techniques.applications[applicationIndex];
-        const techniqueName = state.ct || "Technique";
-        if (!app) return;
-
-        const normalized  = normalizeApplication(app, applicationIndex);
-        const scaled      = getScaledApplicationValues(normalized);
-        const currentEffects = computeActiveModifierEffects(state);
-        // Technique stat key is always 'technique', Talent is skill index 3
-        const statKey = 'technique';
-        const skillIndex = 3;
-        // n = effective stat level (number of dice)
-        const n = getEffectiveStatLevel(state, currentEffects, statKey);
-        if (!n || n < 1) return;
-        // subskillBonus = effective Talent bonus
-        const subskillBonus = getSubskillValue(state, currentEffects, statKey, skillIndex);
-        // statRollBonus = any direct roll bonuses for the stat
-        const statRollBonus = currentEffects?.rollBonuses?.[statKey] || 0;
-        // techniqueRollBonus = any global technique roll bonus
-        const techniqueRollBonus = getEffectiveTechniqueRollBonus(state, applicationIndex);
-        // DC and CE cost
-        const xpThreshold = getEffectiveXpThreshold(state, n);
-        const dc = getAppDcOverride(state, applicationIndex, scaled.dc);
-        const ceCurrent = parseNonNegativeInt(state.ceCurrent);
-        const ceCost = getAppCeCostOverride(state, applicationIndex, scaled.ceCost);
-        // Roll mode
-        const rollMode = getAppRollMode(state, applicationIndex);
-        // Roll dice
-        const rollResult = rollWithMode(
-          n,
-          rolls => rolls.reduce((a, b) => a + b, 0) + subskillBonus + statRollBonus + techniqueRollBonus,
-          rollMode
-        );
-        const rolls = rollResult.rolls;
-        const total = rollResult.total;
-        const maxPossible = n * 6 + subskillBonus + statRollBonus + techniqueRollBonus;
-        const allOnes = rolls.every(r => r === 1);
-        // Pass/fail logic: pass if total >= dc
-        const passed = total >= dc;
-        // Set critStatus for toast: 'pass', 'fail', or null
-        let critStatus = null;
-        if (allOnes) critStatus = "fail";
-        else if (passed) critStatus = "pass";
-        // Build breakdown
-        const passFailText = passed ? "PASS" : "FAIL";
-        const baseBreakdown = {
-          skillModifier: subskillBonus,
-          statRollBonus,
-          techniqueRollBonus,
-          die: "d6",
-          total,
-          dc,
-          passFailText,
-          critStatus
-        };
-        const breakdown = buildComparedBreakdown(
-          baseBreakdown,
-          rollMode,
-          rollResult.firstRolls, rollResult.firstTotal,
-          rollResult.secondRolls, rollResult.secondTotal,
-          rollResult.selectedRollIndex
-        );
-        // Reduce CE
-        state.ceCurrent = String(Math.max(0, ceCurrent - ceCost));
-        syncCeCurrentField(state.ceCurrent);
-        syncTechniqueThresholdLine(state);
-        if (typeof refreshCharacterStats === "function") refreshCharacterStats();
-        scheduleSave();
-        // Show result
-        if (_showRollToast) {
-          // 'fail' for normal fails, 'fail' for critStatus unless allOnes (then 'fail' means crit fail)
-          let toastStatus = null;
-          if (allOnes) toastStatus = "fail"; // This will show as Critical Fail in the toast
-          else if (!passed) toastStatus = "miss"; // This will show as Fail in the toast
-          else if (passed) toastStatus = "pass";
-          // Clean, minimal title: just Technique › Title
-          _showRollToast(
-            `${techniqueName} › ${normalized.title}`,
-            n,
-            rolls,
-            total,
-            toastStatus,
-            "Talent Check",
-            breakdown,
-            rollMode
-          );
-        }
       }
 
       // Handle Damage roll button
@@ -1696,94 +1691,10 @@ export function initTechniques({ getState: getStateFn, scheduleSave: scheduleSav
         const state = getState();
         if (!state) return;
         const idx = parseNonNegativeInt(damageTrigger.dataset.appDamage);
-        const app = state.techniques.applications[idx];
-        const normalized = normalizeApplication(app, idx);
-        // Compose damage parts including scaling, but combine like dice
-        const baseDamageParts = Array.isArray(normalized.damageParts) && normalized.damageParts.length
-          ? normalized.damageParts
-          : [];
-        const scalingDamageParts = Array.isArray(normalized.scalingDamageParts) && normalized.scalingDamageParts.length
-          ? normalized.scalingDamageParts
-          : [];
-        // Aggregate dice by die type
-        const diceMap = new Map();
-        // Add base damage
-        for (const part of baseDamageParts) {
-          if (!part.die) continue;
-          const key = part.die.toLowerCase();
-          diceMap.set(key, (diceMap.get(key) || 0) + parseNonNegativeInt(part.count));
-        }
-        // Add scaling damage (multiplied by currentStep)
-        if (normalized.scalingEnabled && normalized.currentStep > 0 && scalingDamageParts.length) {
-          for (const part of scalingDamageParts) {
-            if (!part.die) continue;
-            const key = part.die.toLowerCase();
-            diceMap.set(key, (diceMap.get(key) || 0) + parseNonNegativeInt(part.count) * normalized.currentStep);
-          }
-        }
-        // Build combined damageParts array
-        let damageParts = Array.from(diceMap.entries())
-          .filter(([_, count]) => count > 0)
-          .map(([die, count]) => ({ count, die }));
-        if (!damageParts.length) damageParts = [{ count: 1, die: "d6" }];
-
-        let outputBonus = 0;
-        let outputBreakdown = null;
-        let outputRolls = [];
-        if (normalized.addOutput) {
-          const outputLevel = Math.max(1, Math.min(3, parseInt(state.outputLevel, 10) || 1));
-          if (outputLevel === 1) {
-            outputBonus = Math.floor(Math.random() * 4) + 1; outputBreakdown = "1d4";
-          }
-          else if (outputLevel === 2) {
-            outputBonus = Math.floor(Math.random() * 4) + 1 + 2; outputBreakdown = "1d4+2";
-          }
-          else {
-            outputRolls.push(Math.floor(Math.random() * 4) + 1);
-            outputRolls.push(Math.floor(Math.random() * 4) + 1);
-            outputBonus = outputRolls.reduce((a, b) => a + b, 0);
-            outputBreakdown = "2d4";
-          }
-        }
-        const techScore = parseNonNegativeInt(state?.stats?.technique?.score);
-        const techniqueLevelBonus = normalized.addTechniqueLevel ? techScore : 0;
-        const damageResults = damageParts.map(part => {
-          const dieMatch = String(part.die).match(/d(\d+)/i);
-          const sides = dieMatch ? parseInt(dieMatch[1], 10) : 6;
-          const rolls = Array.from({ length: part.count }, () => Math.floor(Math.random() * sides) + 1);
-          return { ...part, sides, rolls, total: rolls.reduce((a, b) => a + b, 0) };
-        });
-        const damageTotal = damageResults.reduce((sum, r) => sum + r.total, 0) + outputBonus + techniqueLevelBonus;
-        const dieGroups = damageResults.map(part => ({
-          label: `${part.count}${part.die}`,
-          rolls: part.rolls,
-          total: part.total
-        }));
-        if (normalized.addOutput && outputBonus) {
-          dieGroups.push({
-            label: `Output (${outputBreakdown})`,
-            rolls: outputRolls,
-            total: outputBonus
-          });
-        }
-        if (normalized.addTechniqueLevel && techniqueLevelBonus) {
-          dieGroups.push({
-            label: `Technique Level`,
-            rolls: [`+${techScore}`],
-            total: techniqueLevelBonus
-          });
-        }
-        const breakdown = {
-          skillModifier: 0,
-          die: damageResults[0]?.die || "d6",
-          dieGroups,
-          total: damageTotal
-        };
-        if (_showRollToast) {
-          _showRollToast(`${normalized.title}`, null, null, damageTotal, null, "Damage", breakdown, null);
-        }
+        rollDamageForApplication(state, idx, { aggregateDice: true });
         return;
       }
+
 
       // Inline damage dice editing
       const addDamageTrigger = e.target?.closest?.("[data-app-add-damage]");
