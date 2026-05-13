@@ -1,5 +1,6 @@
 import martialArtsData from './data/martial-arts.json';
 import weaponArtsData from './data/weapon-arts.json';
+import { ARCHETYPE_RULES } from './data/archetype-rules.js';
 import {
   WEAPON_TYPE_LABELS,
   getWeaponDamageText,
@@ -134,6 +135,46 @@ function escapeHtml(value) {
     .replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#39;");
 }
 
+// ── ARCHETYPE FEATURES ────────────────────────────────────────────────────────
+
+function resolveArchetypeAbilityDef(archetypeKey, abilityId) {
+  const rule = archetypeKey === "custom" ? null : (ARCHETYPE_RULES[archetypeKey] || null);
+  if (!rule) return null;
+
+  const shared = (rule.sharedAbilities || []).find(a => a.id === abilityId);
+  if (shared) return { ...shared, source: rule.label || archetypeKey };
+
+  for (const [, subDef] of Object.entries(rule.subclassAbilities || {})) {
+    if (subDef?.tier1?.id === abilityId) return { ...subDef.tier1, tier: 1, source: rule.label || archetypeKey };
+    if (subDef?.tier5?.id === abilityId) return { ...subDef.tier5, tier: 5, source: rule.label || archetypeKey };
+  }
+  return null;
+}
+
+function computeArchetypeFeatures(state) {
+  const unlockedIds = Array.isArray(state?.archetypeProgress?.unlockedAbilityIds)
+    ? state.archetypeProgress.unlockedAbilityIds
+    : [];
+
+  return unlockedIds
+    .map(globalId => {
+      const colonIdx = String(globalId || "").indexOf(":");
+      if (colonIdx < 0) return null;
+      const archetypeKey = globalId.slice(0, colonIdx);
+      const abilityId    = globalId.slice(colonIdx + 1);
+      const def = resolveArchetypeAbilityDef(archetypeKey, abilityId);
+      if (!def) return null;
+      return {
+        globalId,
+        name:   def.name   || abilityId,
+        notes:  def.notes  || "",
+        tier:   def.tier   != null ? def.tier : "?",
+        source: def.source || archetypeKey,
+      };
+    })
+    .filter(Boolean);
+}
+
 // ── COMPUTE ───────────────────────────────────────────────────────────────────
 
 export function computeCombatTabData(state) {
@@ -231,6 +272,7 @@ export function computeCombatTabData(state) {
     imbueDC, maxImbueStacks, talentBonus, currentCE,
     blackFlashRange: blackFlashRange ?? '—',
     blackFlashMin: blackFlashRange,
+    archetypeFeatures: computeArchetypeFeatures(state),
     state,
   };
 }
@@ -304,6 +346,26 @@ export function renderCombatTabData(data) {
   }
 
   filterAndRenderArts(data);
+  renderArchetypeFeatures(data);
+}
+
+function renderArchetypeFeatures(data) {
+  const el = document.getElementById("combatArchetypeFeaturesList");
+  if (!el) return;
+
+  const features = data.archetypeFeatures || [];
+  if (!features.length) {
+    el.innerHTML = '<span class="combat-empty">No archetype features unlocked.</span>';
+    return;
+  }
+
+  el.innerHTML = features.map(f => `
+    <div class="combat-art-item">
+      <strong>${escapeHtml(f.name)}</strong>
+      ${f.notes ? `<span>${escapeHtml(f.notes)}</span>` : ""}
+      <em>${escapeHtml(f.source)} &nbsp;·&nbsp; Tier ${escapeHtml(String(f.tier))}</em>
+    </div>`
+  ).join("");
 }
 
 function filterAndRenderArts(data) {
