@@ -7,50 +7,54 @@ let _renderRollHistory = null;
 let _switchRollTab = null;
 let _getState = null;
 let _scheduleSave = null;
-let _applySheetState = null;
-let _clearSheetState = null;
+let _applySheetState = null; // (fullState) => void
+let _clearSheetState = null; // () => void
 let _isInitialized = false;
 
-let _viewingMemberSnapshot = null;
+// Tracks the member currently being viewed (slim display info only — NOT used for rendering)
+let _viewingMember = null; // { name, playerName } | null
 
-function getState() {
-  return _getState ? _getState() : null;
-}
-function scheduleSave() {
-  if (_scheduleSave) _scheduleSave();
-}
+function getState() { return _getState ? _getState() : null; }
+function scheduleSave() { if (_scheduleSave) _scheduleSave(); }
 
 const SHARED_TABS = ["party", "notes"];
+
+// ── GM LAYOUT ─────────────────────────────────────────────────────────────────
 
 export function applyGmLayout() {
   const gm = isGm();
 
   document.querySelectorAll(".tab[data-tab]").forEach(tab => {
     const name = tab.dataset.tab;
-    if (gm && !_viewingMemberSnapshot) {
+    if (gm && !_viewingMember) {
+      // GM home: Party + Notes only
       tab.style.display = SHARED_TABS.includes(name) ? "" : "none";
+    } else if (gm && _viewingMember) {
+      // GM viewing a member: all player tabs + hide Party tab (back btn replaces it)
+      tab.style.display = name === "party" ? "none" : "";
     } else {
-      tab.style.display = "";
+      // Player: show all except Party (which is GM-only)
+      tab.style.display = name === "party" ? "none" : "";
     }
   });
 
-  // Back button
+  // ── Back button ───────────────────────────────────────────────────────────
   let backBtn = document.getElementById("gmBackBtn");
-  if (gm && _viewingMemberSnapshot) {
+  if (gm && _viewingMember) {
     if (!backBtn) {
-      backBtn = document.createElement("button");
+      backBtn = document.createElement("div");
       backBtn.id = "gmBackBtn";
-      backBtn.className = "gm-back-btn";
-      backBtn.textContent = "← Party";
+      backBtn.className = "tab gm-back-btn";
       backBtn.addEventListener("click", exitMemberSheet);
       document.querySelector(".tab-bar")?.insertAdjacentElement("afterbegin", backBtn);
     }
+    backBtn.textContent = `← ${_viewingMember.name || "Back"}`;
     backBtn.style.display = "";
   } else if (backBtn) {
     backBtn.style.display = "none";
   }
 
-  // GM badge
+  // ── GM badge ─────────────────────────────────────────────────────────────
   let badge = document.getElementById("gmRoleBadge");
   if (gm) {
     if (!badge) {
@@ -58,38 +62,45 @@ export function applyGmLayout() {
       badge.id = "gmRoleBadge";
       badge.className = "gm-role-badge";
       badge.textContent = "GM";
-      const saveBtn = document.getElementById("saveStatusBadge");
-      if (saveBtn?.parentElement) {
-        saveBtn.parentElement.insertBefore(badge, saveBtn);
-      } else {
-        document.querySelector(".tab-bar")?.insertAdjacentElement("beforebegin", badge);
-      }
+      document.body.appendChild(badge);
     }
     badge.style.display = "";
-    badge.title = _viewingMemberSnapshot?.name ? `GM — ${_viewingMemberSnapshot.name}` : "GM mode";
+    badge.title = _viewingMember
+      ? `GM — viewing ${_viewingMember.name}`
+      : "GM mode";
   } else if (badge) {
     badge.style.display = "none";
   }
 }
 
-export function enterMemberSheet(snapshot) {
+// ── PARTY SHEET DRILL-IN ──────────────────────────────────────────────────────
+
+/**
+ * Called by main.js after it has fetched the member's full saved state.
+ * @param {object} fullState  - complete saved state object for the member
+ * @param {string} memberName - display name for the back button / badge
+ * @param {string} playerName - player name for context
+ */
+export function enterMemberSheet(fullState, memberName, playerName) {
   if (!isGm()) return;
-  _viewingMemberSnapshot = snapshot;
-  if (_applySheetState) _applySheetState(snapshot);
+  _viewingMember = { name: memberName || playerName || "Member", playerName };
+  if (_applySheetState) _applySheetState(fullState);
   applyGmLayout();
   _activateMainTab?.("character");
 }
 
 function exitMemberSheet() {
-  _viewingMemberSnapshot = null;
+  _viewingMember = null;
   if (_clearSheetState) _clearSheetState();
   applyGmLayout();
   _activateMainTab?.("party");
 }
 
 export function isViewingMemberSheet() {
-  return _viewingMemberSnapshot !== null;
+  return _viewingMember !== null;
 }
+
+// ── DEV TOGGLE PANEL ─────────────────────────────────────────────────────────
 
 function buildDevPanel() {
   document.getElementById("gmDevPanel")?.remove();
@@ -130,7 +141,6 @@ function buildDevPanel() {
   document.body.appendChild(panel);
 
   document.getElementById("gmDevPanelClose")?.addEventListener("click", () => panel.remove());
-
   panel.querySelectorAll("[data-role]").forEach(btn => {
     btn.addEventListener("click", () => {
       setGmOverride(btn.dataset.role === "clear" ? null : btn.dataset.role);
@@ -148,6 +158,8 @@ function buildDevPanel() {
     });
   }, 0);
 }
+
+// ── INIT ──────────────────────────────────────────────────────────────────────
 
 export function initUiShell({
   activateMainTab,
@@ -203,9 +215,9 @@ export function initUiShell({
     }
   });
 
-  tabMine?.addEventListener("click",      () => _switchRollTab?.("mine"));
-  tabGroup?.addEventListener("click",     () => _switchRollTab?.("group"));
-  partyQuickBtn?.addEventListener("click",() => _activateMainTab?.("party"));
+  tabMine?.addEventListener("click",       () => _switchRollTab?.("mine"));
+  tabGroup?.addEventListener("click",      () => _switchRollTab?.("group"));
+  partyQuickBtn?.addEventListener("click", () => _activateMainTab?.("party"));
 
   // Info overlay + triple-click dev toggle
   const infoBtn      = document.getElementById("infoBtn");
@@ -219,11 +231,8 @@ export function initUiShell({
       clickCount++;
       clearTimeout(clickTimer);
       clickTimer = setTimeout(() => {
-        if (clickCount === 1) {
-          infoOverlay?.classList.add("open");
-        } else if (clickCount >= 3) {
-          buildDevPanel();
-        }
+        if (clickCount === 1)    infoOverlay?.classList.add("open");
+        else if (clickCount >= 3) buildDevPanel();
         clickCount = 0;
       }, 350);
     });
@@ -235,7 +244,6 @@ export function initUiShell({
   });
 
   applyGmLayout();
-
   _isInitialized = true;
   _renderRollHistory?.();
 }

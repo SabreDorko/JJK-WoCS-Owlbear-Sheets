@@ -51,7 +51,7 @@ import {
   clearGroupRollHistory,
 } from "./rolls.js";
 import { initUiShell, applyGmLayout, enterMemberSheet } from "./ui-shell.js";
-import { initGmRole, isGm } from "./gm.js";
+import { initGmRole } from "./gm.js";
 import { initNotes, applyNotesStateToUI } from "./notes.js";
 import { initTraining, renderTraining } from "./training.js";
 import { initSkills, renderSkills } from "./skills.js";
@@ -64,33 +64,38 @@ let localPlayerName = "";
 let obrReady = false;
 let _lastSaveTooltip = "No save yet.";
 
-// GM sheet drill-in: temporarily render a party member's snapshot
-let _ownState = null; // saved reference to restore after GM drill-in
+// ── GM SHEET VIEW ─────────────────────────────────────────────────────────────
+// When GM drills into a member's sheet, we swap `state` temporarily ONLY for
+// rendering, then swap it back before the call stack returns. `scheduleSave`
+// checks `_gmViewing` and skips saves while a member sheet is active.
+let _gmViewing = false;
 
-function applySheetState(snapshot) {
-  // Snapshot is the party broadcast object — it may be a partial state.
-  // Merge over defaultState so all keys exist, then apply to UI read-only.
-  _ownState = state;
-  // We don't overwrite `state` (that would risk saving foreign data).
-  // Instead we apply the snapshot directly to UI only.
-  if (typeof applyCharacterStateToUI === "function") {
-    // Temporarily swap state so all UI renderers read the member's data
-    const prev = state;
-    state = { ...defaultState(), ...snapshot };
-    applyStateToUI();
-    state = prev;
-    // Re-point state back; keep _ownState for clearSheetState
-    _ownState = prev;
-    state = { ...defaultState(), ...snapshot };
-  }
+function applySheetState(fullState) {
+  _gmViewing = true;
+  const own = state;
+  state = fullState;
+  _applyStateToUI();
+  state = own;
+  // Keep _gmViewing true so scheduleSave blocks until exitMemberSheet clears it
 }
 
 function clearSheetState() {
-  if (_ownState) {
-    state = _ownState;
-    _ownState = null;
-  }
-  applyStateToUI();
+  _gmViewing = false;
+  _applyStateToUI();
+}
+
+async function loadMemberFullState(snapshot) {
+  const memberId = snapshot.playerId;
+  const key = memberId ? `${STORAGE_KEY_BASE}-${memberId}` : STORAGE_KEY_BASE;
+  try {
+    const meta = await OBR.room.getMetadata();
+    const saved = meta[key];
+    if (saved && typeof saved === "object") {
+      return mergeLoadedState({ saved, defaultState, centerStats: CENTER_STATS, rightStats: RIGHT_STATS });
+    }
+  } catch (_) {}
+  // Fallback to slim snapshot merged over defaults so all keys exist
+  return mergeLoadedState({ saved: snapshot, defaultState, centerStats: CENTER_STATS, rightStats: RIGHT_STATS });
 }
 
 // Expose for combat tab input handlers
@@ -186,11 +191,12 @@ const persistence = createPersistenceRuntime({
 });
 
 function scheduleSave() {
+  if (_gmViewing) return; // never save while viewing a member's sheet
   persistence.scheduleSave();
 }
 
 // ── APPLY STATE TO UI ─────────────────────────────────────────────────────────
-function applyStateToUI() {
+function _applyStateToUI() {
   applyCharacterStateToUI();
   applyTechniquesStateToUI();
   applyArchetypeStateToUI();
@@ -202,10 +208,12 @@ function applyStateToUI() {
   renderPartyList();
   renderInventory();
 
-  // Update Combat tab
   const combatData = computeCombatTabData(state);
   renderCombatTabData(combatData);
 }
+
+// Public alias used outside this module (e.g. after OBR load)
+function applyStateToUI() { _applyStateToUI(); }
 
 // ── TABS ──────────────────────────────────────────────────────────────────────
 function activateMainTab(tabName) {
@@ -227,7 +235,14 @@ async function init() {
     getState: () => state,
     getPreferredPlayerName,
     getLocalPlayerId: () => localPlayerId,
-    onOpenSheet: (snapshot) => enterMemberSheet(snapshot),
+    onOpenSheet: async (snapshot) => {
+      const fullState = await loadMemberFullState(snapshot);
+      enterMemberSheet(
+        fullState,
+        snapshot.charName || snapshot.playerName || "Member",
+        snapshot.playerName,
+      );
+    },
   });
 
   initCharacter({
@@ -322,12 +337,7 @@ async function init() {
       try { localPlayerId   = await OBR.player.getId();   } catch (_) { localPlayerId   = localPlayerName || null; }
 
       // Detect GM role and apply layout
-      try {
-        const role = await OBR.player.getRole();
-        initGmRole(role);
-      } catch (_) {
-        initGmRole(null);
-      }
+      try { initGmRole(await OBR.player.getRole()); } catch (_) { initGmRole(null); }
       applyGmLayout();
 
       OBR.broadcast.onMessage(PARTY_BROADCAST_CHANNEL, event => {
