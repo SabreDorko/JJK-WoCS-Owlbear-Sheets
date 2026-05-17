@@ -4939,6 +4939,162 @@
       padding: 8px 4px;
     }
 
+    /* ── GM ROLE BADGE ──────────────────────────────────────── */
+    /* Fixed bottom-right, mirrors save badge position */
+    .gm-role-badge {
+      position: fixed;
+      right: 12px;
+      bottom: 12px;
+      z-index: 29;
+      font-family: 'Cinzel', serif;
+      font-size: 9px;
+      letter-spacing: 1.8px;
+      text-transform: uppercase;
+      color: var(--accent);
+      opacity: 0.72;
+      user-select: none;
+      pointer-events: none;
+      text-shadow: 0 1px 0 rgba(240,235,224,0.35);
+      transition: opacity 120ms ease;
+    }
+
+    /* ── GM BACK BUTTON ─────────────────────────────────────── */
+    /* Lives in the tab-bar, same height as tabs */
+    .gm-back-btn {
+      padding: 7px 12px 7px 10px;
+      font-family: 'Cinzel', serif;
+      font-size: 10px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--accent);
+      background: var(--parchment-dark);
+      border: none;
+      border-right: 1.5px solid var(--border-strong);
+      cursor: pointer;
+      user-select: none;
+      flex-shrink: 0;
+      transition: background 120ms, color 120ms;
+    }
+    .gm-back-btn:hover {
+      background: var(--parchment);
+      color: var(--ink);
+    }
+
+    /* ── GM PARTY ITEM — OPENABLE ────────────────────────────── */
+    .party-item--gm-openable {
+      cursor: pointer;
+      transition: background 120ms, border-color 120ms;
+    }
+    .party-item--gm-openable:hover {
+      background: var(--parchment-dark);
+      border-color: var(--ink);
+    }
+    .party-item-gm-hint {
+      font-family: 'Cinzel', serif;
+      font-size: 9px;
+      color: var(--accent);
+      opacity: 0.7;
+      margin-left: 3px;
+    }
+
+    /* ── GM DEV PANEL ───────────────────────────────────────── */
+    .gm-dev-panel {
+      position: fixed;
+      bottom: 44px;
+      left: 12px;
+      z-index: 999;
+      background: var(--parchment-dark);
+      border: 1.5px solid var(--ink);
+      min-width: 210px;
+      box-shadow: 0 4px 18px rgba(26,20,16,0.22);
+      animation: sectionRiseIn 160ms ease both;
+    }
+    .gm-dev-panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 10px;
+      border-bottom: 1px solid var(--border-strong);
+      background: var(--parchment-darker);
+    }
+    .gm-dev-panel-title {
+      font-family: 'Cinzel', serif;
+      font-size: 9px;
+      letter-spacing: 1.2px;
+      text-transform: uppercase;
+      color: var(--ink);
+    }
+    .gm-dev-panel-close {
+      background: none;
+      border: none;
+      font-size: 12px;
+      color: var(--ink-faint);
+      cursor: pointer;
+      padding: 0 2px;
+      line-height: 1;
+    }
+    .gm-dev-panel-close:hover { color: var(--ink); }
+    .gm-dev-panel-body {
+      padding: 8px 10px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+    .gm-dev-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+    }
+    .gm-dev-label {
+      font-family: 'Cinzel', serif;
+      font-size: 8px;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      color: var(--ink-faint);
+    }
+    .gm-dev-value {
+      font-family: 'Crimson Text', serif;
+      font-size: 13px;
+      color: var(--ink);
+    }
+    .gm-dev-effective {
+      font-weight: 700;
+      color: var(--accent);
+    }
+    .gm-dev-buttons {
+      display: flex;
+      gap: 5px;
+      margin-top: 4px;
+      flex-wrap: wrap;
+    }
+    .gm-dev-btn {
+      flex: 1;
+      font-family: 'Cinzel', serif;
+      font-size: 8px;
+      letter-spacing: 0.7px;
+      text-transform: uppercase;
+      padding: 4px 8px;
+      border: 1px solid var(--border-strong);
+      background: var(--parchment);
+      color: var(--ink);
+      cursor: pointer;
+      transition: background 120ms, color 120ms;
+    }
+    .gm-dev-btn:hover {
+      background: var(--ink);
+      color: var(--parchment);
+    }
+    .gm-dev-btn--clear {
+      color: var(--ink-faint);
+      border-color: var(--border);
+      flex-basis: 100%;
+    }
+    .gm-dev-btn--clear:hover {
+      background: var(--parchment-darker);
+      color: var(--ink);
+    }
+
     /* Notes tab */
     .notes-panel {
       border: 0;

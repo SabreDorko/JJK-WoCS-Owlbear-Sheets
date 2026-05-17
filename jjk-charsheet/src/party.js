@@ -3,6 +3,7 @@ const partyRoster = new Map();
 let _getState = null;
 let _getPreferredPlayerName = null;
 let _getLocalPlayerId = null;
+let _onOpenSheet = null; // (snapshot) => void — GM callback to drill into a member's sheet
 
 function getState() {
   return _getState ? _getState() : null;
@@ -103,15 +104,21 @@ export function renderPartyList() {
     return;
   }
 
-  list.innerHTML = roster.map(entry => {
+  const isGmView = typeof _onOpenSheet === "function";
+
+  list.innerHTML = roster.map((entry, i) => {
+    const isSelf = entry.playerId === self.playerId;
     const arcDisplay = formatArchetypeDisplay(entry);
     const gradeStr = entry.grade ? `Grade ${entry.grade}` : "";
     const metaLeft = [gradeStr, arcDisplay].filter(Boolean).join(" \u2022 ");
+    const gmOpenable = isGmView && !isSelf;
     return `
-    <div class="party-item">
+    <div class="party-item${gmOpenable ? " party-item--gm-openable" : ""}"
+      data-party-idx="${i}"
+      ${gmOpenable ? `role="button" tabindex="0" title="Open ${entry.charName}'s sheet"` : ""}>
       <div class="party-item-header">
         <div class="party-character">${entry.charName}</div>
-        <div class="party-player">${entry.playerName}</div>
+        <div class="party-player">${isSelf ? "(You)" : entry.playerName}${gmOpenable ? ' <span class="party-item-gm-hint">↗</span>' : ""}</div>
       </div>
       <div class="party-meta">
         <span class="party-meta-left">${metaLeft}</span>
@@ -133,6 +140,19 @@ export function renderPartyList() {
     </div>
   `;
   }).join("");
+
+  // Wire GM open-sheet clicks
+  if (isGmView) {
+    const allEntries = hasCharacterName(self) ? [self, ...others] : others;
+    list.querySelectorAll(".party-item--gm-openable").forEach(el => {
+      const idx = parseInt(el.dataset.partyIdx, 10);
+      const entry = allEntries[idx];
+      if (!entry) return;
+      const activate = () => _onOpenSheet(entry);
+      el.addEventListener("click", activate);
+      el.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") activate(); });
+    });
+  }
 }
 
 export function handleIncomingPartySnapshot(entry) {
@@ -146,8 +166,9 @@ export function handleIncomingPartySnapshot(entry) {
   renderPartyList();
 }
 
-export function initParty({ getState: getStateFn, getPreferredPlayerName: getPreferredNameFn, getLocalPlayerId: getLocalPlayerIdFn }) {
+export function initParty({ getState: getStateFn, getPreferredPlayerName: getPreferredNameFn, getLocalPlayerId: getLocalPlayerIdFn, onOpenSheet = null }) {
   _getState = getStateFn;
   _getPreferredPlayerName = getPreferredNameFn;
   _getLocalPlayerId = getLocalPlayerIdFn;
+  _onOpenSheet = onOpenSheet;
 }
