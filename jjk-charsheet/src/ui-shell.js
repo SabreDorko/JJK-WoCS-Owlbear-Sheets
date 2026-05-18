@@ -246,9 +246,6 @@ export function initUiShell({
   });
 
   applyGmLayout();
-  // GM starts on Party tab; players start on whichever tab is already active
-  if (isGm()) _activateMainTab?.("party");
-
   _isInitialized = true;
   _renderRollHistory?.();
 }

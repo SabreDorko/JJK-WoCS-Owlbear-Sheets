@@ -348,6 +348,7 @@ async function init() {
       // Detect GM role and apply layout
       try { initGmRole(await OBR.player.getRole()); } catch (_) { initGmRole(null); }
       applyGmLayout();
+      if (isGm()) activateMainTab("party");
 
       OBR.broadcast.onMessage(PARTY_BROADCAST_CHANNEL, event => {
         handleIncomingPartySnapshot(event.data);
