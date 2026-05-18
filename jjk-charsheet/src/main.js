@@ -28,10 +28,12 @@ import {
 import {
   initTechniques,
   applyTechniquesStateToUI,
+  updateTechniquesDerivedUI,
 } from "./techniques.js";
 import {
   initArchetype,
   applyArchetypeStateToUI,
+  renderArchetypeReadOnly,
 } from "./archetype.js";
 import {
   initParty,
@@ -199,17 +201,24 @@ function scheduleSave() {
 function _applyStateToUI() {
   applyCharacterStateToUI();
   applyTechniquesStateToUI();
-  applyArchetypeStateToUI();
+
+  // Use side-effect-free renderer during GM view; full version for own sheet
+  if (_gmViewing) {
+    renderArchetypeReadOnly(state);
+  } else {
+    applyArchetypeStateToUI();
+  }
+
   applyNotesStateToUI();
   renderTraining(state);
   renderSkills(state);
-
   renderRollHistory();
-  renderPartyList();
-  renderInventory();
 
-  const combatData = computeCombatTabData(state);
-  renderCombatTabData(combatData);
+  // Never re-render party list while viewing a member (prevents ghost entries)
+  if (!_gmViewing) renderPartyList();
+
+  renderInventory();
+  renderCombatTabData(computeCombatTabData(state));
 }
 
 // Public alias used outside this module (e.g. after OBR load)

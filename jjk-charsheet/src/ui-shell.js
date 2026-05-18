@@ -17,7 +17,9 @@ let _viewingMember = null; // { name, playerName } | null
 function getState() { return _getState ? _getState() : null; }
 function scheduleSave() { if (_scheduleSave) _scheduleSave(); }
 
-const SHARED_TABS = ["party", "notes"];
+const GM_HOME_TABS   = ["party", "notes"]; // GM home: Party + their own Notes
+const PLAYER_TABS    = ["character", "archetype", "inventory", "combat", "jujutsu", "notes"];
+const MEMBER_TABS    = ["character", "archetype", "inventory", "combat", "jujutsu"]; // no notes when viewing a member
 
 // ── GM LAYOUT ─────────────────────────────────────────────────────────────────
 
@@ -27,14 +29,14 @@ export function applyGmLayout() {
   document.querySelectorAll(".tab[data-tab]").forEach(tab => {
     const name = tab.dataset.tab;
     if (gm && !_viewingMember) {
-      // GM home: Party + Notes only
-      tab.style.display = SHARED_TABS.includes(name) ? "" : "none";
+      // GM home: Party tab only
+      tab.style.display = GM_HOME_TABS.includes(name) ? "" : "none";
     } else if (gm && _viewingMember) {
-      // GM viewing a member: all player tabs + hide Party tab (back btn replaces it)
-      tab.style.display = name === "party" ? "none" : "";
+      // GM in a member sheet: player tabs, no Notes, no Party
+      tab.style.display = MEMBER_TABS.includes(name) ? "" : "none";
     } else {
-      // Player: show all except Party (which is GM-only)
-      tab.style.display = name === "party" ? "none" : "";
+      // Player: all player tabs, hide Party (GM-only)
+      tab.style.display = PLAYER_TABS.includes(name) ? "" : "none";
     }
   });
 
@@ -48,7 +50,7 @@ export function applyGmLayout() {
       backBtn.addEventListener("click", exitMemberSheet);
       document.querySelector(".tab-bar")?.insertAdjacentElement("afterbegin", backBtn);
     }
-    backBtn.textContent = `← ${_viewingMember.name || "Back"}`;
+    backBtn.textContent = "← Back";
     backBtn.style.display = "";
   } else if (backBtn) {
     backBtn.style.display = "none";
@@ -244,6 +246,9 @@ export function initUiShell({
   });
 
   applyGmLayout();
+  // GM starts on Party tab; players start on whichever tab is already active
+  if (isGm()) _activateMainTab?.("party");
+
   _isInitialized = true;
   _renderRollHistory?.();
 }

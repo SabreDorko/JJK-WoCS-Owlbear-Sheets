@@ -3,12 +3,6 @@ import { ARCHETYPE_RULES } from "./data/archetype-rules.js";
 import { resolveBaseItemTemplateByStartingEquipmentLine } from "./data/base-items.js";
 import { applyCharacterStateToUI } from "./character.js";
 import { renderInventory } from "./inventory.js";
-import { computeCombatTabData, renderCombatTabData } from "./combat.js";
-
-function refreshCombatFeatures() {
-  const state = getState();
-  if (state) renderCombatTabData(computeCombatTabData(state));
-}
 
 let _getState = null;
 let _scheduleSave = null;
@@ -1251,7 +1245,6 @@ function addAbilitySlot() {
   renderArchetypeSummary(state);
   renderAbilitySlots(state);
   renderAbilityTree(state);
-  refreshCombatFeatures();
   scheduleSave();
 }
 
@@ -1282,7 +1275,6 @@ function removeAbilitySlot(slotIndexRaw) {
   renderArchetypeSummary(state);
   renderAbilitySlots(state);
   renderAbilityTree(state);
-  refreshCombatFeatures();
   scheduleSave();
 }
 
@@ -1437,7 +1429,6 @@ function addAbilityToSlots(globalId) {
   renderBenefits(state);
   renderAbilitySlots(state);
   renderAbilityTree(state);
-  refreshCombatFeatures();
   scheduleSave();
 }
 
@@ -1461,7 +1452,6 @@ function removeAbilityFromSlots(globalId) {
   renderBenefits(state);
   renderAbilitySlots(state);
   renderAbilityTree(state);
-  refreshCombatFeatures();
   scheduleSave();
 }
 
@@ -1527,6 +1517,22 @@ function syncArchetypeCollapseUI() {
   // archetypePermanentAptitudesPanel removed from HTML.
 }
 
+/**
+ * Pure render — no state mutations, no scheduleSave, safe to call during GM view.
+ */
+export function renderArchetypeReadOnly(stateArg) {
+  const s = stateArg || getState();
+  if (!s) return;
+  ensureArchetypeState(s);
+  renderArchetypeSummary(s);
+  renderBenefits(s);
+  renderPermanentAptitudePicker(s);
+  renderCustomBuilder(s);
+  renderAbilitySlots(s);
+  renderAbilityTree(s);
+  syncArchetypeCollapseUI();
+}
+
 export function applyArchetypeStateToUI() {
   const state = getState();
   if (!state) return;
@@ -1557,7 +1563,6 @@ export function applyArchetypeStateToUI() {
   renderCustomBuilder(state);
   renderAbilitySlots(state);
   renderAbilityTree(state);
-  refreshCombatFeatures();
   syncArchetypeCollapseUI();
   applyCharacterStateToUI();
   if (grantedStarterItems) renderInventory();
