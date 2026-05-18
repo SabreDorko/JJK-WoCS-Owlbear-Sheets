@@ -3,7 +3,8 @@ const partyRoster = new Map();
 let _getState = null;
 let _getPreferredPlayerName = null;
 let _getLocalPlayerId = null;
-let _onOpenSheet = null; // (snapshot) => void — GM callback to drill into a member's sheet
+let _onOpenSheet = null; // (snapshot) => void — GM opens a member's sheet
+let _isGm = null;        // () => bool — true if current user is GM
 
 function getState() {
   return _getState ? _getState() : null;
@@ -92,12 +93,17 @@ export function renderPartyList() {
   const list = document.getElementById("partyList");
   if (!list) return;
 
+  const gmMode = typeof _isGm === "function" && _isGm();
   const self = getPartySnapshot();
   const others = Array.from(partyRoster.values())
     .filter(entry => entry.playerId !== self.playerId)
     .filter(hasCharacterName)
     .sort((a, b) => (a.playerName || "").localeCompare(b.playerName || ""));
-  const roster = hasCharacterName(self) ? [self, ...others] : others;
+
+  // GMs don't appear in the party list — they're facilitators, not characters
+  const roster = (!gmMode && hasCharacterName(self))
+    ? [self, ...others]
+    : others;
 
   if (!roster.length) {
     list.innerHTML = '<div class="party-empty">No party data yet.</div>';
@@ -107,7 +113,7 @@ export function renderPartyList() {
   const isGmView = typeof _onOpenSheet === "function";
 
   list.innerHTML = roster.map((entry, i) => {
-    const isSelf = entry.playerId === self.playerId;
+    const isSelf = !gmMode && entry.playerId === self.playerId;
     const arcDisplay = formatArchetypeDisplay(entry);
     const gradeStr = entry.grade ? `Grade ${entry.grade}` : "";
     const metaLeft = [gradeStr, arcDisplay].filter(Boolean).join(" \u2022 ");
@@ -115,7 +121,7 @@ export function renderPartyList() {
     return `
     <div class="party-item${gmOpenable ? " party-item--gm-openable" : ""}"
       data-party-idx="${i}"
-      ${gmOpenable ? `role="button" tabindex="0" title="Open ${entry.charName}'s sheet"` : ""}>
+      ${gmOpenable ? `role="button" tabindex="0" title="Open ${entry.charName || entry.playerName}'s sheet"` : ""}>
       <div class="party-item-header">
         <div class="party-character">${entry.charName}</div>
         <div class="party-player">${isSelf ? "(You)" : entry.playerName}${gmOpenable ? ' <span class="party-item-gm-hint">↗</span>' : ""}</div>
@@ -143,10 +149,9 @@ export function renderPartyList() {
 
   // Wire GM open-sheet clicks
   if (isGmView) {
-    const allEntries = hasCharacterName(self) ? [self, ...others] : others;
     list.querySelectorAll(".party-item--gm-openable").forEach(el => {
       const idx = parseInt(el.dataset.partyIdx, 10);
-      const entry = allEntries[idx];
+      const entry = roster[idx];
       if (!entry) return;
       const activate = () => _onOpenSheet(entry);
       el.addEventListener("click", activate);
@@ -164,11 +169,24 @@ export function handleIncomingPartySnapshot(entry) {
     partyRoster.set(entry.playerId, entry);
   }
   renderPartyList();
+  // Notify GM if the update is for the member currently being viewed
+  if (typeof _onMemberUpdate === "function") _onMemberUpdate(entry);
 }
 
-export function initParty({ getState: getStateFn, getPreferredPlayerName: getPreferredNameFn, getLocalPlayerId: getLocalPlayerIdFn, onOpenSheet = null }) {
+let _onMemberUpdate = null; // (snapshot) => void — called when a viewed member sends a new snapshot
+
+export function initParty({
+  getState: getStateFn,
+  getPreferredPlayerName: getPreferredNameFn,
+  getLocalPlayerId: getLocalPlayerIdFn,
+  onOpenSheet = null,
+  onMemberUpdate = null,
+  isGm = null,
+}) {
   _getState = getStateFn;
   _getPreferredPlayerName = getPreferredNameFn;
   _getLocalPlayerId = getLocalPlayerIdFn;
   _onOpenSheet = onOpenSheet;
+  _onMemberUpdate = onMemberUpdate;
+  _isGm = isGm;
 }

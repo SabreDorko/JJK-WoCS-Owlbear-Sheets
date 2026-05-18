@@ -70,6 +70,7 @@ let _lastSaveTooltip = "No save yet.";
 // All renderers call getActiveState() instead of reading `state` directly.
 // The global `state` (own sheet) is NEVER modified or swapped.
 let _gmState = null;
+let _viewedPlayerId = null;
 
 function getActiveState() {
   return _gmState !== null ? _gmState : state;
@@ -82,6 +83,7 @@ function applySheetState(fullState) {
 
 function clearSheetState() {
   _gmState = null;
+  _viewedPlayerId = null;
   _applyStateToUI();
 }
 
@@ -245,13 +247,21 @@ async function init() {
     getState: () => state,       // party snapshot always from own state
     getPreferredPlayerName,
     getLocalPlayerId: () => localPlayerId,
+    isGm: () => isGm(),
     onOpenSheet: async (snapshot) => {
+      _viewedPlayerId = snapshot.playerId;
       const fullState = await loadMemberFullState(snapshot);
       enterMemberSheet(
         fullState,
         snapshot.charName || snapshot.playerName || "Member",
         snapshot.playerName,
       );
+    },
+    onMemberUpdate: async (snapshot) => {
+      if (_gmState === null || snapshot.playerId !== _viewedPlayerId) return;
+      const fullState = await loadMemberFullState(snapshot);
+      _gmState = fullState;
+      _applyStateToUI();
     },
   });
 
