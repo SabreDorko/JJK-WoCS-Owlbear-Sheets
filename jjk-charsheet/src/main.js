@@ -28,7 +28,6 @@ import {
 import {
   initTechniques,
   applyTechniquesStateToUI,
-  updateTechniquesDerivedUI,
 } from "./techniques.js";
 import {
   initArchetype,
@@ -53,7 +52,7 @@ import {
   clearGroupRollHistory,
 } from "./rolls.js";
 import { initUiShell, applyGmLayout, enterMemberSheet } from "./ui-shell.js";
-import { initGmRole } from "./gm.js";
+import { initGmRole, isGm } from "./gm.js";
 import { initNotes, applyNotesStateToUI } from "./notes.js";
 import { initTraining, renderTraining } from "./training.js";
 import { initSkills, renderSkills } from "./skills.js";
@@ -67,22 +66,22 @@ let obrReady = false;
 let _lastSaveTooltip = "No save yet.";
 
 // ── GM SHEET VIEW ─────────────────────────────────────────────────────────────
-// When GM drills into a member's sheet, we swap `state` temporarily ONLY for
-// rendering, then swap it back before the call stack returns. `scheduleSave`
-// checks `_gmViewing` and skips saves while a member sheet is active.
-let _gmViewing = false;
+// _gmState holds a member's full state while the GM views their sheet.
+// All renderers call getActiveState() instead of reading `state` directly.
+// The global `state` (own sheet) is NEVER modified or swapped.
+let _gmState = null;
+
+function getActiveState() {
+  return _gmState !== null ? _gmState : state;
+}
 
 function applySheetState(fullState) {
-  _gmViewing = true;
-  const own = state;
-  state = fullState;
+  _gmState = fullState;
   _applyStateToUI();
-  state = own;
-  // Keep _gmViewing true so scheduleSave blocks until exitMemberSheet clears it
 }
 
 function clearSheetState() {
-  _gmViewing = false;
+  _gmState = null;
   _applyStateToUI();
 }
 
@@ -96,7 +95,7 @@ async function loadMemberFullState(snapshot) {
       return mergeLoadedState({ saved, defaultState, centerStats: CENTER_STATS, rightStats: RIGHT_STATS });
     }
   } catch (_) {}
-  // Fallback to slim snapshot merged over defaults so all keys exist
+  // Fallback: slim snapshot merged over defaults so all keys exist
   return mergeLoadedState({ saved: snapshot, defaultState, centerStats: CENTER_STATS, rightStats: RIGHT_STATS });
 }
 
@@ -167,8 +166,8 @@ function getPreferredPlayerName() {
   return sheetPlayerName || owlbearPlayerName || "Unknown Player";
 }
 
-
 function broadcastPartySnapshot() {
+  if (_gmState !== null) return; // never broadcast while viewing a member
   const snapshot = getPartySnapshot();
   try {
     OBR.broadcast.sendMessage(PARTY_BROADCAST_CHANNEL, snapshot, { destination: "REMOTE" });
@@ -177,7 +176,7 @@ function broadcastPartySnapshot() {
 
 const persistence = createPersistenceRuntime({
   storageKeyBase: STORAGE_KEY_BASE,
-  getState: () => state,
+  getState: () => state, // always saves own state, never member state
   getLocalPlayerId: () => localPlayerId,
   onSchedule: () => {
     renderPartyList();
@@ -193,35 +192,37 @@ const persistence = createPersistenceRuntime({
 });
 
 function scheduleSave() {
-  if (_gmViewing) return; // never save while viewing a member's sheet
+  if (_gmState !== null) return; // never save while viewing a member's sheet
   persistence.scheduleSave();
 }
 
 // ── APPLY STATE TO UI ─────────────────────────────────────────────────────────
 function _applyStateToUI() {
+  const s = getActiveState();
+  const viewing = _gmState !== null;
+
   applyCharacterStateToUI();
   applyTechniquesStateToUI();
 
-  // Use side-effect-free renderer during GM view; full version for own sheet
-  if (_gmViewing) {
-    renderArchetypeReadOnly(state);
+  // Safe read-only archetype render during GM view (no mutations/saves)
+  if (viewing) {
+    renderArchetypeReadOnly(s);
   } else {
     applyArchetypeStateToUI();
   }
 
   applyNotesStateToUI();
-  renderTraining(state);
-  renderSkills(state);
+  renderTraining(s);
+  renderSkills(s);
   renderRollHistory();
 
   // Never re-render party list while viewing a member (prevents ghost entries)
-  if (!_gmViewing) renderPartyList();
+  if (!viewing) renderPartyList();
 
   renderInventory();
-  renderCombatTabData(computeCombatTabData(state));
+  renderCombatTabData(computeCombatTabData(s));
 }
 
-// Public alias used outside this module (e.g. after OBR load)
 function applyStateToUI() { _applyStateToUI(); }
 
 // ── TABS ──────────────────────────────────────────────────────────────────────
@@ -241,7 +242,7 @@ async function init() {
   setSaveStatusBadge({ label: "Saving", tooltip: "Waiting for initial load...", pending: true });
 
   initParty({
-    getState: () => state,
+    getState: () => state,       // party snapshot always from own state
     getPreferredPlayerName,
     getLocalPlayerId: () => localPlayerId,
     onOpenSheet: async (snapshot) => {
@@ -255,74 +256,66 @@ async function init() {
   });
 
   initCharacter({
-    getState: () => state,
+    getState: getActiveState,
     scheduleSave,
     showRollToast,
-    refreshCombatTab: () => renderCombatTabData(computeCombatTabData(state)),
-    refreshCombatTab,
+    refreshCombatTab: () => renderCombatTabData(computeCombatTabData(getActiveState())),
   });
 
   initTechniques({
-    getState: () => state,
+    getState: getActiveState,
     scheduleSave,
     refreshCharacterStats: applyCharacterStateToUI,
     showRollToast,
-    refreshCombatTab: () => renderCombatTabData(computeCombatTabData(state)),
-    refreshCombatTab,
+    refreshCombatTab: () => renderCombatTabData(computeCombatTabData(getActiveState())),
   });
 
   initArchetype({
-    getState: () => state,
+    getState: getActiveState,
     scheduleSave,
   });
 
-  // Wire up the rolls module with its dependencies
   initRolls({
-    getState:               () => state,
+    getState: getActiveState,
     scheduleSave,
     getPreferredPlayerName,
   });
 
-  // Inventory
   initInventory({
-    getState: () => state,
+    getState: getActiveState,
     scheduleSave,
     refreshCharacterStats: applyCharacterStateToUI,
     refreshArchetypeState: applyArchetypeStateToUI,
-    // Refresh Combat tab when inventory changes
-    refreshCombatTab: () => {
-      renderCombatTabData(computeCombatTabData(state));
-    },
+    refreshCombatTab: () => renderCombatTabData(computeCombatTabData(getActiveState())),
   });
 
   initNotes({
-    getState: () => state,
+    getState: getActiveState,
     scheduleSave,
   });
 
   initTraining({
-    getState: () => state,
+    getState: getActiveState,
     scheduleSave,
     showRollToast,
-    refreshUI: () => renderTraining(state),
+    refreshUI: () => renderTraining(getActiveState()),
     refreshAll: applyStateToUI,
   });
 
   initSkills({
-    getState: () => state,
+    getState: getActiveState,
     scheduleSave,
-    refreshTraining: () => renderTraining(state),
+    refreshTraining: () => renderTraining(getActiveState()),
     refreshCharacterStats: applyCharacterStateToUI,
   });
 
   initCombat({
-    getState: () => state,
+    getState: getActiveState,
     scheduleSave,
     showRollToast,
   });
 
-  // Re-render training slots whenever grade changes (slot unlock is grade-gated)
-  document.getElementById("gradeSelect")?.addEventListener("change", () => renderTraining(state));
+  document.getElementById("gradeSelect")?.addEventListener("change", () => renderTraining(getActiveState()));
 
   initUiShell({
     activateMainTab,
@@ -330,7 +323,7 @@ async function init() {
     clearGroupRollHistory,
     renderRollHistory,
     switchRollTab,
-    getState: () => state,
+    getState: getActiveState,
     scheduleSave,
     applySheetState,
     clearSheetState,
@@ -345,10 +338,9 @@ async function init() {
       try { localPlayerName = await OBR.player.getName(); } catch (_) { localPlayerName = ""; }
       try { localPlayerId   = await OBR.player.getId();   } catch (_) { localPlayerId   = localPlayerName || null; }
 
-      // Detect GM role and apply layout
+      // Detect GM role
       try { initGmRole(await OBR.player.getRole()); } catch (_) { initGmRole(null); }
       applyGmLayout();
-      if (isGm()) activateMainTab("party");
 
       OBR.broadcast.onMessage(PARTY_BROADCAST_CHANNEL, event => {
         handleIncomingPartySnapshot(event.data);
@@ -374,6 +366,9 @@ async function init() {
         });
         applyStateToUI();
       }
+
+      // Activate party tab AFTER everything is loaded — GM only
+      if (isGm()) activateMainTab("party");
 
       renderPartyList();
       broadcastPartySnapshot();
