@@ -168,8 +168,13 @@ export async function loadStateForPlayer(storageKeyBase, playerId) {
     const meta = await OBR.room.getMetadata();
     const allKeys = Object.keys(meta).filter(k => k.startsWith(storageKeyBase));
     console.log(`[GM loadState] room keys matching base:`, allKeys);
-    roomState = meta[key] || meta[storageKeyBase] || null;
+    // Only use the exact player key — no bare key fallback (that would load the wrong player)
+    roomState = playerId ? (meta[key] || null) : (meta[storageKeyBase] || null);
     console.log(`[GM loadState] roomState found:`, !!roomState, roomState ? `charName="${roomState.charName}"` : "");
+    if (roomState) {
+      console.log(`[GM loadState] techniques.bindingVows:`, roomState.techniques?.bindingVows);
+      console.log(`[GM loadState] archetypeProgress.unlockedAbilityIds:`, roomState.archetypeProgress?.unlockedAbilityIds);
+    }
   } catch (err) {
     console.warn(`[GM loadState] room metadata failed:`, err);
     roomState = null;
@@ -178,11 +183,11 @@ export async function loadStateForPlayer(storageKeyBase, playerId) {
   try {
     const saved = localStorage.getItem(key);
     localState = saved ? JSON.parse(saved) : null;
-    if (!localState) {
-      const oldSaved = localStorage.getItem(storageKeyBase);
-      localState = oldSaved ? JSON.parse(oldSaved) : null;
-    }
     console.log(`[GM loadState] localState found:`, !!localState, localState ? `charName="${localState.charName}"` : "");
+    if (localState) {
+      console.log(`[GM loadState] local techniques.bindingVows:`, localState.techniques?.bindingVows);
+      console.log(`[GM loadState] local archetypeProgress.unlockedAbilityIds:`, localState.archetypeProgress?.unlockedAbilityIds);
+    }
   } catch (_) {
     localState = null;
   }
