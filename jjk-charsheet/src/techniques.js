@@ -1362,6 +1362,8 @@ export function applyTechniquesStateToUI() {
   const state = getState();
   if (!state) return;
 
+  console.log(`[techniques render] charName="${state.charName}" bindingVows=${state.techniques?.bindingVows?.length} applications=${state.techniques?.applications?.length}`);
+
   ensureTechniquesState(state);
 
   const mode = state.techniques.mode;
@@ -1460,42 +1462,27 @@ export function computeCombatApplications(state) {
   if (!state) return [];
   ensureTechniquesState(state);
   const apps = Array.isArray(state.techniques?.applications) ? state.techniques.applications : [];
-
-  return apps
-    .map((raw, idx) => {
-      const app = normalizeApplication(raw, idx);
-      const hasDamage = Array.isArray(app.damageParts) && app.damageParts.some(p => p.die && parseInt(p.count) > 0);
-      if (!hasDamage) return null;
-
-      const scaled   = getScaledApplicationValues(app);
-      const ceCost   = getAppCeCostOverride(state, idx, scaled.ceCost);
-      const dc       = getAppDcOverride(state, idx, scaled.dc);
-      const btnState = getApplicationButtonState(state, idx);
-
-      let rangeSummary;
-      if      (app.rangeType === "melee") rangeSummary = "Melee";
-      else if (app.rangeType === "range") rangeSummary = app.rangeValue || "—";
-      else if (app.rangeType === "aoe")   rangeSummary = `${getAoeShapeLabel(app.aoeShape)} ${app.aoeSize || ""}`.trim();
-      else                                rangeSummary = "Self";
-
-      return {
-        idx,
-        title:              app.title,
-        effect:             app.effect,
-        ceCost,
-        dc,
-        rangeSummary,
-        damageParts:        app.damageParts        || [],
-        scalingDamageParts: app.scalingDamageParts || [],
-        scalingEnabled:     !!app.scalingEnabled,
-        currentStep:        scaled.currentStep,
-        isAutoPass:         btnState.isAutoPass,
-        isDisabled:         btnState.disabled,
-        rollMode:           btnState.rollMode,
-        tooltip:            btnState.tooltip,
-      };
-    })
-    .filter(Boolean);
+  return apps.map((raw, idx) => {
+    const app = normalizeApplication(raw, idx);
+    const hasDamage = Array.isArray(app.damageParts) && app.damageParts.some(p => p.die && parseInt(p.count) > 0);
+    if (!hasDamage) return null;
+    const scaled   = getScaledApplicationValues(app);
+    const ceCost   = getAppCeCostOverride(state, idx, scaled.ceCost);
+    const dc       = getAppDcOverride(state, idx, scaled.dc);
+    const btnState = getApplicationButtonState(state, idx);
+    let rangeSummary;
+    if      (app.rangeType === "melee") rangeSummary = "Melee";
+    else if (app.rangeType === "range") rangeSummary = app.rangeValue || "—";
+    else if (app.rangeType === "aoe")   rangeSummary = `${getAoeShapeLabel(app.aoeShape)} ${app.aoeSize || ""}`.trim();
+    else                                rangeSummary = "Self";
+    return {
+      idx, title: app.title, effect: app.effect, ceCost, dc, rangeSummary,
+      damageParts: app.damageParts || [], scalingDamageParts: app.scalingDamageParts || [],
+      scalingEnabled: !!app.scalingEnabled, currentStep: scaled.currentStep,
+      isAutoPass: btnState.isAutoPass, isDisabled: btnState.disabled,
+      rollMode: btnState.rollMode, tooltip: btnState.tooltip,
+    };
+  }).filter(Boolean);
 }
 
 export function castApplicationFromCombat(state, appIndex) {
@@ -1519,7 +1506,6 @@ export function castApplicationFromCombat(state, appIndex) {
 
 export function rollApplicationDamageForCombat(state, appIndex) {
   if (!state) return;
-  // aggregateDice:true merges same-die groups in the toast
   rollDamageForApplication(state, appIndex, { aggregateDice: true });
 }
 
@@ -1530,7 +1516,7 @@ export function stepApplicationForCombat(state, appIndex, delta) {
   if (!app || !app.scalingEnabled) return;
   app.currentStep = Math.max(0, parseNonNegativeInt(app.currentStep) + delta);
   syncApplicationButtonStates(state);
-  if (_refreshCombatTab) _refreshCombatTab();
+  applyTechniquesStateToUI();
   if (_scheduleSave) _scheduleSave();
 }
 

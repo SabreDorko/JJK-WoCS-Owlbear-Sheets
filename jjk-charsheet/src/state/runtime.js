@@ -76,18 +76,23 @@ export function createPersistenceRuntime({
 
     state.__savedAt = Date.now();
     let wroteRoom = false;
+    const key = getStorageKey();
+
+    console.log(`[save] key="${key}" charName="${state.charName}" bindingVows=${state.techniques?.bindingVows?.length} unlockedIds=${state.archetypeProgress?.unlockedAbilityIds?.length}`);
 
     try {
-      await OBR.room.setMetadata({ [getStorageKey()]: state });
+      await OBR.room.setMetadata({ [key]: state });
       wroteRoom = true;
-    } catch (_) {
-      // Keep going and persist local backup below.
+      console.log(`[save] room write OK key="${key}"`);
+    } catch (err) {
+      console.error(`[save] room write FAILED key="${key}"`, err);
     }
 
     try {
-      localStorage.setItem(getStorageKey(), JSON.stringify(state));
-    } catch (_) {
-      // Ignore local backup write failures.
+      localStorage.setItem(key, JSON.stringify(state));
+      console.log(`[save] localStorage write OK key="${key}"`);
+    } catch (err) {
+      console.error(`[save] localStorage write FAILED`, err);
     }
 
     if (onAfterSave) {
@@ -152,13 +157,8 @@ export function createPersistenceRuntime({
   };
 }
 
-/**
- * Load the saved state for any player by their OBR player ID,
- * using the exact same room+local logic as the player's own loadState.
- */
 export async function loadStateForPlayer(storageKeyBase, playerId) {
   const key = playerId ? `${storageKeyBase}-${playerId}` : storageKeyBase;
-
   console.log(`[GM loadState] playerId="${playerId}" key="${key}"`);
 
   let roomState  = null;
@@ -168,7 +168,6 @@ export async function loadStateForPlayer(storageKeyBase, playerId) {
     const meta = await OBR.room.getMetadata();
     const allKeys = Object.keys(meta).filter(k => k.startsWith(storageKeyBase));
     console.log(`[GM loadState] room keys matching base:`, allKeys);
-    // Only use the exact player key — no bare key fallback (that would load the wrong player)
     roomState = playerId ? (meta[key] || null) : (meta[storageKeyBase] || null);
     console.log(`[GM loadState] roomState found:`, !!roomState, roomState ? `charName="${roomState.charName}"` : "");
     if (roomState) {
@@ -200,7 +199,7 @@ export async function loadStateForPlayer(storageKeyBase, playerId) {
   if (!localState) return roomState;
   const roomTs  = parseInt(roomState?.__savedAt,  10) || 0;
   const localTs = parseInt(localState?.__savedAt, 10) || 0;
-  const picked = roomTs > localTs ? roomState : localState;
+  const picked  = roomTs > localTs ? roomState : localState;
   console.log(`[GM loadState] picked source: ${roomTs > localTs ? "room" : "local"}, charName="${picked.charName}"`);
   return picked;
 }
