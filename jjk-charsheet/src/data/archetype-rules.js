@@ -724,7 +724,7 @@ export const ARCHETYPE_RULES = {
       "power",
     ],
     startingEquipment: [
-      "Hero/Business Suit (Body): This high class or heroic suit grants you +1 AC and +1 Fortitude.",
+      "Hero Suit/Business Suit (Body): This high class or heroic suit grants you +1 AC and +1 Fortitude.",
       "Professional Glasses (Accessory): These fashionable glasses give +2 Insight."
     ],
     sharedAbilities: [

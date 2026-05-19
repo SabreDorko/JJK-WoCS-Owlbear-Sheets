@@ -36,7 +36,7 @@
     "description": "Rugged uniform for close combat. Grants +1 AC and +1 Strength. Can be torn off for advantage on one Intimidation roll.",
     "modifiers": [
       { "kind": "ac", "value": 1 },
-      { "kind": "stat", "statKey": "power", "skillIndex": 5, "value": 1 }
+      { "kind": "stat", "statKey": "power", "skillIndex": 4, "value": 1 }
     ],
     "aliases": ["tearaway uniform"],
     "stackable": false
@@ -126,8 +126,8 @@
     "slotsNeeded": 2,
     "description": "Athletic wear optimized for speed.",
     "modifiers": [
-      { "kind": "skill", "statKey": "speed", "skillIndex": 4, "value": 1 },
-      { "kind": "skill", "statKey": "technique", "skillIndex": 1, "value": 1 },
+      { "kind": "skill", "statKey": "speed", "skillIndex": 3, "value": 1 },
+      { "kind": "skill", "statKey": "technique", "skillIndex": 0, "value": 1 },
       { "kind": "movement", "value": 5 }
     ],
     "aliases": ["running gear"],
@@ -258,7 +258,7 @@
     "description": "Formal combat-ready attire.",
     "modifiers": [
       { "kind": "ac", "value": 1 },
-      { "kind": "skill", "statKey": "power", "skillIndex": 3, "value": 1 }
+      { "kind": "skill", "statKey": "power", "skillIndex": 2, "value": 1 }
     ],
     "aliases": ["hero/business suit", "hero suit", "business suit"],
     "stackable": false
@@ -270,7 +270,7 @@
     "allowedSlots": ["accessory"],
     "slotsNeeded": 1,
     "description": "Stylish glasses for tactical reads.",
-    "modifiers": [{ "kind": "skill", "statKey": "cooperation", "skillIndex": 4, "value": 2 }],
+    "modifiers": [{ "kind": "skill", "statKey": "cooperation", "skillIndex": 3, "value": 2 }],
     "aliases": ["professional glasses"],
     "stackable": false
   },
