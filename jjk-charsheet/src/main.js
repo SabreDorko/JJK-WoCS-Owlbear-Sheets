@@ -13,6 +13,7 @@ import {
 import {
   createPersistenceRuntime,
   mergeLoadedState,
+  loadStateForPlayer,
 } from "./state/runtime.js";
 
 import { initInventory, renderInventory } from "./inventory.js";
@@ -87,44 +88,11 @@ function clearSheetState() {
 }
 
 async function loadMemberFullState(snapshot) {
-  const memberId   = snapshot.playerId;
-  const memberName = snapshot.playerName || "";
-
-  try {
-    const meta = await OBR.room.getMetadata();
-    const allKeys = Object.keys(meta);
-
-    // Build a list of candidate keys in priority order
-    const exactCandidates = [
-      memberId ? `${STORAGE_KEY_BASE}-${memberId}` : null,
-      memberName ? `${STORAGE_KEY_BASE}-${memberName}` : null,
-      STORAGE_KEY_BASE,
-    ].filter(Boolean);
-
-    // Try exact matches first
-    for (const key of exactCandidates) {
-      const saved = meta[key];
-      if (saved && typeof saved === "object" && saved.charName) {
-        return mergeLoadedState({ saved, defaultState, centerStats: CENTER_STATS, rightStats: RIGHT_STATS });
-      }
-    }
-
-    // Fuzzy scan: find any jjk key whose charName or playerName matches the snapshot
-    const fuzzyMatch = allKeys
-      .filter(k => k.startsWith(STORAGE_KEY_BASE))
-      .map(k => meta[k])
-      .filter(v => v && typeof v === "object")
-      .find(v =>
-        (v.charName  && v.charName  === snapshot.charName)  ||
-        (v.playerName && v.playerName === memberName)
-      );
-
-    if (fuzzyMatch) {
-      return mergeLoadedState({ saved: fuzzyMatch, defaultState, centerStats: CENTER_STATS, rightStats: RIGHT_STATS });
-    }
-  } catch (_) {}
-
-  // Last resort: slim snapshot merged over defaults
+  const saved = await loadStateForPlayer(STORAGE_KEY_BASE, snapshot.playerId);
+  if (saved) {
+    return mergeLoadedState({ saved, defaultState, centerStats: CENTER_STATS, rightStats: RIGHT_STATS });
+  }
+  // Fallback: build from slim snapshot so at least name/grade/archetype show
   return mergeLoadedState({ saved: snapshot, defaultState, centerStats: CENTER_STATS, rightStats: RIGHT_STATS });
 }
 
