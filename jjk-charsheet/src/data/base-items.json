@@ -260,7 +260,7 @@
       { "kind": "ac", "value": 1 },
       { "kind": "skill", "statKey": "power", "skillIndex": 2, "value": 1 }
     ],
-    "aliases": ["hero/business suit", "hero suit", "business suit"],
+    "aliases": ["hero suit", "business suit"],
     "stackable": false
   },
   {
