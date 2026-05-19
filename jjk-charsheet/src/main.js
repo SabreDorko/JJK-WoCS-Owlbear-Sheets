@@ -87,27 +87,45 @@ function clearSheetState() {
 }
 
 async function loadMemberFullState(snapshot) {
-  const memberId = snapshot.playerId;
-  const key = memberId ? `${STORAGE_KEY_BASE}-${memberId}` : STORAGE_KEY_BASE;
+  const memberId   = snapshot.playerId;
+  const memberName = snapshot.playerName || "";
+
   try {
     const meta = await OBR.room.getMetadata();
-    const saved = meta[key];
-    if (saved && typeof saved === "object") {
-      return mergeLoadedState({
-        saved,
-        defaultState,
-        centerStats: CENTER_STATS,
-        rightStats:  RIGHT_STATS,
-      });
+    const allKeys = Object.keys(meta);
+
+    // Build a list of candidate keys in priority order
+    const exactCandidates = [
+      memberId ? `${STORAGE_KEY_BASE}-${memberId}` : null,
+      memberName ? `${STORAGE_KEY_BASE}-${memberName}` : null,
+      STORAGE_KEY_BASE,
+    ].filter(Boolean);
+
+    // Try exact matches first
+    for (const key of exactCandidates) {
+      const saved = meta[key];
+      if (saved && typeof saved === "object" && saved.charName) {
+        return mergeLoadedState({ saved, defaultState, centerStats: CENTER_STATS, rightStats: RIGHT_STATS });
+      }
+    }
+
+    // Fuzzy scan: find any jjk key whose charName or playerName matches the snapshot
+    const fuzzyMatch = allKeys
+      .filter(k => k.startsWith(STORAGE_KEY_BASE))
+      .map(k => meta[k])
+      .filter(v => v && typeof v === "object")
+      .find(v =>
+        (v.charName  && v.charName  === snapshot.charName)  ||
+        (v.playerName && v.playerName === memberName)
+      );
+
+    if (fuzzyMatch) {
+      return mergeLoadedState({ saved: fuzzyMatch, defaultState, centerStats: CENTER_STATS, rightStats: RIGHT_STATS });
     }
   } catch (_) {}
-  // Fallback: slim snapshot merged over defaults so all keys exist
-  return mergeLoadedState({
-    saved:        snapshot,
-    defaultState,
-    centerStats:  CENTER_STATS,
-    rightStats:   RIGHT_STATS,
-  });
+
+  // Last resort: slim snapshot merged over defaults
+  return mergeLoadedState({ saved: snapshot, defaultState, centerStats: CENTER_STATS, rightStats: RIGHT_STATS });
 }
 
 // ── EXPOSE GLOBALS ────────────────────────────────────────────────────────────
