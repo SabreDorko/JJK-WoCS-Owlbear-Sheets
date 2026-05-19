@@ -472,8 +472,8 @@ function rollDamageForApplication(state, applicationIndex, { aggregateDice = fal
   let outputBonus = 0, outputBreakdown = null, outputRolls = [];
   if (normalized.addOutput) {
     const outputLevel = Math.max(1, Math.min(3, parseInt(state.outputLevel, 10) || 1));
-    if (outputLevel === 1)      { outputBonus = Math.floor(Math.random() * 4) + 1;         outputBreakdown = "1d4"; outputRolls = [outputBonus]; }
-    else if (outputLevel === 2) { outputBonus = Math.floor(Math.random() * 4) + 1 + 2;     outputBreakdown = "1d4+2"; outputRolls = [outputBonus - 2, 2]; }
+    if (outputLevel === 1)      { outputBonus = Math.floor(Math.random() * 4) + 1;         outputBreakdown = "1d4"; }
+    else if (outputLevel === 2) { outputBonus = Math.floor(Math.random() * 4) + 1 + 2;     outputBreakdown = "1d4+2"; }
     else {
       outputRolls = [Math.floor(Math.random() * 4) + 1, Math.floor(Math.random() * 4) + 1];
       outputBonus = outputRolls.reduce((a, b) => a + b, 0);
@@ -490,13 +490,8 @@ function rollDamageForApplication(state, applicationIndex, { aggregateDice = fal
   const damageTotal = damageResults.reduce((sum, r) => sum + r.total, 0) + outputBonus + techniqueLevelBonus;
 
   const dieGroups = damageResults.map(r => ({ label: `${r.count}${r.die}`, rolls: r.rolls, total: r.total }));
-  // Show Output and Technique Level bonuses as separate lines in the breakdown
-  if (normalized.addOutput && outputBonus) {
-    dieGroups.push({ label: `Output (${outputBreakdown})`, rolls: outputRolls, total: outputBonus });
-  }
-  if (normalized.addTechniqueLevel && techniqueLevelBonus) {
-    dieGroups.push({ label: "Technique Level", rolls: [`+${techScore}`], total: techniqueLevelBonus });
-  }
+  if (normalized.addOutput && outputBonus)           dieGroups.push({ label: `Output (${outputBreakdown})`, rolls: outputRolls, total: outputBonus });
+  if (normalized.addTechniqueLevel && techniqueLevelBonus) dieGroups.push({ label: "Technique Level", rolls: [`+${techScore}`], total: techniqueLevelBonus });
 
   const breakdown = { skillModifier: 0, die: damageResults[0]?.die || "d6", dieGroups, total: damageTotal };
 
@@ -1457,7 +1452,6 @@ function saveTechniqueEditing() {
   refreshCharacterStats();
   applyTechniquesStateToUI();
   scheduleSave();
-  if (typeof window.refreshCombatTab === "function") window.refreshCombatTab();
 }
 
 // ─── Combat tab integration ────────────────────────────────────────────────────
@@ -1683,10 +1677,7 @@ export function initTechniques({ getState: getStateFn, scheduleSave: scheduleSav
         _expandedAppIndices.delete(idx);
         if (_pendingNewApplicationIndex === idx) _pendingNewApplicationIndex = null;
         const state = getState();
-        if (state) {
-          refreshApplicationCards(state);
-          if (typeof window.refreshCombatTab === "function") window.refreshCombatTab();
-        }
+        if (state) refreshApplicationCards(state);
         return;
       }
 
@@ -1733,7 +1724,6 @@ export function initTechniques({ getState: getStateFn, scheduleSave: scheduleSav
           state.techniques.applications[idx].currentStep = Math.max(0, normalized.currentStep - 1);
           syncApplicationButtonStates(state);
           scheduleSave();
-          if (typeof window.refreshCombatTab === "function") window.refreshCombatTab();
         }
         return;
       }
@@ -1748,7 +1738,6 @@ export function initTechniques({ getState: getStateFn, scheduleSave: scheduleSav
           state.techniques.applications[idx].currentStep = normalized.currentStep + 1;
           syncApplicationButtonStates(state);
           scheduleSave();
-          if (typeof window.refreshCombatTab === "function") window.refreshCombatTab();
         }
         return;
       }
@@ -1901,7 +1890,6 @@ export function initTechniques({ getState: getStateFn, scheduleSave: scheduleSav
         if (app && Array.isArray(app.scalingDamageParts) && app.scalingDamageParts[partIdx]) {
           app.scalingDamageParts[partIdx].count = Math.max(1, parseInt(e.target.value, 10) || 1);
           scheduleSave();
-          if (typeof window.refreshCombatTab === "function") window.refreshCombatTab();
         }
         return;
       }
@@ -1914,7 +1902,6 @@ export function initTechniques({ getState: getStateFn, scheduleSave: scheduleSav
           const raw = e.target.value.replace(/[^0-9]/g, "") || "6";
           app.scalingDamageParts[partIdx].die = `d${raw}`;
           scheduleSave();
-          if (typeof window.refreshCombatTab === "function") window.refreshCombatTab();
         }
         return;
       }
@@ -1930,15 +1917,10 @@ export function initTechniques({ getState: getStateFn, scheduleSave: scheduleSav
         appAoeSizeInline: (idx, v) => { if (state.techniques.applications[idx]) state.techniques.applications[idx].aoeSize = String(v || "").trim(); },
         appEffectInline: (idx, v) => { if (state.techniques.applications[idx]) state.techniques.applications[idx].effect = String(v || ""); },
       };
-      let scalingChanged = false;
       for (const [key, handler] of Object.entries(inlineMap)) {
-        if (ds[key] !== undefined) {
-          handler(parseNonNegativeInt(ds[key]), e.target.value);
-          if (key === "appScalingCeInline" || key === "appScalingDcInline") scalingChanged = true;
-        }
+        if (ds[key] !== undefined) handler(parseNonNegativeInt(ds[key]), e.target.value);
       }
       scheduleSave();
-      if (scalingChanged && typeof window.refreshCombatTab === "function") window.refreshCombatTab();
     });
 
     summaryGrid.addEventListener("change", e => {
@@ -1953,7 +1935,6 @@ export function initTechniques({ getState: getStateFn, scheduleSave: scheduleSav
           state.techniques.applications[idx].scalingEnabled = Boolean(e.target.checked);
           if (!state.techniques.applications[idx].scalingEnabled) state.techniques.applications[idx].currentStep = 0;
           refreshApplicationCards(state);
-          if (typeof window.refreshCombatTab === "function") window.refreshCombatTab();
         }
         scheduleSave(); return;
       }

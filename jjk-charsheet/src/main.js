@@ -201,6 +201,10 @@ function _applyStateToUI() {
   const viewing = _gmState !== null;
 
   console.log(`[GM render] viewing=${viewing} charName="${s?.charName}" techniques.mode="${s?.techniques?.mode}" bindingVows=${s?.techniques?.bindingVows?.length} archetypeProgress.unlockedAbilityIds=${s?.archetypeProgress?.unlockedAbilityIds?.length}`);
+  if (!viewing && _viewedPlayerId) {
+    // We have a viewed player but _gmState is null — something cleared it unexpectedly
+    console.trace("[GM render] _gmState was cleared unexpectedly");
+  }
 
   // All of these read state via their _getState closure = getActiveState
   applyCharacterStateToUI();
