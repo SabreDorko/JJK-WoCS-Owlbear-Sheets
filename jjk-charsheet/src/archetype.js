@@ -133,8 +133,9 @@ function getStarterItemDisplayName(line, fallbackName = "Starter Item") {
 function buildStarterItemFromLine(line) {
   const template = resolveBaseItemTemplateByStartingEquipmentLine(line);
   if (template) {
+    // Always use the canonical name from the template, not the input alias
     const item = buildInventoryItemFromBaseTemplate(template);
-    item.name = getStarterItemDisplayName(line, item.name);
+    // item.name is already set to template.name in buildInventoryItemFromBaseTemplate
     return item;
   }
 
