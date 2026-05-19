@@ -151,3 +151,51 @@ export function createPersistenceRuntime({
     scheduleSave,
   };
 }
+
+/**
+ * Load the saved state for any player by their OBR player ID,
+ * using the exact same room+local logic as the player's own loadState.
+ */
+export async function loadStateForPlayer(storageKeyBase, playerId) {
+  const key = playerId ? `${storageKeyBase}-${playerId}` : storageKeyBase;
+
+  console.log(`[GM loadState] playerId="${playerId}" key="${key}"`);
+
+  let roomState  = null;
+  let localState = null;
+
+  try {
+    const meta = await OBR.room.getMetadata();
+    const allKeys = Object.keys(meta).filter(k => k.startsWith(storageKeyBase));
+    console.log(`[GM loadState] room keys matching base:`, allKeys);
+    roomState = meta[key] || meta[storageKeyBase] || null;
+    console.log(`[GM loadState] roomState found:`, !!roomState, roomState ? `charName="${roomState.charName}"` : "");
+  } catch (err) {
+    console.warn(`[GM loadState] room metadata failed:`, err);
+    roomState = null;
+  }
+
+  try {
+    const saved = localStorage.getItem(key);
+    localState = saved ? JSON.parse(saved) : null;
+    if (!localState) {
+      const oldSaved = localStorage.getItem(storageKeyBase);
+      localState = oldSaved ? JSON.parse(oldSaved) : null;
+    }
+    console.log(`[GM loadState] localState found:`, !!localState, localState ? `charName="${localState.charName}"` : "");
+  } catch (_) {
+    localState = null;
+  }
+
+  if (!roomState && !localState) {
+    console.warn(`[GM loadState] no state found for playerId="${playerId}"`);
+    return null;
+  }
+  if (!roomState) return localState;
+  if (!localState) return roomState;
+  const roomTs  = parseInt(roomState?.__savedAt,  10) || 0;
+  const localTs = parseInt(localState?.__savedAt, 10) || 0;
+  const picked = roomTs > localTs ? roomState : localState;
+  console.log(`[GM loadState] picked source: ${roomTs > localTs ? "room" : "local"}, charName="${picked.charName}"`);
+  return picked;
+}
