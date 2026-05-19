@@ -20,7 +20,8 @@ import {
   initCombat,
   computeCombatTabData,
   renderCombatTabData,
-  refreshCombatTab } from "./combat.js";
+  refreshCombatTab,
+} from "./combat.js";
 import {
   initCharacter,
   applyCharacterStateToUI,
@@ -40,11 +41,9 @@ import {
   renderPartyList,
   handleIncomingPartySnapshot,
 } from "./party.js";
-
 import {
   initRolls,
   showRollToast,
-  pushRollHistory,
   renderRollHistory,
   switchRollTab,
   getActiveRollTab,
@@ -60,16 +59,16 @@ import { initSkills, renderSkills } from "./skills.js";
 
 // ── RUNTIME STATE ─────────────────────────────────────────────────────────────
 let state           = defaultState();
-let localPlayerId = null;
+let localPlayerId   = null;
 let localPlayerName = "";
-let obrReady = false;
+let obrReady        = false;
 let _lastSaveTooltip = "No save yet.";
 
 // ── GM SHEET VIEW ─────────────────────────────────────────────────────────────
 // _gmState holds a member's full state while the GM views their sheet.
-// All renderers call getActiveState() instead of reading `state` directly.
-// The global `state` (own sheet) is NEVER modified or swapped.
-let _gmState = null;
+// All module closures receive getActiveState so they automatically read the
+// right state. The global `state` (GM's own sheet) is never modified.
+let _gmState        = null;
 let _viewedPlayerId = null;
 
 function getActiveState() {
@@ -82,7 +81,7 @@ function applySheetState(fullState) {
 }
 
 function clearSheetState() {
-  _gmState = null;
+  _gmState        = null;
   _viewedPlayerId = null;
   _applyStateToUI();
 }
@@ -94,36 +93,46 @@ async function loadMemberFullState(snapshot) {
     const meta = await OBR.room.getMetadata();
     const saved = meta[key];
     if (saved && typeof saved === "object") {
-      return mergeLoadedState({ saved, defaultState, centerStats: CENTER_STATS, rightStats: RIGHT_STATS });
+      return mergeLoadedState({
+        saved,
+        defaultState,
+        centerStats: CENTER_STATS,
+        rightStats:  RIGHT_STATS,
+      });
     }
   } catch (_) {}
   // Fallback: slim snapshot merged over defaults so all keys exist
-  return mergeLoadedState({ saved: snapshot, defaultState, centerStats: CENTER_STATS, rightStats: RIGHT_STATS });
+  return mergeLoadedState({
+    saved:        snapshot,
+    defaultState,
+    centerStats:  CENTER_STATS,
+    rightStats:   RIGHT_STATS,
+  });
 }
 
-// Expose for combat tab input handlers
-if (typeof window !== 'undefined') {
-  window.scheduleSave = scheduleSave;
-  window.refreshCombatTab = refreshCombatTab;
+// ── EXPOSE GLOBALS ────────────────────────────────────────────────────────────
+if (typeof window !== "undefined") {
+  window.scheduleSave            = () => scheduleSave();
+  window.refreshCombatTab        = refreshCombatTab;
   window.applyCharacterStateToUI = applyCharacterStateToUI;
 }
 
+// ── SAVE STATUS ───────────────────────────────────────────────────────────────
 function formatSavedAt(savedAt) {
   const parsed = parseInt(savedAt, 10);
   if (!Number.isFinite(parsed) || parsed <= 0) return "Never";
-  const dt = new Date(parsed);
-  return dt.toLocaleTimeString([], { hour: "numeric", minute: "2-digit", second: "2-digit" });
+  return new Date(parsed).toLocaleTimeString([], { hour: "numeric", minute: "2-digit", second: "2-digit" });
 }
 
 function getSaveSourceLabel(source) {
   if (source === "room+local") return "Room + Local";
-  if (source === "room") return "Room";
-  if (source === "local") return "Local";
+  if (source === "room")       return "Room";
+  if (source === "local")      return "Local";
   return "Unknown";
 }
 
 function setSaveStatusBadge({ label, tooltip, pending = false, error = false }) {
-  const badge = document.getElementById("saveStatusBadge");
+  const badge   = document.getElementById("saveStatusBadge");
   const labelEl = document.getElementById("saveStatusLabel");
   if (!badge) return;
   if (labelEl) labelEl.textContent = label;
@@ -132,7 +141,7 @@ function setSaveStatusBadge({ label, tooltip, pending = false, error = false }) 
   badge.title = title;
   badge.setAttribute("aria-label", `${label}. ${title}`);
   badge.classList.toggle("is-pending", Boolean(pending));
-  badge.classList.toggle("is-error", Boolean(error));
+  badge.classList.toggle("is-error",   Boolean(error));
 }
 
 function showSavePendingStatus() {
@@ -143,7 +152,7 @@ function showSavePendingStatus() {
 }
 
 function showSavedStatus(info) {
-  const timeText = formatSavedAt(info?.savedAt);
+  const timeText   = formatSavedAt(info?.savedAt);
   const sourceText = getSaveSourceLabel(info?.source);
   _lastSaveTooltip = `Last saved: ${timeText}\nSource: ${sourceText}`;
   setSaveStatusBadge({ label: "Saved", tooltip: _lastSaveTooltip });
@@ -155,30 +164,31 @@ function showLoadedStatus(info) {
     setSaveStatusBadge({ label: "Unsaved", tooltip: _lastSaveTooltip, error: true });
     return;
   }
-
-  const timeText = formatSavedAt(info?.savedAt);
+  const timeText   = formatSavedAt(info?.savedAt);
   const sourceText = getSaveSourceLabel(info?.source);
   _lastSaveTooltip = `Loaded save: ${timeText}\nSource: ${sourceText}`;
   setSaveStatusBadge({ label: "Saved", tooltip: _lastSaveTooltip });
 }
 
 function getPreferredPlayerName() {
-  const sheetPlayerName = (state.playerName || "").trim();
-  const owlbearPlayerName = (localPlayerName || "").trim();
+  const sheetPlayerName   = (state.playerName  || "").trim();
+  const owlbearPlayerName = (localPlayerName   || "").trim();
   return sheetPlayerName || owlbearPlayerName || "Unknown Player";
 }
 
 function broadcastPartySnapshot() {
-  if (_gmState !== null) return; // never broadcast while viewing a member
+  // Never broadcast while viewing a member — would overwrite own snapshot
+  if (_gmState !== null) return;
   const snapshot = getPartySnapshot();
   try {
     OBR.broadcast.sendMessage(PARTY_BROADCAST_CHANNEL, snapshot, { destination: "REMOTE" });
   } catch (_) { /* outside OBR */ }
 }
 
+// ── PERSISTENCE ───────────────────────────────────────────────────────────────
 const persistence = createPersistenceRuntime({
-  storageKeyBase: STORAGE_KEY_BASE,
-  getState: () => state, // always saves own state, never member state
+  storageKeyBase:  STORAGE_KEY_BASE,
+  getState:        () => state,      // always persists GM's own state
   getLocalPlayerId: () => localPlayerId,
   onSchedule: () => {
     renderPartyList();
@@ -194,19 +204,21 @@ const persistence = createPersistenceRuntime({
 });
 
 function scheduleSave() {
-  if (_gmState !== null) return; // never save while viewing a member's sheet
+  // Never save while viewing a member's sheet
+  if (_gmState !== null) return;
   persistence.scheduleSave();
 }
 
 // ── APPLY STATE TO UI ─────────────────────────────────────────────────────────
 function _applyStateToUI() {
-  const s = getActiveState();
+  const s       = getActiveState();
   const viewing = _gmState !== null;
 
+  // All of these read state via their _getState closure = getActiveState
   applyCharacterStateToUI();
   applyTechniquesStateToUI();
 
-  // Safe read-only archetype render during GM view (no mutations/saves)
+  // Use side-effect-free render when viewing a member (no mutations, no saves)
   if (viewing) {
     renderArchetypeReadOnly(s);
   } else {
@@ -244,10 +256,10 @@ async function init() {
   setSaveStatusBadge({ label: "Saving", tooltip: "Waiting for initial load...", pending: true });
 
   initParty({
-    getState: () => state,       // party snapshot always from own state
+    getState:              () => state,      // snapshot always from own state
     getPreferredPlayerName,
-    getLocalPlayerId: () => localPlayerId,
-    isGm: () => isGm(),
+    getLocalPlayerId:      () => localPlayerId,
+    isGm:                  () => isGm(),
     onOpenSheet: async (snapshot) => {
       _viewedPlayerId = snapshot.playerId;
       const fullState = await loadMemberFullState(snapshot);
@@ -258,6 +270,7 @@ async function init() {
       );
     },
     onMemberUpdate: async (snapshot) => {
+      // Refresh GM view when the viewed member broadcasts a state change
       if (_gmState === null || snapshot.playerId !== _viewedPlayerId) return;
       const fullState = await loadMemberFullState(snapshot);
       _gmState = fullState;
@@ -266,14 +279,14 @@ async function init() {
   });
 
   initCharacter({
-    getState: getActiveState,
+    getState:       getActiveState,
     scheduleSave,
     showRollToast,
     refreshCombatTab: () => renderCombatTabData(computeCombatTabData(getActiveState())),
   });
 
   initTechniques({
-    getState: getActiveState,
+    getState:              getActiveState,
     scheduleSave,
     refreshCharacterStats: applyCharacterStateToUI,
     showRollToast,
@@ -281,18 +294,18 @@ async function init() {
   });
 
   initArchetype({
-    getState: getActiveState,
+    getState:  getActiveState,
     scheduleSave,
   });
 
   initRolls({
-    getState: getActiveState,
+    getState:              getActiveState,
     scheduleSave,
     getPreferredPlayerName,
   });
 
   initInventory({
-    getState: getActiveState,
+    getState:              getActiveState,
     scheduleSave,
     refreshCharacterStats: applyCharacterStateToUI,
     refreshArchetypeState: applyArchetypeStateToUI,
@@ -300,32 +313,33 @@ async function init() {
   });
 
   initNotes({
-    getState: getActiveState,
+    getState:  getActiveState,
     scheduleSave,
   });
 
   initTraining({
-    getState: getActiveState,
+    getState:   getActiveState,
     scheduleSave,
     showRollToast,
-    refreshUI: () => renderTraining(getActiveState()),
+    refreshUI:  () => renderTraining(getActiveState()),
     refreshAll: applyStateToUI,
   });
 
   initSkills({
-    getState: getActiveState,
+    getState:              getActiveState,
     scheduleSave,
-    refreshTraining: () => renderTraining(getActiveState()),
+    refreshTraining:       () => renderTraining(getActiveState()),
     refreshCharacterStats: applyCharacterStateToUI,
   });
 
   initCombat({
-    getState: getActiveState,
+    getState:  getActiveState,
     scheduleSave,
     showRollToast,
   });
 
-  document.getElementById("gradeSelect")?.addEventListener("change", () => renderTraining(getActiveState()));
+  document.getElementById("gradeSelect")
+    ?.addEventListener("change", () => renderTraining(getActiveState()));
 
   initUiShell({
     activateMainTab,
@@ -333,7 +347,7 @@ async function init() {
     clearGroupRollHistory,
     renderRollHistory,
     switchRollTab,
-    getState: getActiveState,
+    getState:        getActiveState,
     scheduleSave,
     applySheetState,
     clearSheetState,
@@ -341,14 +355,14 @@ async function init() {
 
   renderPartyList();
 
-  // OBR init
+  // ── OBR ──────────────────────────────────────────────────────────────────
   try {
     await OBR.onReady(async () => {
       obrReady = true;
       try { localPlayerName = await OBR.player.getName(); } catch (_) { localPlayerName = ""; }
       try { localPlayerId   = await OBR.player.getId();   } catch (_) { localPlayerId   = localPlayerName || null; }
 
-      // Detect GM role
+      // Detect GM role — must happen before applyGmLayout
       try { initGmRole(await OBR.player.getRole()); } catch (_) { initGmRole(null); }
       applyGmLayout();
 
@@ -365,24 +379,28 @@ async function init() {
         state.playerName      = localPlayerName;
       }
 
-      // Load saved state
+      // Load own state
       const saved = await persistence.loadState();
       if (saved) {
         state = mergeLoadedState({
           saved,
           defaultState,
           centerStats: CENTER_STATS,
-          rightStats: RIGHT_STATS,
+          rightStats:  RIGHT_STATS,
         });
         applyStateToUI();
       }
 
-      // Activate party tab AFTER everything is loaded — GM only
+      // Activate Party tab AFTER everything is loaded — GM only
       if (isGm()) activateMainTab("party");
 
       renderPartyList();
       broadcastPartySnapshot();
-      OBR.broadcast.sendMessage(PARTY_SYNC_REQUEST_CHANNEL, { requesterId: localPlayerId || "unknown" }, { destination: "REMOTE" });
+      OBR.broadcast.sendMessage(
+        PARTY_SYNC_REQUEST_CHANNEL,
+        { requesterId: localPlayerId || "unknown" },
+        { destination: "REMOTE" },
+      );
     });
   } catch (_) {
     // Dev fallback (outside OBR)
@@ -392,10 +410,13 @@ async function init() {
         saved,
         defaultState,
         centerStats: CENTER_STATS,
-        rightStats: RIGHT_STATS,
+        rightStats:  RIGHT_STATS,
       });
       applyStateToUI();
     }
+    // Apply GM layout even outside OBR (dev override works via localStorage)
+    applyGmLayout();
+    if (isGm()) activateMainTab("party");
   }
 }
 

@@ -17,6 +17,8 @@
 
     <div class="tab-bar">
       <div class="tab" data-tab="party" style="display:none;">Party</div>
+      <div class="tab" data-tab="npcs" style="display:none;">NPCs</div>
+      <div class="tab" data-tab="spirits" style="display:none;">Spirits</div>
       <div class="tab active" data-tab="character">Character</div>
       <div class="tab" data-tab="archetype">Archetype</div>
       <div class="tab" data-tab="inventory">Inventory</div>
@@ -862,6 +864,30 @@
             <div class="party-note">Live list of your sheet and other players currently sharing data.</div>
           </div>
           <div id="partyList" class="party-list"></div>
+        </div>
+      </div>
+
+      <div class="tab-panel" id="panel-npcs">
+        <div class="party-panel">
+          <div class="party-header">
+            <div class="party-title">NPCs</div>
+            <div class="party-note">Non-player characters managed by the GM.</div>
+          </div>
+          <div id="npcList" class="party-list">
+            <div class="party-empty">No NPCs yet.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="tab-panel" id="panel-spirits">
+        <div class="party-panel">
+          <div class="party-header">
+            <div class="party-title">Spirits</div>
+            <div class="party-note">Cursed spirits and entities tracked by the GM.</div>
+          </div>
+          <div id="spiritList" class="party-list">
+            <div class="party-empty">No spirits yet.</div>
+          </div>
         </div>
       </div>
 

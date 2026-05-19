@@ -17,7 +17,7 @@ let _viewingMember = null; // { name, playerName } | null
 function getState() { return _getState ? _getState() : null; }
 function scheduleSave() { if (_scheduleSave) _scheduleSave(); }
 
-const GM_HOME_TABS   = ["party", "notes"]; // GM home: Party + their own Notes
+const GM_HOME_TABS   = ["party", "npcs", "spirits", "notes"]; // GM home tabs
 const PLAYER_TABS    = ["character", "archetype", "inventory", "combat", "jujutsu", "notes"];
 const MEMBER_TABS    = ["character", "archetype", "inventory", "combat", "jujutsu"]; // no notes when viewing a member
 
@@ -40,7 +40,9 @@ export function applyGmLayout() {
     }
   });
 
-  // ── Back button ───────────────────────────────────────────────────────────
+  // ── Rest button — hidden for GM ───────────────────────────────────────────
+  const restWrap = document.querySelector(".rest-control-wrap");
+  if (restWrap) restWrap.style.display = gm ? "none" : "";
   let backBtn = document.getElementById("gmBackBtn");
   if (gm && _viewingMember) {
     if (!backBtn) {
