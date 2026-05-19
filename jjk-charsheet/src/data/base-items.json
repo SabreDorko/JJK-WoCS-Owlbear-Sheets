@@ -250,8 +250,8 @@
     "stackable": false
   },
   {
-    "id": "hero-business-suit",
-    "name": "Hero/Business Suit",
+    "id": "hero-suit",
+    "name": "Hero Suit",
     "itemType": "clothing",
     "allowedSlots": ["body"],
     "slotsNeeded": 1,
