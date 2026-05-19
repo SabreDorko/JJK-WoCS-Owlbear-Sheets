@@ -1362,8 +1362,6 @@ export function applyTechniquesStateToUI() {
   const state = getState();
   if (!state) return;
 
-  console.log(`[techniques render] charName="${state.charName}" bindingVows=${state.techniques?.bindingVows?.length} applications=${state.techniques?.applications?.length}`);
-
   ensureTechniquesState(state);
 
   const mode = state.techniques.mode;

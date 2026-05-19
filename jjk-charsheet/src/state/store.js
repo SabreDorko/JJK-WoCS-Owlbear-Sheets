@@ -5,6 +5,7 @@ export const PARTY_BROADCAST_CHANNEL    = "jjk-party-v1";
 export const PARTY_SYNC_REQUEST_CHANNEL = "jjk-party-sync-v1";
 export const GM_STATE_REQUEST_CHANNEL   = "jjk-gm-state-request-v1";  // GM → player: "send me your full state"
 export const GM_STATE_RESPONSE_CHANNEL  = "jjk-gm-state-response-v1"; // player → GM: full state payload
+export const GM_STATE_PUSH_CHANNEL      = "jjk-gm-state-push-v1";     // GM → player: "apply this edited state"
 
 // ── ARCHETYPES ────────────────────────────────────────────────────────────────
 export const ARCHETYPES = {

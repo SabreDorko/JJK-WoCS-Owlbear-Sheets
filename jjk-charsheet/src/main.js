@@ -8,6 +8,7 @@ import {
   ROLL_BROADCAST_CHANNEL,
   GM_STATE_REQUEST_CHANNEL,
   GM_STATE_RESPONSE_CHANNEL,
+  GM_STATE_PUSH_CHANNEL,
   CENTER_STATS,
   RIGHT_STATS,
   defaultState,
@@ -61,18 +62,18 @@ import { initSkills, renderSkills } from "./skills.js";
 
 
 // ── RUNTIME STATE ─────────────────────────────────────────────────────────────
-let state           = defaultState();
-let localPlayerId   = null;
-let localPlayerName = "";
-let obrReady        = false;
+let state            = defaultState();
+let localPlayerId    = null;
+let localPlayerName  = "";
+let obrReady         = false;
 let _lastSaveTooltip = "No save yet.";
 
-// ── GM SHEET VIEW ─────────────────────────────────────────────────────────────
-// _gmState holds a member's full state while the GM views their sheet.
-// All module closures receive getActiveState so they automatically read the
-// right state. The global `state` (GM's own sheet) is never modified.
+// ── GM SHEET VIEW & EDITING ───────────────────────────────────────────────────
+// _gmState: the member's full state while GM is viewing/editing their sheet.
+// The global `state` (GM's own sheet) is never modified.
 let _gmState        = null;
 let _viewedPlayerId = null;
+let _gmPushTimer    = null;
 
 function getActiveState() {
   return _gmState !== null ? _gmState : state;
@@ -84,12 +85,30 @@ function applySheetState(fullState) {
 }
 
 function clearSheetState() {
+  clearTimeout(_gmPushTimer);
+  _gmPushTimer    = null;
   _gmState        = null;
   _viewedPlayerId = null;
   _applyStateToUI();
 }
 
-// Pending GM state requests: playerId → { resolve, timer }
+// Debounced push of edited _gmState to the target player (600ms, same as scheduleSave)
+function scheduleGmPush() {
+  if (_gmState === null || !_viewedPlayerId) return;
+  clearTimeout(_gmPushTimer);
+  _gmPushTimer = setTimeout(() => {
+    _gmPushTimer = null;
+    try {
+      OBR.broadcast.sendMessage(
+        GM_STATE_PUSH_CHANNEL,
+        { targetPlayerId: _viewedPlayerId, state: _gmState },
+        { destination: "REMOTE" },
+      );
+    } catch (_) {}
+  }, 600);
+}
+
+// ── GM STATE REQUEST (broadcast-based load) ───────────────────────────────────
 const _pendingStateRequests = new Map();
 
 function requestMemberFullState(snapshot) {
@@ -99,7 +118,6 @@ function requestMemberFullState(snapshot) {
     // Timeout after 4s — fall back to room metadata
     const timer = setTimeout(async () => {
       _pendingStateRequests.delete(playerId);
-      console.log(`[GM] broadcast timeout for "${snapshot.charName}", falling back to room metadata`);
       const saved = await loadStateForPlayer(STORAGE_KEY_BASE, playerId);
       resolve(saved
         ? mergeLoadedState({ saved, defaultState, centerStats: CENTER_STATS, rightStats: RIGHT_STATS })
@@ -109,7 +127,6 @@ function requestMemberFullState(snapshot) {
 
     _pendingStateRequests.set(playerId, { resolve, timer });
 
-    // Ask the player to send their full state
     try {
       OBR.broadcast.sendMessage(
         GM_STATE_REQUEST_CHANNEL,
@@ -117,7 +134,6 @@ function requestMemberFullState(snapshot) {
         { destination: "REMOTE" },
       );
     } catch (_) {
-      // Outside OBR — resolve immediately with metadata fallback
       clearTimeout(timer);
       _pendingStateRequests.delete(playerId);
       loadStateForPlayer(STORAGE_KEY_BASE, playerId).then(saved => {
@@ -197,18 +213,17 @@ function getPreferredPlayerName() {
 }
 
 function broadcastPartySnapshot() {
-  // Never broadcast while viewing a member — would overwrite own snapshot
-  if (_gmState !== null) return;
+  if (_gmState !== null) return; // never broadcast own snapshot while viewing a member
   const snapshot = getPartySnapshot();
   try {
     OBR.broadcast.sendMessage(PARTY_BROADCAST_CHANNEL, snapshot, { destination: "REMOTE" });
-  } catch (_) { /* outside OBR */ }
+  } catch (_) {}
 }
 
 // ── PERSISTENCE ───────────────────────────────────────────────────────────────
 const persistence = createPersistenceRuntime({
-  storageKeyBase:  STORAGE_KEY_BASE,
-  getState:        () => state,      // always persists GM's own state
+  storageKeyBase:   STORAGE_KEY_BASE,
+  getState:         () => state,        // always persists own state
   getLocalPlayerId: () => localPlayerId,
   onSchedule: () => {
     renderPartyList();
@@ -224,8 +239,11 @@ const persistence = createPersistenceRuntime({
 });
 
 function scheduleSave() {
-  // Never save while viewing a member's sheet
-  if (_gmState !== null) return;
+  if (_gmState !== null) {
+    // GM is editing a member's sheet — push to player instead of saving own state
+    scheduleGmPush();
+    return;
+  }
   persistence.scheduleSave();
 }
 
@@ -234,29 +252,18 @@ function _applyStateToUI() {
   const s       = getActiveState();
   const viewing = _gmState !== null;
 
-  console.log(`[GM render] viewing=${viewing} charName="${s?.charName}" techniques.mode="${s?.techniques?.mode}" bindingVows=${s?.techniques?.bindingVows?.length} archetypeProgress.unlockedAbilityIds=${s?.archetypeProgress?.unlockedAbilityIds?.length}`);
-  if (!viewing && _viewedPlayerId) {
-    // We have a viewed player but _gmState is null — something cleared it unexpectedly
-    console.trace("[GM render] _gmState was cleared unexpectedly");
-  }
-
-  // All of these read state via their _getState closure = getActiveState
   applyCharacterStateToUI();
   applyTechniquesStateToUI();
 
-  // Use side-effect-free render when viewing a member (no mutations, no saves)
-  if (viewing) {
-    renderArchetypeReadOnly(s);
-  } else {
-    applyArchetypeStateToUI();
-  }
+  // Full archetype apply in both modes — scheduleSave is redirected to
+  // scheduleGmPush when viewing, so side effects safely target the member
+  applyArchetypeStateToUI();
 
   applyNotesStateToUI();
   renderTraining(s);
   renderSkills(s);
   renderRollHistory();
 
-  // Never re-render party list while viewing a member (prevents ghost entries)
   if (!viewing) renderPartyList();
 
   renderInventory();
@@ -282,7 +289,7 @@ async function init() {
   setSaveStatusBadge({ label: "Saving", tooltip: "Waiting for initial load...", pending: true });
 
   initParty({
-    getState:              () => state,      // snapshot always from own state
+    getState:              () => state,
     getPreferredPlayerName,
     getLocalPlayerId:      () => localPlayerId,
     isGm:                  () => isGm(),
@@ -296,7 +303,6 @@ async function init() {
       );
     },
     onMemberUpdate: async (snapshot) => {
-      // Refresh GM view when the viewed member broadcasts a state change
       if (_gmState === null || snapshot.playerId !== _viewedPlayerId) return;
       const fullState = await requestMemberFullState(snapshot);
       _gmState = fullState;
@@ -305,7 +311,7 @@ async function init() {
   });
 
   initCharacter({
-    getState:       getActiveState,
+    getState:         getActiveState,
     scheduleSave,
     showRollToast,
     refreshCombatTab: () => renderCombatTabData(computeCombatTabData(getActiveState())),
@@ -316,7 +322,7 @@ async function init() {
     scheduleSave,
     refreshCharacterStats: applyCharacterStateToUI,
     showRollToast,
-    refreshCombatTab: () => renderCombatTabData(computeCombatTabData(getActiveState())),
+    refreshCombatTab:      () => renderCombatTabData(computeCombatTabData(getActiveState())),
   });
 
   initArchetype({
@@ -335,7 +341,7 @@ async function init() {
     scheduleSave,
     refreshCharacterStats: applyCharacterStateToUI,
     refreshArchetypeState: applyArchetypeStateToUI,
-    refreshCombatTab: () => renderCombatTabData(computeCombatTabData(getActiveState())),
+    refreshCombatTab:      () => renderCombatTabData(computeCombatTabData(getActiveState())),
   });
 
   initNotes({
@@ -344,11 +350,11 @@ async function init() {
   });
 
   initTraining({
-    getState:   getActiveState,
+    getState:              getActiveState,
     scheduleSave,
     showRollToast,
-    refreshUI:  () => renderTraining(getActiveState()),
-    refreshAll: applyStateToUI,
+    refreshUI:             () => renderTraining(getActiveState()),
+    refreshAll:            applyStateToUI,
   });
 
   initSkills({
@@ -388,22 +394,21 @@ async function init() {
       try { localPlayerName = await OBR.player.getName(); } catch (_) { localPlayerName = ""; }
       try { localPlayerId   = await OBR.player.getId();   } catch (_) { localPlayerId   = localPlayerName || null; }
 
-      // Detect GM role — must happen before applyGmLayout
       try { initGmRole(await OBR.player.getRole()); } catch (_) { initGmRole(null); }
       applyGmLayout();
 
+      // ── Broadcast listeners ─────────────────────────────────────────────
       OBR.broadcast.onMessage(PARTY_BROADCAST_CHANNEL, event => {
         handleIncomingPartySnapshot(event.data);
       });
       OBR.broadcast.onMessage(PARTY_SYNC_REQUEST_CHANNEL, () => broadcastPartySnapshot());
       OBR.broadcast.onMessage(ROLL_BROADCAST_CHANNEL, event => addIncomingGroupRoll(event.data));
 
-      // Player: respond to GM requests for full state
+      // Player → responds to GM full-state requests
       OBR.broadcast.onMessage(GM_STATE_REQUEST_CHANNEL, event => {
         const { targetPlayerId } = event.data || {};
-        if (targetPlayerId !== localPlayerId) return; // not for us
+        if (targetPlayerId !== localPlayerId) return;
         try {
-          // Send full state (from localStorage — complete, no size restriction)
           OBR.broadcast.sendMessage(
             GM_STATE_RESPONSE_CHANNEL,
             { playerId: localPlayerId, state },
@@ -412,30 +417,44 @@ async function init() {
         } catch (_) {}
       });
 
-      // GM: receive full state response from a player
+      // GM → receives full-state response, resolves pending promise
       OBR.broadcast.onMessage(GM_STATE_RESPONSE_CHANNEL, event => {
         const { playerId, state: memberState } = event.data || {};
         const pending = _pendingStateRequests.get(playerId);
         if (!pending) return;
         clearTimeout(pending.timer);
         _pendingStateRequests.delete(playerId);
-        const fullState = mergeLoadedState({
-          saved: memberState,
+        pending.resolve(mergeLoadedState({
+          saved:       memberState,
           defaultState,
           centerStats: CENTER_STATS,
-          rightStats: RIGHT_STATS,
-        });
-        pending.resolve(fullState);
+          rightStats:  RIGHT_STATS,
+        }));
       });
 
-      // Auto-fill player name if blank
-      const playerNameField = document.getElementById("playerName");
-      if (playerNameField && !playerNameField.value) {
-        playerNameField.value = localPlayerName;
-        state.playerName      = localPlayerName;
-      }
+      // Player → receives GM edits, applies and saves
+      OBR.broadcast.onMessage(GM_STATE_PUSH_CHANNEL, event => {
+        const { targetPlayerId, state: gmEditedState } = event.data || {};
+        if (targetPlayerId !== localPlayerId) return;
+        if (!gmEditedState || typeof gmEditedState !== "object") return;
 
-      // Load own state
+        // Merge GM's edits into own state, preserving own roll history
+        const ownRollHistory = state.rollHistory || [];
+        state = mergeLoadedState({
+          saved:       { ...gmEditedState, rollHistory: ownRollHistory },
+          defaultState,
+          centerStats: CENTER_STATS,
+          rightStats:  RIGHT_STATS,
+        });
+
+        // Re-render own sheet and save
+        applyStateToUI();
+        persistence.scheduleSave();
+        broadcastPartySnapshot();
+      });
+
+      // ── Load own state ──────────────────────────────────────────────────
+      const playerNameField = document.getElementById("playerName");
       const saved = await persistence.loadState();
       if (saved) {
         state = mergeLoadedState({
@@ -447,7 +466,11 @@ async function init() {
         applyStateToUI();
       }
 
-      // Activate Party tab AFTER everything is loaded — GM only
+      if (playerNameField && !playerNameField.value) {
+        playerNameField.value = localPlayerName;
+        state.playerName      = localPlayerName;
+      }
+
       if (isGm()) activateMainTab("party");
 
       renderPartyList();
@@ -470,7 +493,6 @@ async function init() {
       });
       applyStateToUI();
     }
-    // Apply GM layout even outside OBR (dev override works via localStorage)
     applyGmLayout();
     if (isGm()) activateMainTab("party");
   }

@@ -1520,7 +1520,6 @@ function syncArchetypeCollapseUI() {
 export function renderArchetypeReadOnly(stateArg) {
   const s = stateArg || getState();
   if (!s) return;
-  console.log(`[archetype render] archetype="${s.archetype}" unlockedIds=${s.archetypeProgress?.unlockedAbilityIds?.length} permanentAptitudes=${s.archetypeProgress?.permanentAptitudeSelections?.length}`);
   ensureArchetypeState(s);
   renderArchetypeSummary(s);
   renderBenefits(s);
