@@ -200,6 +200,8 @@ function _applyStateToUI() {
   const s       = getActiveState();
   const viewing = _gmState !== null;
 
+  console.log(`[GM render] viewing=${viewing} charName="${s?.charName}" techniques.mode="${s?.techniques?.mode}" bindingVows=${s?.techniques?.bindingVows?.length} archetypeProgress.unlockedAbilityIds=${s?.archetypeProgress?.unlockedAbilityIds?.length}`);
+
   // All of these read state via their _getState closure = getActiveState
   applyCharacterStateToUI();
   applyTechniquesStateToUI();
