@@ -6,6 +6,8 @@ import {
   PARTY_BROADCAST_CHANNEL,
   PARTY_SYNC_REQUEST_CHANNEL,
   ROLL_BROADCAST_CHANNEL,
+  GM_STATE_REQUEST_CHANNEL,
+  GM_STATE_RESPONSE_CHANNEL,
   CENTER_STATS,
   RIGHT_STATS,
   defaultState,
@@ -87,13 +89,45 @@ function clearSheetState() {
   _applyStateToUI();
 }
 
-async function loadMemberFullState(snapshot) {
-  const saved = await loadStateForPlayer(STORAGE_KEY_BASE, snapshot.playerId);
-  if (saved) {
-    return mergeLoadedState({ saved, defaultState, centerStats: CENTER_STATS, rightStats: RIGHT_STATS });
-  }
-  // Fallback: build from slim snapshot so at least name/grade/archetype show
-  return mergeLoadedState({ saved: snapshot, defaultState, centerStats: CENTER_STATS, rightStats: RIGHT_STATS });
+// Pending GM state requests: playerId → { resolve, timer }
+const _pendingStateRequests = new Map();
+
+function requestMemberFullState(snapshot) {
+  return new Promise((resolve) => {
+    const playerId = snapshot.playerId;
+
+    // Timeout after 4s — fall back to room metadata
+    const timer = setTimeout(async () => {
+      _pendingStateRequests.delete(playerId);
+      console.log(`[GM] broadcast timeout for "${snapshot.charName}", falling back to room metadata`);
+      const saved = await loadStateForPlayer(STORAGE_KEY_BASE, playerId);
+      resolve(saved
+        ? mergeLoadedState({ saved, defaultState, centerStats: CENTER_STATS, rightStats: RIGHT_STATS })
+        : mergeLoadedState({ saved: snapshot, defaultState, centerStats: CENTER_STATS, rightStats: RIGHT_STATS })
+      );
+    }, 4000);
+
+    _pendingStateRequests.set(playerId, { resolve, timer });
+
+    // Ask the player to send their full state
+    try {
+      OBR.broadcast.sendMessage(
+        GM_STATE_REQUEST_CHANNEL,
+        { targetPlayerId: playerId },
+        { destination: "REMOTE" },
+      );
+    } catch (_) {
+      // Outside OBR — resolve immediately with metadata fallback
+      clearTimeout(timer);
+      _pendingStateRequests.delete(playerId);
+      loadStateForPlayer(STORAGE_KEY_BASE, playerId).then(saved => {
+        resolve(saved
+          ? mergeLoadedState({ saved, defaultState, centerStats: CENTER_STATS, rightStats: RIGHT_STATS })
+          : mergeLoadedState({ saved: snapshot, defaultState, centerStats: CENTER_STATS, rightStats: RIGHT_STATS })
+        );
+      });
+    }
+  });
 }
 
 // ── EXPOSE GLOBALS ────────────────────────────────────────────────────────────
@@ -254,7 +288,7 @@ async function init() {
     isGm:                  () => isGm(),
     onOpenSheet: async (snapshot) => {
       _viewedPlayerId = snapshot.playerId;
-      const fullState = await loadMemberFullState(snapshot);
+      const fullState = await requestMemberFullState(snapshot);
       enterMemberSheet(
         fullState,
         snapshot.charName || snapshot.playerName || "Member",
@@ -264,7 +298,7 @@ async function init() {
     onMemberUpdate: async (snapshot) => {
       // Refresh GM view when the viewed member broadcasts a state change
       if (_gmState === null || snapshot.playerId !== _viewedPlayerId) return;
-      const fullState = await loadMemberFullState(snapshot);
+      const fullState = await requestMemberFullState(snapshot);
       _gmState = fullState;
       _applyStateToUI();
     },
@@ -363,6 +397,36 @@ async function init() {
       });
       OBR.broadcast.onMessage(PARTY_SYNC_REQUEST_CHANNEL, () => broadcastPartySnapshot());
       OBR.broadcast.onMessage(ROLL_BROADCAST_CHANNEL, event => addIncomingGroupRoll(event.data));
+
+      // Player: respond to GM requests for full state
+      OBR.broadcast.onMessage(GM_STATE_REQUEST_CHANNEL, event => {
+        const { targetPlayerId } = event.data || {};
+        if (targetPlayerId !== localPlayerId) return; // not for us
+        try {
+          // Send full state (from localStorage — complete, no size restriction)
+          OBR.broadcast.sendMessage(
+            GM_STATE_RESPONSE_CHANNEL,
+            { playerId: localPlayerId, state },
+            { destination: "REMOTE" },
+          );
+        } catch (_) {}
+      });
+
+      // GM: receive full state response from a player
+      OBR.broadcast.onMessage(GM_STATE_RESPONSE_CHANNEL, event => {
+        const { playerId, state: memberState } = event.data || {};
+        const pending = _pendingStateRequests.get(playerId);
+        if (!pending) return;
+        clearTimeout(pending.timer);
+        _pendingStateRequests.delete(playerId);
+        const fullState = mergeLoadedState({
+          saved: memberState,
+          defaultState,
+          centerStats: CENTER_STATS,
+          rightStats: RIGHT_STATS,
+        });
+        pending.resolve(fullState);
+      });
 
       // Auto-fill player name if blank
       const playerNameField = document.getElementById("playerName");

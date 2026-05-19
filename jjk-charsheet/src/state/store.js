@@ -3,6 +3,8 @@ export const STORAGE_KEY_BASE           = "jjk-charsheet-v1";
 export const ROLL_BROADCAST_CHANNEL     = "jjk-roll-v1";
 export const PARTY_BROADCAST_CHANNEL    = "jjk-party-v1";
 export const PARTY_SYNC_REQUEST_CHANNEL = "jjk-party-sync-v1";
+export const GM_STATE_REQUEST_CHANNEL   = "jjk-gm-state-request-v1";  // GM → player: "send me your full state"
+export const GM_STATE_RESPONSE_CHANNEL  = "jjk-gm-state-response-v1"; // player → GM: full state payload
 
 // ── ARCHETYPES ────────────────────────────────────────────────────────────────
 export const ARCHETYPES = {

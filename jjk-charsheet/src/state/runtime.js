@@ -78,29 +78,18 @@ export function createPersistenceRuntime({
     let wroteRoom = false;
     const key = getStorageKey();
 
-    console.log(`[save] key="${key}" charName="${state.charName}" bindingVows=${state.techniques?.bindingVows?.length} unlockedIds=${state.archetypeProgress?.unlockedAbilityIds?.length}`);
-
-    // Strip bulky fields that aren't needed for GM sheet viewing before
-    // writing to OBR room metadata (16 kB limit per key).
-    // localStorage keeps the full state as backup.
-    const roomState = { ...state };
-    delete roomState.rollHistory;
-
+    // Try to write to room metadata — may fail if state exceeds OBR's 16 kB limit.
+    // That's OK: GM sheet loading now uses broadcast, so room metadata is just a fallback.
     try {
-      await OBR.room.setMetadata({ [key]: roomState });
+      await OBR.room.setMetadata({ [key]: state });
       wroteRoom = true;
-      console.log(`[save] room write OK key="${key}"`);
-    } catch (err) {
-      console.error(`[save] room write FAILED key="${key}"`, err);
+    } catch (_) {
+      // Silently fall through — localStorage below is the reliable backup.
     }
 
-    // Always write full state (including rollHistory) to localStorage
     try {
       localStorage.setItem(key, JSON.stringify(state));
-      console.log(`[save] localStorage write OK key="${key}"`);
-    } catch (err) {
-      console.error(`[save] localStorage write FAILED`, err);
-    }
+    } catch (_) {}
 
     if (onAfterSave) {
       onAfterSave({
