@@ -120,16 +120,19 @@ export function renderNpcList() {
             data-npc-delete="${npc.id}" title="Delete NPC" type="button">✕</button>
         </div>
         ${meta ? `<div class="party-meta"><span class="party-meta-left">${escHtml(meta)}</span></div>` : ""}
-        <div class="party-stats">
+        <div class="party-stats" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; text-align: center;">
           <div class="party-stat">
+            <span class="party-stat-label">HP</span>
             ${hpIcon()}
             <div class="party-stat-value">${track(npc.hpCurrent, npc.hpMax)}</div>
           </div>
           <div class="party-stat">
+            <span class="party-stat-label">CE</span>
             ${ceIcon()}
             <div class="party-stat-value">${track(npc.ceCurrent, npc.ceMax)}</div>
           </div>
           <div class="party-stat">
+            <span class="party-stat-label">AC</span>
             ${acIcon()}
             <div class="party-stat-value">${npc.ac === "" || npc.ac == null ? "—" : npc.ac}</div>
           </div>
