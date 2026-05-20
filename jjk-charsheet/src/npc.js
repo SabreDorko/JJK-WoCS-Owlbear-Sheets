@@ -121,23 +121,17 @@ export function renderNpcList() {
         </div>
         ${meta ? `<div class="party-meta"><span class="party-meta-left">${escHtml(meta)}</span></div>` : ""}
         <div class="party-stats" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; text-align: center; align-items: center; justify-items: center;">
-          <div class="party-stat">
-            <div style="display: flex; flex-direction: column; align-items: center;">
-              ${getNPCStatIcon("hp")}
-              <div class="party-stat-value">${track(npc.hpCurrent, npc.hpMax)}</div>
-            </div>
+          <div class="party-stat" style="display: flex; align-items: center; justify-content: center; gap: 6px;">
+            ${getNPCStatIcon("hp")}
+            <div class="party-stat-value">${track(npc.hpCurrent, npc.hpMax)}</div>
           </div>
-          <div class="party-stat">
-            <div style="display: flex; flex-direction: column; align-items: center;">
-              ${getNPCStatIcon("ce")}
-              <div class="party-stat-value">${track(npc.ceCurrent, npc.ceMax)}</div>
-            </div>
+          <div class="party-stat" style="display: flex; align-items: center; justify-content: center; gap: 6px;">
+            ${getNPCStatIcon("ce")}
+            <div class="party-stat-value">${track(npc.ceCurrent, npc.ceMax)}</div>
           </div>
-          <div class="party-stat">
-            <div style="display: flex; flex-direction: column; align-items: center;">
-              ${getNPCStatIcon("ac")}
-              <div class="party-stat-value">${npc.ac === "" || npc.ac == null ? "—" : npc.ac}</div>
-            </div>
+          <div class="party-stat" style="display: flex; align-items: center; justify-content: center; gap: 6px;">
+            ${getNPCStatIcon("ac")}
+            <div class="party-stat-value">${npc.ac === "" || npc.ac == null ? "—" : npc.ac}</div>
           </div>
         </div>
         <div class="divider" style="margin: 10px 0 6px 0;"></div>
