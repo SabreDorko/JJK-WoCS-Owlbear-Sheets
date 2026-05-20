@@ -144,11 +144,11 @@ export function renderNpcList() {
             <span class="npc-core-stat-label">COOP</span>
           </div>
           <div class="npc-core-stat-value-row" style="grid-column: 1 / -1; display: grid; grid-template-columns: repeat(5, 1fr); text-align: left;">
-            <span class="npc-core-stat-value">${npc.stats?.power?.score !== "" && npc.stats?.power?.score != null ? npc.stats.power.score : "—"}</span>
-            <span class="npc-core-stat-value">${npc.stats?.speed?.score !== "" && npc.stats?.speed?.score != null ? npc.stats.speed.score : "—"}</span>
-            <span class="npc-core-stat-value">${npc.stats?.technique?.score !== "" && npc.stats?.technique?.score != null ? npc.stats.technique.score : "—"}</span>
-            <span class="npc-core-stat-value">${npc.stats?.intelligence?.score !== "" && npc.stats?.intelligence?.score != null ? npc.stats.intelligence.score : "—"}</span>
-            <span class="npc-core-stat-value">${npc.stats?.cooperation?.score !== "" && npc.stats?.cooperation?.score != null ? npc.stats.cooperation.score : "—"}</span>
+            <span class="npc-core-stat-value"> ${npc.stats?.power?.score !== "" && npc.stats?.power?.score != null ? npc.stats.power.score : "—"}</span>
+            <span class="npc-core-stat-value"> ${npc.stats?.speed?.score !== "" && npc.stats?.speed?.score != null ? npc.stats.speed.score : "—"}</span>
+            <span class="npc-core-stat-value">  ${npc.stats?.technique?.score !== "" && npc.stats?.technique?.score != null ? npc.stats.technique.score : "—"}</span>
+            <span class="npc-core-stat-value"> ${npc.stats?.intelligence?.score !== "" && npc.stats?.intelligence?.score != null ? npc.stats.intelligence.score : "—"}</span>
+            <span class="npc-core-stat-value">  ${npc.stats?.cooperation?.score !== "" && npc.stats?.cooperation?.score != null ? npc.stats.cooperation.score : "—"}</span>
           </div>
         </div>
       </div>`;
