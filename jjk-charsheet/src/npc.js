@@ -129,6 +129,25 @@ export function renderNpcList() {
             ${ceIcon()}
             <div class="party-stat-value">${track(npc.ceCurrent, npc.ceMax)}</div>
           </div>
+          <div class="party-stat">
+            ${acIcon()}
+            <div class="party-stat-value">${npc.ac === "" || npc.ac == null ? "—" : npc.ac}</div>
+          </div>
+        </div>
+        <div class="npc-core-stats">
+          ${[
+            { key: "power",         short: "PWR" },
+            { key: "speed",         short: "SPD" },
+            { key: "technique",     short: "TEC" },
+            { key: "intelligence",  short: "INT" },
+            { key: "cooperation",   short: "COO" },
+          ].map(({ key, short }) => {
+            const val = npc.stats?.[key]?.score;
+            return `<div class="npc-core-stat">
+              <span class="npc-core-stat-label">${short}</span>
+              <span class="npc-core-stat-value">${val !== "" && val != null ? val : "—"}</span>
+            </div>`;
+          }).join("")}
         </div>
       </div>`;
   }).join("");
