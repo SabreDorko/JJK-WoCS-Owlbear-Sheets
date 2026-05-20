@@ -94,9 +94,9 @@ export function renderNpcList() {
   ensureNpcs(state);
 
   const query = _npcSearchQuery.toLowerCase().trim();
-  const npcs  = state.npcs.filter(n =>
-    !query || (n.charName || "").toLowerCase().includes(query)
-  );
+  const npcs  = state.npcs
+    .filter(n => !query || (n.charName || "").toLowerCase().includes(query))
+    .sort((a, b) => (b.favorite ? 1 : 0) - (a.favorite ? 1 : 0));
 
   if (!npcs.length) {
     list.innerHTML = `<div class="party-empty">${query ? "No NPCs match that search." : "No NPCs yet. Click New NPC to add one."}</div>`;
@@ -110,14 +110,25 @@ export function renderNpcList() {
       : "";
     const sub     = npc.subArchetype ? ` (${npc.subArchetype})` : "";
     const meta    = [grade, arcName ? arcName + sub : ""].filter(Boolean).join(" · ");
+    const isFav   = !!npc.favorite;
 
     return `
       <div class="party-item party-item--gm-openable npc-item" data-npc-id="${npc.id}"
         role="button" tabindex="0" title="Open ${npc.charName}">
         <div class="party-item-header">
           <div class="party-character">${escHtml(npc.charName || "Unnamed NPC")}</div>
-          <button class="npc-delete-btn inventory-mini-btn danger"
-            data-npc-delete="${npc.id}" title="Delete NPC" type="button">✕</button>
+          <div class="npc-item-actions">
+            <button class="npc-fav-btn${isFav ? " npc-fav-btn--active" : ""}"
+              data-npc-fav="${npc.id}" title="${isFav ? "Unfavourite" : "Favourite"}" type="button"
+              aria-label="${isFav ? "Remove from favourites" : "Add to favourites"}">★</button>
+            <button class="inventory-mini-btn inventory-icon-btn danger npc-delete-btn"
+              data-npc-delete="${npc.id}" title="Delete NPC" type="button" aria-label="Delete NPC">
+              <svg class="inventory-icon-trash" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path fill="currentColor" d="M9 3h6a1 1 0 0 1 1 1v1h4v2h-1l-1 12a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 7H4V5h4V4a1 1 0 0 1 1-1Zm1 2v0h4V5h-4Zm-1 4h2v9H9V9Zm4 0h2v9h-2V9Z"/>
+                <path fill="none" stroke="currentColor" stroke-width="1.5" d="M6 7.5h12"/>
+              </svg>
+            </button>
+          </div>
         </div>
         ${meta ? `<div class="party-meta"><span class="party-meta-left">${escHtml(meta)}</span></div>` : ""}
         <div class="party-stats" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; text-align: center; align-items: center; justify-items: center;">
@@ -157,13 +168,22 @@ export function renderNpcList() {
   // Open NPC on click
   list.querySelectorAll(".npc-item").forEach(el => {
     el.addEventListener("click", e => {
-      if (e.target.closest("[data-npc-delete]")) return; // handled below
+      if (e.target.closest("[data-npc-delete]")) return;
+      if (e.target.closest("[data-npc-fav]")) return;
       const id  = el.dataset.npcId;
       const npc = state.npcs.find(n => n.id === id);
       if (npc && _onOpenNpc) _onOpenNpc(npc);
     });
     el.addEventListener("keydown", e => {
       if (e.key === "Enter" || e.key === " ") el.click();
+    });
+  });
+
+  // Favourite toggle
+  list.querySelectorAll("[data-npc-fav]").forEach(btn => {
+    btn.addEventListener("click", e => {
+      e.stopPropagation();
+      toggleNpcFavorite(btn.dataset.npcFav);
     });
   });
 
@@ -189,6 +209,17 @@ function addNpc() {
   renderNpcList();
   // Open the new NPC immediately so GM can edit its name
   if (_onOpenNpc) _onOpenNpc(npc);
+}
+
+function toggleNpcFavorite(id) {
+  const state = getState();
+  if (!state) return;
+  ensureNpcs(state);
+  const npc = state.npcs.find(n => n.id === id);
+  if (!npc) return;
+  npc.favorite = !npc.favorite;
+  scheduleSave();
+  renderNpcList();
 }
 
 function deleteNpc(id) {

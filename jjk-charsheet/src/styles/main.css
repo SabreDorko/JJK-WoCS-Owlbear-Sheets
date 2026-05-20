@@ -4950,8 +4950,26 @@
       font-size: 12px;
       padding: 4px 6px;
     }
+    .npc-item-actions {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      flex-shrink: 0;
+    }
+    .npc-fav-btn {
+      background: none;
+      border: none;
+      font-size: 15px;
+      color: var(--ink-faint);
+      cursor: pointer;
+      padding: 0 2px;
+      line-height: 1;
+      transition: color 120ms;
+    }
+    .npc-fav-btn:hover { color: #c9960a; }
+    .npc-fav-btn--active { color: #c9960a; }
     .npc-delete-btn {
-      padding: 1px 6px;
+      padding: 2px 5px;
       font-size: 11px;
       flex-shrink: 0;
     }
@@ -5040,23 +5058,6 @@
     .gm-dev-btn:hover { background: var(--ink); color: var(--parchment); }
     .gm-dev-btn--clear { color: var(--ink-faint); border-color: var(--border); flex-basis: 100%; }
     .gm-dev-btn--clear:hover { background: var(--parchment-darker); color: var(--ink); }
-
-    /* ── NPC PANEL ──────────────────────────────────────────── */
-    .npc-toolbar {
-      display: flex;
-      gap: 6px;
-      align-items: center;
-    }
-    .npc-search-input {
-      flex: 1;
-      font-size: 12px;
-      padding: 4px 6px;
-    }
-    .npc-delete-btn {
-      padding: 1px 6px;
-      font-size: 11px;
-      flex-shrink: 0;
-    }
 
     /* Notes tab */
     .notes-panel {
