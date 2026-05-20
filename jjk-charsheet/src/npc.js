@@ -123,17 +123,17 @@ export function renderNpcList() {
         <div class="party-stats" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; text-align: center;">
           <div class="party-stat">
             <span class="party-stat-label">HP</span>
-            ${hpIcon()}
+            ${getNPCStatIcon("hp")}
             <div class="party-stat-value">${track(npc.hpCurrent, npc.hpMax)}</div>
           </div>
           <div class="party-stat">
             <span class="party-stat-label">CE</span>
-            ${ceIcon()}
+            ${getNPCStatIcon("ce")}
             <div class="party-stat-value">${track(npc.ceCurrent, npc.ceMax)}</div>
           </div>
           <div class="party-stat">
             <span class="party-stat-label">AC</span>
-            ${acIcon()}
+            ${getNPCStatIcon("ac")}
             <div class="party-stat-value">${npc.ac === "" || npc.ac == null ? "—" : npc.ac}</div>
           </div>
         </div>
@@ -141,9 +141,9 @@ export function renderNpcList() {
           ${[
             { key: "power",         short: "PWR" },
             { key: "speed",         short: "SPD" },
-            { key: "technique",     short: "TEC" },
+            { key: "technique",     short: "TECH" },
             { key: "intelligence",  short: "INT" },
-            { key: "cooperation",   short: "COO" },
+            { key: "cooperation",   short: "COOP" },
           ].map(({ key, short }) => {
             const val = npc.stats?.[key]?.score;
             return `<div class="npc-core-stat">
@@ -253,21 +253,28 @@ function track(cur, max) {
   return `${cur === "" ? "—" : cur} / ${max === "" ? "—" : max}`;
 }
 
-function hpIcon() {
-  return `<svg class="party-stat-icon" viewBox="0 0 28 28" aria-hidden="true">
-    <path fill="currentColor" d="M14 24c-.2 0-.4-.1-.6-.2C8.5 21 4 17 4 11.8 4 8.6 6.3 6.2 9.2 6.2c2.1 0 3.8 1.1 4.8 2.8 1-1.7 2.7-2.8 4.8-2.8C21.7 6.2 24 8.6 24 11.8c0 5.2-4.5 9.2-9.4 12-.2.1-.4.2-.6.2Z"/>
-  </svg>`;
-}
 
-function ceIcon() {
-  return `<svg class="party-stat-icon" viewBox="0 0 28 28" aria-hidden="true">
-    <path fill="currentColor" d="M14 2 25 14 14 26 3 14Z"/>
-  </svg>`;
-}
-
-function acIcon() {
-  return `<svg class="party-stat-icon" viewBox="0 0 60 68" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-    <path d="M30 4L5 13V36C5 50 17 62 30 66C43 62 55 50 55 36V13L30 4Z" stroke="currentColor" stroke-width="1.8" fill="#e2d9c8" />
-    <path d="M30 9L9 17V36C9 48 19 58 30 62C41 58 51 48 51 36V17L30 9Z" stroke="currentColor" stroke-width="0.8" fill="none" stroke-dasharray="2 2" />
-  </svg>`;
+function getNPCStatIcon(type) {
+  if (type === "hp") {
+    return `
+      <svg class="party-stat-icon" viewBox="0 0 28 28" aria-hidden="true" focusable="false">
+        <path fill="currentColor" d="M14 24c-.2 0-.4-.1-.6-.2C8.5 21 4 17 4 11.8 4 8.6 6.3 6.2 9.2 6.2c2.1 0 3.8 1.1 4.8 2.8 1-1.7 2.7-2.8 4.8-2.8C21.7 6.2 24 8.6 24 11.8c0 5.2-4.5 9.2-9.4 12-.2.1-.4.2-.6.2Z"/>
+        <text x="14" y="14">HP</text>
+      </svg>
+    `;
+  }
+  if (type === "ce") {
+    return `
+      <svg class="party-stat-icon" viewBox="0 0 28 28" aria-hidden="true" focusable="false">
+        <path fill="currentColor" d="M14 2 25 14 14 26 3 14Z"/>
+        <text x="14" y="15">CE</text>
+      </svg>
+    `;
+  }
+  return `
+    <svg class="party-stat-icon" viewBox="0 0 28 28" aria-hidden="true" focusable="false">
+      <path fill="currentColor" d="M14 2 23 6v7c0 5.4-3.4 9.8-9 13-5.6-3.2-9-7.6-9-13V6l9-4Z"/>
+      <text x="14" y="14">AC</text>
+    </svg>
+  `;
 }
