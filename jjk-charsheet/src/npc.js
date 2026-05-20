@@ -122,35 +122,33 @@ export function renderNpcList() {
         ${meta ? `<div class="party-meta"><span class="party-meta-left">${escHtml(meta)}</span></div>` : ""}
         <div class="party-stats" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; text-align: center;">
           <div class="party-stat">
-            <span class="party-stat-label">HP</span>
             ${getNPCStatIcon("hp")}
             <div class="party-stat-value">${track(npc.hpCurrent, npc.hpMax)}</div>
           </div>
           <div class="party-stat">
-            <span class="party-stat-label">CE</span>
             ${getNPCStatIcon("ce")}
             <div class="party-stat-value">${track(npc.ceCurrent, npc.ceMax)}</div>
           </div>
           <div class="party-stat">
-            <span class="party-stat-label">AC</span>
             ${getNPCStatIcon("ac")}
             <div class="party-stat-value">${npc.ac === "" || npc.ac == null ? "—" : npc.ac}</div>
           </div>
         </div>
-        <div class="npc-core-stats">
-          ${[
-            { key: "power",         short: "PWR" },
-            { key: "speed",         short: "SPD" },
-            { key: "technique",     short: "TECH" },
-            { key: "intelligence",  short: "INT" },
-            { key: "cooperation",   short: "COOP" },
-          ].map(({ key, short }) => {
-            const val = npc.stats?.[key]?.score;
-            return `<div class="npc-core-stat">
-              <span class="npc-core-stat-label">${short}</span>
-              <span class="npc-core-stat-value">${val !== "" && val != null ? val : "—"}</span>
-            </div>`;
-          }).join("")}
+        <div class="npc-core-stats" style="display: grid; grid-template-columns: repeat(5, 1fr); text-align: center; gap: 2px 0; margin-top: 6px;">
+          <div class="npc-core-stat-label-row" style="grid-column: 1 / -1; display: grid; grid-template-columns: repeat(5, 1fr);">
+            <span class="npc-core-stat-label">PWR</span>
+            <span class="npc-core-stat-label">SPD</span>
+            <span class="npc-core-stat-label">TEC</span>
+            <span class="npc-core-stat-label">INT</span>
+            <span class="npc-core-stat-label">COO</span>
+          </div>
+          <div class="npc-core-stat-value-row" style="grid-column: 1 / -1; display: grid; grid-template-columns: repeat(5, 1fr);">
+            <span class="npc-core-stat-value">${npc.stats?.power?.score !== "" && npc.stats?.power?.score != null ? npc.stats.power.score : "—"}</span>
+            <span class="npc-core-stat-value">${npc.stats?.speed?.score !== "" && npc.stats?.speed?.score != null ? npc.stats.speed.score : "—"}</span>
+            <span class="npc-core-stat-value">${npc.stats?.technique?.score !== "" && npc.stats?.technique?.score != null ? npc.stats.technique.score : "—"}</span>
+            <span class="npc-core-stat-value">${npc.stats?.intelligence?.score !== "" && npc.stats?.intelligence?.score != null ? npc.stats.intelligence.score : "—"}</span>
+            <span class="npc-core-stat-value">${npc.stats?.cooperation?.score !== "" && npc.stats?.cooperation?.score != null ? npc.stats.cooperation.score : "—"}</span>
+          </div>
         </div>
       </div>`;
   }).join("");
