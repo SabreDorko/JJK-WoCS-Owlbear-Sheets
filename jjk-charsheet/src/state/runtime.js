@@ -78,15 +78,21 @@ export function createPersistenceRuntime({
     let wroteRoom = false;
     const key = getStorageKey();
 
-    // Try to write to room metadata — may fail if state exceeds OBR's 16 kB limit.
-    // That's OK: GM sheet loading now uses broadcast, so room metadata is just a fallback.
+    // Try to write to room metadata — strip bulky fields to stay under OBR's
+    // 16 kB limit. rollHistory and npcs are GM/local-only data; players read
+    // their own history from localStorage, and GM reads NPCs from their own state.
+    const roomState = { ...state };
+    delete roomState.rollHistory;
+    delete roomState.npcs;
+
     try {
-      await OBR.room.setMetadata({ [key]: state });
+      await OBR.room.setMetadata({ [key]: roomState });
       wroteRoom = true;
     } catch (_) {
       // Silently fall through — localStorage below is the reliable backup.
     }
 
+    // Always write full state to localStorage (no size limit concerns)
     try {
       localStorage.setItem(key, JSON.stringify(state));
     } catch (_) {}

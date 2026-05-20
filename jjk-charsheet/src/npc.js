@@ -1,4 +1,5 @@
 // ── NPC MODULE ────────────────────────────────────────────────────────────────
+import { CENTER_STATS, RIGHT_STATS } from "./state/store.js";
 // NPCs are stored as full character-state objects inside state.npcs[].
 // Each has a unique `id` so they can be looked up and updated.
 // The GM opens an NPC the same way they open a player sheet — the shared
@@ -25,7 +26,11 @@ function generateId() {
 }
 
 function createBlankNpc() {
-  // Minimal character-state shape — same fields the sheet renders from
+  const stats = {};
+  [...CENTER_STATS, ...RIGHT_STATS].forEach(s => {
+    stats[s.key] = { score: "", skills: s.skills.map(() => ({ aptitude: 0 })) };
+  });
+
   return {
     id:           generateId(),
     charName:     "New NPC",
@@ -55,8 +60,8 @@ function createBlankNpc() {
       bindingVowsNotes: "",
     },
     archetypeProgress: {
-      unlockedAbilityIds:           [],
-      permanentAptitudeSelections:  [],
+      unlockedAbilityIds:          [],
+      permanentAptitudeSelections: [],
     },
     archetypeGrantedAbilities: [],
     hasSecondArchetype: false,
@@ -70,7 +75,7 @@ function createBlankNpc() {
     directModifiers: [],
     overrides:       { derived: {}, subskills: {} },
     rollHistory:     [],
-    stats:           {},
+    stats,
     notes:           [],
     training:        { jujutsuSkills: [], aptitudeTraining: { activeTrainings: [] } },
     skills:          { xpSkills: [], jujutsuSkills: [] },
