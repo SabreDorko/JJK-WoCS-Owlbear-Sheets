@@ -132,14 +132,17 @@ export function renderPartyList() {
       <div class="party-stats">
         <div class="party-stat">
           ${getPartyStatIcon("hp")}
+          <span class="party-stat-label" style="margin-left: 2px;">HP</span>
           <div class="party-stat-value">${formatTrack(entry.hpCurrent, entry.hpMax)}</div>
         </div>
         <div class="party-stat">
           ${getPartyStatIcon("ce")}
+          <span class="party-stat-label" style="margin-left: 2px;">CE</span>
           <div class="party-stat-value">${formatTrack(entry.ceCurrent, entry.ceMax)}</div>
         </div>
         <div class="party-stat">
           ${getPartyStatIcon("ac")}
+          <span class="party-stat-label" style="margin-left: 2px;">AC</span>
           <div class="party-stat-value">${entry.ac === "" ? "—" : entry.ac}</div>
         </div>
       </div>

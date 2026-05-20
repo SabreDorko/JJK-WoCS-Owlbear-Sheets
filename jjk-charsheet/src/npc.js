@@ -123,14 +123,17 @@ export function renderNpcList() {
         <div class="party-stats" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; text-align: left; align-items: start;">
           <div class="party-stat">
             ${getNPCStatIcon("hp")}
+            <span class="party-stat-label" style="margin-left: 2px;">HP</span>
             <div class="party-stat-value">${track(npc.hpCurrent, npc.hpMax)}</div>
           </div>
           <div class="party-stat">
             ${getNPCStatIcon("ce")}
+            <span class="party-stat-label" style="margin-left: 2px;">CE</span>
             <div class="party-stat-value">${track(npc.ceCurrent, npc.ceMax)}</div>
           </div>
           <div class="party-stat">
             ${getNPCStatIcon("ac")}
+            <span class="party-stat-label" style="margin-left: 2px;">AC</span>
             <div class="party-stat-value">${npc.ac === "" || npc.ac == null ? "—" : npc.ac}</div>
           </div>
         </div>
@@ -146,9 +149,9 @@ export function renderNpcList() {
           <div class="npc-core-stat-value-row" style="grid-column: 1 / -1; display: grid; grid-template-columns: repeat(5, 1fr); text-align: left;">
             <span class="npc-core-stat-value"> ${npc.stats?.power?.score !== "" && npc.stats?.power?.score != null ? npc.stats.power.score : "—"}</span>
             <span class="npc-core-stat-value"> ${npc.stats?.speed?.score !== "" && npc.stats?.speed?.score != null ? npc.stats.speed.score : "—"}</span>
-            <span class="npc-core-stat-value">  ${npc.stats?.technique?.score !== "" && npc.stats?.technique?.score != null ? npc.stats.technique.score : "—"}</span>
+            <span class="npc-core-stat-value"> ${npc.stats?.technique?.score !== "" && npc.stats?.technique?.score != null ? npc.stats.technique.score : "—"}</span>
             <span class="npc-core-stat-value"> ${npc.stats?.intelligence?.score !== "" && npc.stats?.intelligence?.score != null ? npc.stats.intelligence.score : "—"}</span>
-            <span class="npc-core-stat-value">  ${npc.stats?.cooperation?.score !== "" && npc.stats?.cooperation?.score != null ? npc.stats.cooperation.score : "—"}</span>
+            <span class="npc-core-stat-value"> ${npc.stats?.cooperation?.score !== "" && npc.stats?.cooperation?.score != null ? npc.stats.cooperation.score : "—"}</span>
           </div>
         </div>
       </div>`;
