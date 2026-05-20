@@ -120,7 +120,7 @@ export function renderNpcList() {
             data-npc-delete="${npc.id}" title="Delete NPC" type="button">✕</button>
         </div>
         ${meta ? `<div class="party-meta"><span class="party-meta-left">${escHtml(meta)}</span></div>` : ""}
-        <div class="party-stats" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; text-align: center;">
+        <div class="party-stats" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; text-align: left; align-items: start;">
           <div class="party-stat">
             ${getNPCStatIcon("hp")}
             <div class="party-stat-value">${track(npc.hpCurrent, npc.hpMax)}</div>
@@ -134,15 +134,16 @@ export function renderNpcList() {
             <div class="party-stat-value">${npc.ac === "" || npc.ac == null ? "—" : npc.ac}</div>
           </div>
         </div>
-        <div class="npc-core-stats" style="display: grid; grid-template-columns: repeat(5, 1fr); text-align: center; gap: 2px 0; margin-top: 6px;">
-          <div class="npc-core-stat-label-row" style="grid-column: 1 / -1; display: grid; grid-template-columns: repeat(5, 1fr);">
+        <div class="divider" style="margin: 10px 0 6px 0;"></div>
+        <div class="npc-core-stats" style="display: grid; grid-template-columns: repeat(5, 1fr); text-align: left; gap: 2px 0;">
+          <div class="npc-core-stat-label-row" style="grid-column: 1 / -1; display: grid; grid-template-columns: repeat(5, 1fr); text-align: left;">
             <span class="npc-core-stat-label">PWR</span>
             <span class="npc-core-stat-label">SPD</span>
-            <span class="npc-core-stat-label">TEC</span>
+            <span class="npc-core-stat-label">TECH</span>
             <span class="npc-core-stat-label">INT</span>
-            <span class="npc-core-stat-label">COO</span>
+            <span class="npc-core-stat-label">COOP</span>
           </div>
-          <div class="npc-core-stat-value-row" style="grid-column: 1 / -1; display: grid; grid-template-columns: repeat(5, 1fr);">
+          <div class="npc-core-stat-value-row" style="grid-column: 1 / -1; display: grid; grid-template-columns: repeat(5, 1fr); text-align: left;">
             <span class="npc-core-stat-value">${npc.stats?.power?.score !== "" && npc.stats?.power?.score != null ? npc.stats.power.score : "—"}</span>
             <span class="npc-core-stat-value">${npc.stats?.speed?.score !== "" && npc.stats?.speed?.score != null ? npc.stats.speed.score : "—"}</span>
             <span class="npc-core-stat-value">${npc.stats?.technique?.score !== "" && npc.stats?.technique?.score != null ? npc.stats.technique.score : "—"}</span>
