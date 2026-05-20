@@ -120,18 +120,24 @@ export function renderNpcList() {
             data-npc-delete="${npc.id}" title="Delete NPC" type="button">✕</button>
         </div>
         ${meta ? `<div class="party-meta"><span class="party-meta-left">${escHtml(meta)}</span></div>` : ""}
-        <div class="party-stats" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; text-align: center; align-items: center;">
+        <div class="party-stats" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; text-align: center; align-items: center; justify-items: center;">
           <div class="party-stat">
-            ${getNPCStatIcon("hp")}
-            <div class="party-stat-value">${track(npc.hpCurrent, npc.hpMax)}</div>
+            <div style="display: flex; flex-direction: column; align-items: center;">
+              ${getNPCStatIcon("hp")}
+              <div class="party-stat-value">${track(npc.hpCurrent, npc.hpMax)}</div>
+            </div>
           </div>
           <div class="party-stat">
-            ${getNPCStatIcon("ce")}
-            <div class="party-stat-value">${track(npc.ceCurrent, npc.ceMax)}</div>
+            <div style="display: flex; flex-direction: column; align-items: center;">
+              ${getNPCStatIcon("ce")}
+              <div class="party-stat-value">${track(npc.ceCurrent, npc.ceMax)}</div>
+            </div>
           </div>
           <div class="party-stat">
-            ${getNPCStatIcon("ac")}
-            <div class="party-stat-value">${npc.ac === "" || npc.ac == null ? "—" : npc.ac}</div>
+            <div style="display: flex; flex-direction: column; align-items: center;">
+              ${getNPCStatIcon("ac")}
+              <div class="party-stat-value">${npc.ac === "" || npc.ac == null ? "—" : npc.ac}</div>
+            </div>
           </div>
         </div>
         <div class="divider" style="margin: 10px 0 6px 0;"></div>
