@@ -59,6 +59,7 @@ import { initGmRole, isGm } from "./gm.js";
 import { initNotes, applyNotesStateToUI } from "./notes.js";
 import { initTraining, renderTraining } from "./training.js";
 import { initSkills, renderSkills } from "./skills.js";
+import { initNpcs, renderNpcList, saveNpcEdits } from "./npc.js";
 
 
 // ── RUNTIME STATE ─────────────────────────────────────────────────────────────
@@ -73,7 +74,9 @@ let _lastSaveTooltip = "No save yet.";
 // The global `state` (GM's own sheet) is never modified.
 let _gmState        = null;
 let _viewedPlayerId = null;
+let _viewingNpcId   = null; // non-null when GM is editing an NPC (not a player)
 let _gmPushTimer    = null;
+let _npcSaveTimer   = null;
 
 function getActiveState() {
   return _gmState !== null ? _gmState : state;
@@ -85,14 +88,21 @@ function applySheetState(fullState) {
 }
 
 function clearSheetState() {
+  // If leaving an NPC sheet, write edits back to state.npcs before clearing
+  if (_viewingNpcId && _gmState) {
+    saveNpcEdits(_viewingNpcId, _gmState);
+  }
   clearTimeout(_gmPushTimer);
+  clearTimeout(_npcSaveTimer);
   _gmPushTimer    = null;
+  _npcSaveTimer   = null;
   _gmState        = null;
   _viewedPlayerId = null;
+  _viewingNpcId   = null;
   _applyStateToUI();
 }
 
-// Debounced push of edited _gmState to the target player (600ms, same as scheduleSave)
+// Debounced push of GM edits to the target player
 function scheduleGmPush() {
   if (_gmState === null || !_viewedPlayerId) return;
   clearTimeout(_gmPushTimer);
@@ -105,6 +115,17 @@ function scheduleGmPush() {
         { destination: "REMOTE" },
       );
     } catch (_) {}
+  }, 600);
+}
+
+// Debounced write of NPC edits back into state.npcs
+function scheduleNpcSave() {
+  if (_gmState === null || !_viewingNpcId) return;
+  clearTimeout(_npcSaveTimer);
+  _npcSaveTimer = setTimeout(() => {
+    _npcSaveTimer = null;
+    saveNpcEdits(_viewingNpcId, _gmState);
+    persistence.scheduleSave();
   }, 600);
 }
 
@@ -240,8 +261,11 @@ const persistence = createPersistenceRuntime({
 
 function scheduleSave() {
   if (_gmState !== null) {
-    // GM is editing a member's sheet — push to player instead of saving own state
-    scheduleGmPush();
+    if (_viewingNpcId) {
+      scheduleNpcSave();   // NPC edit → write back to state.npcs
+    } else {
+      scheduleGmPush();    // Player edit → push to player via broadcast
+    }
     return;
   }
   persistence.scheduleSave();
@@ -265,6 +289,7 @@ function _applyStateToUI() {
   renderRollHistory();
 
   if (!viewing) renderPartyList();
+  if (!viewing) renderNpcList();
 
   renderInventory();
   renderCombatTabData(computeCombatTabData(s));
@@ -368,6 +393,20 @@ async function init() {
     getState:  getActiveState,
     scheduleSave,
     showRollToast,
+  });
+
+  initNpcs({
+    getState:    () => state,  // NPC list always reads own state
+    scheduleSave: () => persistence.scheduleSave(),
+    onOpenNpc: (npc) => {
+      _viewingNpcId   = npc.id;
+      _viewedPlayerId = null;  // not a player
+      enterMemberSheet(
+        { ...npc },            // shallow copy so edits don't mutate array directly
+        npc.charName || "NPC",
+        "NPC",
+      );
+    },
   });
 
   document.getElementById("gradeSelect")
