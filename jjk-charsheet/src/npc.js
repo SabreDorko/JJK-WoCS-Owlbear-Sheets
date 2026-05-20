@@ -261,3 +261,10 @@ function ceIcon() {
     <path fill="currentColor" d="M14 2 25 14 14 26 3 14Z"/>
   </svg>`;
 }
+
+function acIcon() {
+  return `<svg class="party-stat-icon" viewBox="0 0 60 68" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <path d="M30 4L5 13V36C5 50 17 62 30 66C43 62 55 50 55 36V13L30 4Z" stroke="currentColor" stroke-width="1.8" fill="#e2d9c8" />
+    <path d="M30 9L9 17V36C9 48 19 58 30 62C41 58 51 48 51 36V17L30 9Z" stroke="currentColor" stroke-width="0.8" fill="none" stroke-dasharray="2 2" />
+  </svg>`;
+}
