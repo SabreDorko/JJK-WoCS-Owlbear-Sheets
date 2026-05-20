@@ -1,3 +1,11 @@
+.party-stats {
+  text-align: center !important;
+}
+.party-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
 /* NPC core stats grid alignment fix */
 .npc-core-stats {
   display: grid;
