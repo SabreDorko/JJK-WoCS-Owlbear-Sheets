@@ -19,6 +19,7 @@
       <div class="tab" data-tab="party" style="display:none;">Party</div>
       <div class="tab" data-tab="npcs" style="display:none;">NPCs</div>
       <div class="tab" data-tab="spirits" style="display:none;">Spirits</div>
+      <div class="tab" data-tab="spirit-sheet" style="display:none;">Spirit</div>
       <div class="tab active" data-tab="character">Character</div>
       <div class="tab" data-tab="archetype">Archetype</div>
       <div class="tab" data-tab="inventory">Inventory</div>
@@ -880,15 +881,17 @@
 
       <div class="tab-panel" id="panel-spirits">
         <div class="party-panel">
-          <div class="party-header">
-            <div class="party-title">Spirits</div>
-            <div class="party-note">Cursed spirits and entities tracked by the GM.</div>
+          <div class="npc-toolbar">
+            <input id="spiritSearchInput" class="meta-input npc-search-input" type="text"
+              placeholder="Search spirits…" autocomplete="off" />
+            <button id="addSpiritBtn" class="inventory-mini-btn" type="button">New Spirit</button>
           </div>
-          <div id="spiritList" class="party-list">
-            <div class="party-empty">No spirits yet.</div>
-          </div>
+          <div id="spiritList" class="party-list"></div>
         </div>
       </div>
+
+      <!-- Spirit sheet panel — rendered dynamically by ui-shell.js -->
+      <div class="tab-panel" id="panel-spirit-sheet"></div>
 
       <div class="tab-panel" id="panel-notes">
         <div class="notes-panel">

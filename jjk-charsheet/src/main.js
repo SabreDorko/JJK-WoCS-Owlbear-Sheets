@@ -54,12 +54,13 @@ import {
   addIncomingGroupRoll,
   clearGroupRollHistory,
 } from "./rolls.js";
-import { initUiShell, applyGmLayout, enterMemberSheet } from "./ui-shell.js";
+import { initUiShell, applyGmLayout, enterMemberSheet, enterSpiritSheet } from "./ui-shell.js";
 import { initGmRole, isGm } from "./gm.js";
 import { initNotes, applyNotesStateToUI } from "./notes.js";
 import { initTraining, renderTraining } from "./training.js";
 import { initSkills, renderSkills } from "./skills.js";
 import { initNpcs, renderNpcList, saveNpcEdits } from "./npc.js";
+import { initSpirits, renderSpiritList, saveSpiritEdits } from "./spirit.js";
 
 
 // ── RUNTIME STATE ─────────────────────────────────────────────────────────────
@@ -70,13 +71,12 @@ let obrReady         = false;
 let _lastSaveTooltip = "No save yet.";
 
 // ── GM SHEET VIEW & EDITING ───────────────────────────────────────────────────
-// _gmState: the member's full state while GM is viewing/editing their sheet.
-// The global `state` (GM's own sheet) is never modified.
-let _gmState        = null;
-let _viewedPlayerId = null;
-let _viewingNpcId   = null; // non-null when GM is editing an NPC (not a player)
-let _gmPushTimer    = null;
-let _npcSaveTimer   = null;
+let _gmState         = null;
+let _viewedPlayerId  = null;
+let _viewingNpcId    = null;
+let _viewingSpiritId = null;
+let _gmPushTimer     = null;
+let _npcSaveTimer    = null;
 
 function getActiveState() {
   return _gmState !== null ? _gmState : state;
@@ -88,21 +88,19 @@ function applySheetState(fullState) {
 }
 
 function clearSheetState() {
-  // If leaving an NPC sheet, write edits back to state.npcs before clearing
-  if (_viewingNpcId && _gmState) {
-    saveNpcEdits(_viewingNpcId, _gmState);
-  }
+  if (_viewingNpcId    && _gmState) saveNpcEdits(_viewingNpcId, _gmState);
+  if (_viewingSpiritId && _gmState) saveSpiritEdits(_viewingSpiritId, _gmState);
   clearTimeout(_gmPushTimer);
   clearTimeout(_npcSaveTimer);
-  _gmPushTimer    = null;
-  _npcSaveTimer   = null;
-  _gmState        = null;
-  _viewedPlayerId = null;
-  _viewingNpcId   = null;
+  _gmPushTimer     = null;
+  _npcSaveTimer    = null;
+  _gmState         = null;
+  _viewedPlayerId  = null;
+  _viewingNpcId    = null;
+  _viewingSpiritId = null;
   _applyStateToUI();
 }
 
-// Debounced push of GM edits to the target player
 function scheduleGmPush() {
   if (_gmState === null || !_viewedPlayerId) return;
   clearTimeout(_gmPushTimer);
@@ -118,13 +116,13 @@ function scheduleGmPush() {
   }, 600);
 }
 
-// Debounced write of NPC edits back into state.npcs
 function scheduleNpcSave() {
-  if (_gmState === null || !_viewingNpcId) return;
+  if (_gmState === null || (!_viewingNpcId && !_viewingSpiritId)) return;
   clearTimeout(_npcSaveTimer);
   _npcSaveTimer = setTimeout(() => {
     _npcSaveTimer = null;
-    saveNpcEdits(_viewingNpcId, _gmState);
+    if (_viewingNpcId)    saveNpcEdits(_viewingNpcId, _gmState);
+    if (_viewingSpiritId) saveSpiritEdits(_viewingSpiritId, _gmState);
     persistence.scheduleSave();
   }, 600);
 }
@@ -261,8 +259,8 @@ const persistence = createPersistenceRuntime({
 
 function scheduleSave() {
   if (_gmState !== null) {
-    if (_viewingNpcId) {
-      scheduleNpcSave();   // NPC edit → write back to state.npcs
+    if (_viewingNpcId || _viewingSpiritId) {
+      scheduleNpcSave();   // NPC/Spirit edit → write back to state
     } else {
       scheduleGmPush();    // Player edit → push to player via broadcast
     }
@@ -290,6 +288,7 @@ function _applyStateToUI() {
 
   if (!viewing) renderPartyList();
   if (!viewing) renderNpcList();
+  if (!viewing) renderSpiritList();
 
   renderInventory();
   renderCombatTabData(computeCombatTabData(s));
@@ -396,16 +395,25 @@ async function init() {
   });
 
   initNpcs({
-    getState:    () => state,  // NPC list always reads own state
+    getState:     () => state,
     scheduleSave: () => persistence.scheduleSave(),
     onOpenNpc: (npc) => {
-      _viewingNpcId   = npc.id;
-      _viewedPlayerId = null;  // not a player
-      enterMemberSheet(
-        { ...npc },            // shallow copy so edits don't mutate array directly
-        npc.charName || "NPC",
-        "NPC",
-      );
+      _viewingNpcId    = npc.id;
+      _viewedPlayerId  = null;
+      _viewingSpiritId = null;
+      enterMemberSheet({ ...npc }, npc.charName || "NPC", "NPC");
+    },
+  });
+
+  initSpirits({
+    getState:     () => state,
+    scheduleSave: () => persistence.scheduleSave(),
+    onOpenSpirit: (spirit) => {
+      _viewingSpiritId = spirit.id;
+      _viewedPlayerId  = null;
+      _viewingNpcId    = null;
+      _gmState = { ...spirit };
+      enterSpiritSheet(_gmState, scheduleSave);
     },
   });
 

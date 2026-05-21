@@ -84,6 +84,7 @@ export function createPersistenceRuntime({
     const roomState = { ...state };
     delete roomState.rollHistory;
     delete roomState.npcs;
+    delete roomState.spirits;
 
     try {
       await OBR.room.setMetadata({ [key]: roomState });

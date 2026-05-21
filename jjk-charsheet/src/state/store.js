@@ -126,6 +126,7 @@ export function defaultState() {
     dormItemIds: [],
     notes: [],
     npcs: [],
+    spirits: [],
     equippedSlots: {
       head: null,
       body: null,
