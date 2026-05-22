@@ -4992,208 +4992,29 @@
       background: var(--parchment-dark);
     }
 
-    /* ── SPIRIT SHEET PANEL ─────────────────────────────────── */
-    .spirit-sheet {
+    /* ── SPIRIT SHEET ───────────────────────────────────────── */
+    .spirit-sheet { display: flex; flex-direction: column; gap: 0; }
+
+    .spirit-healing-box {
       display: flex;
       flex-direction: column;
-      gap: 8px;
-      padding-bottom: 16px;
-    }
-
-    .spirit-header {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-
-    .spirit-header-name-row {
-      display: flex;
-      align-items: flex-end;
-      gap: 10px;
-    }
-
-    .spirit-name-input {
-      flex: 1;
-    }
-
-    .spirit-vitals-row {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 6px;
-      height: 60px;
-    }
-
-    .spirit-vital {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 3px;
-      padding: 4px;
-    }
-
-    .spirit-vital-track {
-      display: flex;
-      align-items: center;
-      gap: 3px;
-    }
-
-    .spirit-vital-input {
-      width: 36px;
-      border: none;
-      border-bottom: 1px solid var(--border);
-      background: transparent;
-      font-family: 'Crimson Text', serif;
-      font-size: 15px;
-      text-align: center;
-      color: var(--ink);
-      padding: 0;
-    }
-
-    .spirit-vital-sep {
-      font-family: 'Cinzel', serif;
-      font-size: 11px;
-      color: var(--ink-faint);
-    }
-
-    .spirit-vital-value {
-      font-family: 'Cinzel', serif;
-      font-size: 16px;
-      color: var(--ink);
-      font-weight: 700;
-    }
-
-    /* Stats grid — 3 center + 2 right stacked */
-    .spirit-stats-grid {
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-    }
-
-    .spirit-stat-block {
-      display: flex;
-      flex-direction: column;
-      gap: 3px;
-    }
-
-    .spirit-stat-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      border-bottom: 1px solid var(--border);
-      padding-bottom: 3px;
-      margin-bottom: 3px;
-    }
-
-    .spirit-stat-label {
-      font-family: 'Cinzel', serif;
-      font-size: 9px;
-      letter-spacing: 1.5px;
-      text-transform: uppercase;
-      color: var(--ink);
-    }
-
-    .spirit-stat-input {
-      width: 36px;
-      border: none;
-      border-bottom: 1px solid var(--border);
-      background: transparent;
-      font-family: 'Cinzel', serif;
-      font-size: 13px;
-      text-align: center;
-      color: var(--ink);
-      padding: 0;
-    }
-
-    .spirit-skills-list {
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
-    }
-
-    .spirit-skill-row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 6px;
-    }
-
-    .spirit-skill-name {
-      font-family: 'Crimson Text', serif;
-      font-size: 12px;
-      color: var(--ink);
-      flex: 1;
-    }
-
-    .spirit-apt-btn {
-      background: none;
-      border: 1px solid var(--border);
-      width: 22px;
-      height: 22px;
-      font-size: 12px;
-      cursor: pointer;
-      color: var(--ink);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      flex-shrink: 0;
-      transition: border-color 120ms;
-    }
-    .spirit-apt-btn:hover { border-color: var(--ink); }
-
-    /* Combat block */
-    .spirit-combat-grid {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 8px;
-    }
-
-    .spirit-combat-stat {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      border: 1px solid var(--border);
-      padding: 6px 8px;
-      gap: 2px;
-      text-align: center;
-    }
-
-    .spirit-combat-val {
-      font-family: 'Cinzel', serif;
-      font-size: 14px;
-      font-weight: 700;
-      color: var(--ink);
-    }
-
-    .spirit-combat-sub {
-      font-family: 'Crimson Text', serif;
-      font-size: 11px;
-      color: var(--ink-faint);
-      font-style: italic;
-    }
-
-    .spirit-healing-stat { grid-column: 1 / -1; flex-direction: row; justify-content: space-between; align-items: center; }
-    .spirit-heal-btn { margin-left: auto; }
-
-    /* Points input */
-    .spirit-points-label {
-      font-family: 'Crimson Text', serif;
-      font-size: 13px;
-      color: var(--ink-faint);
-      display: flex;
       align-items: center;
       gap: 4px;
+      padding: 8px 4px;
     }
-    .spirit-points-input {
-      width: 48px;
-      border: none;
-      border-bottom: 1px solid var(--border);
-      background: transparent;
+    .spirit-healing-str {
       font-family: 'Crimson Text', serif;
-      font-size: 13px;
-      text-align: center;
+      font-size: 14px;
       color: var(--ink);
-      padding: 0;
+      text-align: center;
+    }
+    .spirit-heal-btn { margin-top: 2px; }
+    .spirit-heal-result {
+      font-family: 'Crimson Text', serif;
+      font-size: 12px;
+      color: var(--ink-faint);
+      font-style: italic;
+      margin-top: 2px;
     }
 
     /* ── GM ROLE BADGE ──────────────────────────────────────── */

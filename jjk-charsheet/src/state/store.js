@@ -1,146 +1,208 @@
-// ── CHANNEL / STORAGE CONSTANTS ───────────────────────────────────────────────
-export const STORAGE_KEY_BASE           = "jjk-charsheet-v1";
-export const ROLL_BROADCAST_CHANNEL     = "jjk-roll-v1";
-export const PARTY_BROADCAST_CHANNEL    = "jjk-party-v1";
-export const PARTY_SYNC_REQUEST_CHANNEL = "jjk-party-sync-v1";
-export const GM_STATE_REQUEST_CHANNEL   = "jjk-gm-state-request-v1";  // GM → player: "send me your full state"
-export const GM_STATE_RESPONSE_CHANNEL  = "jjk-gm-state-response-v1"; // player → GM: full state payload
-export const GM_STATE_PUSH_CHANNEL      = "jjk-gm-state-push-v1";     // GM → player: "apply this edited state"
+import OBR from "https://cdn.jsdelivr.net/npm/@owlbear-rodeo/sdk@3.1.0/+esm";
 
-// ── ARCHETYPES ────────────────────────────────────────────────────────────────
-export const ARCHETYPES = {
-  acrobat:       ["Untouchable", "Link"],
-  brawler:       ["Merciless", "Pain Glutton"],
-  brutalizer:    ["Cannibal", "Hitman"],
-  caster:        ["Sniper", "Zoner"],
-  speedster:     ["Distance Runner", "Bolt"],
-  unbreakable:   ["Everlasting", "Resilient"],
-  mastermind:    ["Trickster", "Manipulator"],
-  swordsman:     ["Lazy", "Upstart"],
-  shaman:        ["Physician", "Mystic"],
-  prodigy:       ["Divine", "Damned"],
-  rebel:         ["Revolutionary", "Black Sheep"],
-  confidant:     ["Comedian", "Mentor"],
-  thrill_seeker: ["Easygoing", "Gambler"],
-  tinkerer:      ["Technician", "Engineer"],
-  toxicologist:  ["Plague", "Herbalist"],
-  custom:        ["Custom A", "Custom B"],
-};
+export function mergeLoadedState({ saved, defaultState, centerStats, rightStats }) {
+  const next = { ...defaultState(), ...saved };
 
-// ── STAT DEFINITIONS ──────────────────────────────────────────────────────────
-export const CENTER_STATS = [
-  { key: "power",     label: "POWER",     skills: ["Athletics", "Combat", "Fortitude", "Intimidation", "Strength"] },
-  { key: "speed",     label: "SPEED",     skills: ["Precision", "Reaction", "Stealth", "Tempo"] },
-  { key: "technique", label: "TECHNIQUE", skills: ["Acrobatics", "Control", "Survival", "Talent"] },
-];
+  if (!next.overrides || typeof next.overrides !== "object") next.overrides = { derived: {}, subskills: {} };
+  if (!next.overrides.derived || typeof next.overrides.derived !== "object") next.overrides.derived = {};
+  if (!next.overrides.subskills || typeof next.overrides.subskills !== "object") next.overrides.subskills = {};
+  if (!Array.isArray(next.directModifiers)) next.directModifiers = [];
 
-export const RIGHT_STATS = [
-  { key: "intelligence", label: "INTELLIGENCE", skills: ["Cursed Technique Education", "General Education", "Medical Education", "Perception", "Tech Education"] },
-  { key: "cooperation",  label: "COOPERATION",  skills: ["Charisma", "Combo", "Deception", "Insight", "Persuasion"] },
-];
+  if (next.archetype2 || next.subArchetype2) {
+    next.hasSecondArchetype = true;
+  }
 
-export const BODY_SLOT_KEYS = [
-  "head",
-  "body",
-  "legs",
-  "feet",
-  "rightHand",
-  "leftHand",
-  "accessory1",
-  "accessory2",
-];
+  if (saved?.stats) {
+    [...centerStats, ...rightStats].forEach(def => {
+      if (saved.stats[def.key]) {
+        const savedStat = saved.stats[def.key];
+        const savedSkills = Array.isArray(savedStat.skills) ? savedStat.skills : [];
+        next.stats[def.key] = {
+          score: savedStat.score ?? "",
+          skills: def.skills.map((_, i) => {
+            const savedSkill = savedSkills[i] || {};
+            const rawAptitude = parseInt(savedSkill.aptitude, 10);
+            const aptitude = Number.isFinite(rawAptitude)
+              ? Math.max(0, Math.min(2, rawAptitude))
+              : (savedSkill.dot ? 1 : 0);
+            return { aptitude };
+          }),
+        };
+      }
+    });
+  }
 
-export const BODY_SLOT_LABELS = {
-  head: "Head",
-  body: "Body",
-  legs: "Legs",
-  feet: "Feet",
-  rightHand: "Right Hand",
-  leftHand: "Left Hand",
-  accessory1: "Accessory 1",
-  accessory2: "Accessory 2",
-};
+  return next;
+}
 
-// ── DEFAULT STATE ─────────────────────────────────────────────────────────────
-export function defaultState() {
-  const stats = {};
-  [...CENTER_STATS, ...RIGHT_STATS].forEach(s => {
-    stats[s.key] = { score: "", skills: s.skills.map(() => ({ aptitude: 0 })) };
-  });
+export function createPersistenceRuntime({
+  storageKeyBase,
+  getState,
+  getLocalPlayerId,
+  onSchedule,
+  onAfterSave,
+  onAfterLoad,
+}) {
+  let saveTimeout = null;
+
+  function parseStateTimestamp(state) {
+    const raw = parseInt(state?.__savedAt, 10);
+    return Number.isFinite(raw) && raw > 0 ? raw : 0;
+  }
+
+  function pickNewestState(preferredA, preferredB) {
+    if (!preferredA && !preferredB) return null;
+    if (!preferredA) return preferredB;
+    if (!preferredB) return preferredA;
+
+    const aTs = parseStateTimestamp(preferredA);
+    const bTs = parseStateTimestamp(preferredB);
+
+    if (aTs > bTs) return preferredA;
+    if (bTs > aTs) return preferredB;
+
+    // If timestamps are missing or identical, prefer local copy for same-device continuity.
+    return preferredB;
+  }
+
+  function getStorageKey() {
+    const localPlayerId = getLocalPlayerId();
+    return localPlayerId ? `${storageKeyBase}-${localPlayerId}` : storageKeyBase;
+  }
+
+  async function saveState() {
+    const state = getState();
+    if (!state || typeof state !== "object") return;
+
+    state.__savedAt = Date.now();
+    let wroteRoom = false;
+    const key = getStorageKey();
+
+    // Try to write to room metadata — strip bulky fields to stay under OBR's
+    // 16 kB limit. rollHistory and npcs are GM/local-only data; players read
+    // their own history from localStorage, and GM reads NPCs from their own state.
+    const roomState = { ...state };
+    delete roomState.rollHistory;
+    delete roomState.npcs;
+    delete roomState.spirits;
+
+    try {
+      await OBR.room.setMetadata({ [key]: roomState });
+      wroteRoom = true;
+    } catch (_) {
+      // Silently fall through — localStorage below is the reliable backup.
+    }
+
+    // Always write full state to localStorage (no size limit concerns)
+    try {
+      localStorage.setItem(key, JSON.stringify(state));
+    } catch (_) {}
+
+    if (onAfterSave) {
+      onAfterSave({
+        savedAt: state.__savedAt,
+        source: wroteRoom ? "room+local" : "local",
+      });
+    }
+  }
+
+  async function loadState() {
+    const key = getStorageKey();
+
+    let roomState = null;
+    let localState = null;
+
+    try {
+      const meta = await OBR.room.getMetadata();
+      roomState = meta[key] || meta[storageKeyBase] || null;
+    } catch (_) {
+      roomState = null;
+    }
+
+    try {
+      const saved = localStorage.getItem(key);
+      localState = saved ? JSON.parse(saved) : null;
+      if (!localState) {
+        const oldSaved = localStorage.getItem(storageKeyBase);
+        localState = oldSaved ? JSON.parse(oldSaved) : null;
+      }
+    } catch (_) {
+      localState = null;
+    }
+
+    const picked = pickNewestState(roomState, localState);
+
+    if (onAfterLoad) {
+      let source = "none";
+      if (picked && picked === roomState) source = "room";
+      else if (picked && picked === localState) source = "local";
+
+      onAfterLoad({
+        savedAt: parseStateTimestamp(picked),
+        source,
+      });
+    }
+
+    return picked;
+  }
+
+  function scheduleSave() {
+    clearTimeout(saveTimeout);
+    if (onSchedule) onSchedule();
+    saveTimeout = setTimeout(saveState, 600);
+  }
+
   return {
-    charName: "", archetype: "", subArchetype: "", age: "",
-    grade: "", ct: "", playerName: "", sorcererXp: "", xp: "0",
-    techniques: {
-      mode: "none",
-      activeSubtab: "technique",
-      applications: [],
-      bindingVows: [],
-      noCtPath: "",
-      notes: "",
-      bindingVowsNotes: "",
-    },
-    training: {
-      jujutsuSkills: [],
-      aptitudeTraining: {
-        activeTrainings: [],
-      },
-    },
-    skills: {
-      xpSkills: [],
-      jujutsuSkills: [],
-    },
-    archetypeProgress: {
-      unlockedAbilityIds: [],
-      permanentAptitudeSelections: [],
-    },
-    customArchetype: {
-      name: "Custom Archetype",
-      scaleStat: "power",
-      subArchetypeA: "Custom A",
-      subArchetypeB: "Custom B",
-      permanentAptitudeStatPicks: ["power", "technique"],
-      permanentAptitudeRules: [
-        "Choose 1 permanent aptitude from Power",
-        "Choose 1 permanent aptitude from Technique",
-      ],
-      startingEquipment: ["", ""],
-      abilities: {
-        tier1A: { id: "custom-tier1-a", name: "Tier 1A", notes: "", minStat: 1 },
-        tier1B: { id: "custom-tier1-b", name: "Tier 1B", notes: "", minStat: 1 },
-        tier2: { id: "custom-tier2", name: "Tier 2", notes: "", minStat: 2 },
-        tier3: { id: "custom-tier3", name: "Tier 3", notes: "", minStat: 3 },
-        tier4: { id: "custom-tier4", name: "Tier 4", notes: "", minStat: 4 },
-        tier5A: { id: "custom-tier5-a", name: "Tier 5A", notes: "", minStat: 5 },
-        tier5B: { id: "custom-tier5-b", name: "Tier 5B", notes: "", minStat: 5 },
-      },
-    },
-    archetypeGrantedAbilities: [],
-    archetype2: "", subArchetype2: "", hasSecondArchetype: false,
-    ac: "", hpCurrent: "", hpMax: "",
-    movement: "", ceCurrent: "", ceMax: "", ceNote: "",
-    yen: "",
-    rollHistory: [],
-    inventoryItems: [],
-    directModifiers: [],
-    inventorySlots: [null, null, null, null, null],
-    dormItemIds: [],
-    notes: [],
-    npcs: [],
-    spirits: [],
-    equippedSlots: {
-      head: null,
-      body: null,
-      legs: null,
-      feet: null,
-      rightHand: null,
-      leftHand: null,
-      accessory1: null,
-      accessory2: null,
-    },
-    overrides: {
-      derived: {},
-      subskills: {},
-    },
-    stats,
+    getStorageKey,
+    saveState,
+    loadState,
+    scheduleSave,
   };
+}
+
+export async function loadStateForPlayer(storageKeyBase, playerId) {
+  const key = playerId ? `${storageKeyBase}-${playerId}` : storageKeyBase;
+  console.log(`[GM loadState] playerId="${playerId}" key="${key}"`);
+
+  let roomState  = null;
+  let localState = null;
+
+  try {
+    const meta = await OBR.room.getMetadata();
+    const allKeys = Object.keys(meta).filter(k => k.startsWith(storageKeyBase));
+    console.log(`[GM loadState] room keys matching base:`, allKeys);
+    roomState = playerId ? (meta[key] || null) : (meta[storageKeyBase] || null);
+    console.log(`[GM loadState] roomState found:`, !!roomState, roomState ? `charName="${roomState.charName}"` : "");
+    if (roomState) {
+      console.log(`[GM loadState] techniques.bindingVows:`, roomState.techniques?.bindingVows);
+      console.log(`[GM loadState] archetypeProgress.unlockedAbilityIds:`, roomState.archetypeProgress?.unlockedAbilityIds);
+    }
+  } catch (err) {
+    console.warn(`[GM loadState] room metadata failed:`, err);
+    roomState = null;
+  }
+
+  try {
+    const saved = localStorage.getItem(key);
+    localState = saved ? JSON.parse(saved) : null;
+    console.log(`[GM loadState] localState found:`, !!localState, localState ? `charName="${localState.charName}"` : "");
+    if (localState) {
+      console.log(`[GM loadState] local techniques.bindingVows:`, localState.techniques?.bindingVows);
+      console.log(`[GM loadState] local archetypeProgress.unlockedAbilityIds:`, localState.archetypeProgress?.unlockedAbilityIds);
+    }
+  } catch (_) {
+    localState = null;
+  }
+
+  if (!roomState && !localState) {
+    console.warn(`[GM loadState] no state found for playerId="${playerId}"`);
+    return null;
+  }
+  if (!roomState) return localState;
+  if (!localState) return roomState;
+  const roomTs  = parseInt(roomState?.__savedAt,  10) || 0;
+  const localTs = parseInt(localState?.__savedAt, 10) || 0;
+  const picked  = roomTs > localTs ? roomState : localState;
+  console.log(`[GM loadState] picked source: ${roomTs > localTs ? "room" : "local"}, charName="${picked.charName}"`);
+  return picked;
 }
