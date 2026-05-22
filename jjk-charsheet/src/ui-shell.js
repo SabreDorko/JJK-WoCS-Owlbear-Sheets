@@ -22,7 +22,7 @@ function scheduleSave() { if (_scheduleSave) _scheduleSave(); }
 const GM_HOME_TABS   = ["party", "npcs", "spirits", "notes"]; // GM home tabs
 const PLAYER_TABS    = ["character", "archetype", "inventory", "combat", "jujutsu", "notes"];
 const MEMBER_TABS    = ["character", "archetype", "inventory", "combat", "jujutsu"]; // no notes when viewing a member
-const SPIRIT_TABS    = ["spirit-sheet", "combat"]; // spirit gets its own dedicated panel and combat tab
+const SPIRIT_TABS    = ["spirit-sheet"]; // spirit gets its own dedicated panel
 
 // ── GM LAYOUT ─────────────────────────────────────────────────────────────────
 
@@ -121,15 +121,15 @@ export function isViewingMemberSheet() {
  * @param {object} spiritState - the spirit's full state (_gmState copy)
  * @param {function} scheduleSave - debounced save callback from main.js
  */
-// Called by main.js when the GM opens a spirit.
-// Shows panel-spirit-sheet and panel-combat as top bar tabs.
 export function enterSpiritSheet(spiritState, scheduleSave) {
   _viewingSpirit = spiritState;
   _spiritSave    = scheduleSave || null;
 
+  // Render the spirit sheet into its dedicated panel
+  renderSpiritSheetPanel(spiritState);
+
   applyGmLayout();
   _activateMainTab?.("spirit-sheet");
-  renderSpiritSheetPanel(spiritState, "spirit-sheet");
 }
 
 function exitSpiritSheet() {
@@ -140,12 +140,9 @@ function exitSpiritSheet() {
   _activateMainTab?.("spirits");
 }
 
-
-// Renders the spirit sheet or combat panel depending on the activeTab
-function renderSpiritSheetPanel(spirit, activeTab = "spirit-sheet") {
-  const sheetPanel = document.getElementById("panel-spirit-sheet");
-  const combatPanel = document.getElementById("panel-combat");
-  if (!sheetPanel || !combatPanel) return;
+function renderSpiritSheetPanel(spirit, activeSubtab = "stats") {
+  const panel = document.getElementById("panel-spirit-sheet");
+  if (!panel) return;
 
   const s = spirit;
   const parseScore = v => { const n = parseInt(v, 10); return Number.isFinite(n) ? Math.max(0, n) : 0; };
@@ -176,8 +173,9 @@ function renderSpiritSheetPanel(spirit, activeTab = "spirit-sheet") {
   ];
   const aptitudeLabels = ["○","◑","●"];
 
-  // Main sheet content (matches player sheet layout)
-  const sheetContent = `
+  // ── STATS SUBTAB ────────────────────────────────────────────────────────────
+  const statsContent = `
+    <!-- Header — mirrors character tab layout -->
     <div class="header-grid">
       <div>
         <div class="jjk-label">呪術廻戦 · Cursed Spirit</div>
@@ -212,8 +210,13 @@ function renderSpiritSheetPanel(spirit, activeTab = "spirit-sheet") {
         </div>
       </div>
     </div>
+
     <div class="divider"></div>
+
+    <!-- Main body — vitals col + stats cols -->
     <div class="main-body">
+
+      <!-- Vitals column -->
       <div class="vitals-col">
         <div class="character-vital-box">
           <span class="vital-label">Health</span>
@@ -252,6 +255,7 @@ function renderSpiritSheetPanel(spirit, activeTab = "spirit-sheet") {
             <span class="move-unit">ft</span>
           </div>
         </div>
+        <!-- Healing — below Movement as requested -->
         <div class="character-vital-box spirit-healing-box">
           <span class="vital-label">Healing (5 CE)</span>
           <div class="spirit-healing-str">${esc(healingStr)}</div>
@@ -259,6 +263,8 @@ function renderSpiritSheetPanel(spirit, activeTab = "spirit-sheet") {
             ${healingDice === 0 ? "disabled" : ""}>Use</button>
         </div>
       </div>
+
+      <!-- Center stats: Power, Speed, Technique -->
       <div class="stats-col">
         ${STATS.slice(0,3).map(stat => {
           const ss = s.stats?.[stat.key] || { score:"", skills: stat.skills.map(()=>({aptitude:0})) };
@@ -281,6 +287,8 @@ function renderSpiritSheetPanel(spirit, activeTab = "spirit-sheet") {
             </div>`;
         }).join("")}
       </div>
+
+      <!-- Right stats: Intelligence, Cooperation -->
       <div class="intel-col">
         ${STATS.slice(3).map(stat => {
           const ss = s.stats?.[stat.key] || { score:"", skills: stat.skills.map(()=>({aptitude:0})) };
@@ -303,10 +311,12 @@ function renderSpiritSheetPanel(spirit, activeTab = "spirit-sheet") {
             </div>`;
         }).join("")}
       </div>
+
     </div>`;
 
-  // Combat content (matches player combat tab style)
+  // ── COMBAT SUBTAB ────────────────────────────────────────────────────────────
   const combatContent = `
+    <!-- Combat header row -->
     <div class="combat-header-grid" style="grid-template-columns:1fr 1fr 1fr;margin-bottom:0.5em;">
       <div class="vital-box" style="display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:6px 0 2px 0;">
         <span class="combat-label" style="margin-bottom:0.5em;margin-top:0.1em;">HP</span>
@@ -351,6 +361,8 @@ function renderSpiritSheetPanel(spirit, activeTab = "spirit-sheet") {
         </div>
       </div>
     </div>
+
+    <!-- Cursed Abilities -->
     <div class="combat-actions-section">
       <div class="combat-section-title">Cursed Abilities</div>
       <div id="spiritAbilitiesList" class="combat-attacks-list">
@@ -358,105 +370,30 @@ function renderSpiritSheetPanel(spirit, activeTab = "spirit-sheet") {
       </div>
       <button class="inventory-mini-btn" id="addSpiritAbilityBtn" type="button" style="margin-top:6px;">+ Add Ability</button>
     </div>
+
+    <!-- Martial Arts (INT ≥ 4 only) -->
     ${martialAvail ? `
     <div class="combat-actions-section">
       <div class="combat-section-title">Martial Arts</div>
       <span class="combat-empty">Martial arts editor — coming soon.</span>
     </div>` : ""}
+
+    <!-- Cursed Skills -->
     <div class="combat-actions-section">
       <div class="combat-section-title">Cursed Skills</div>
       <span class="combat-empty">Skill editor — coming soon.</span>
     </div>`;
 
-  // Show/hide panels based on activeTab
-  if (activeTab === "spirit-sheet") {
-    sheetPanel.innerHTML = `<div class="spirit-sheet">${sheetContent}</div>`;
-    sheetPanel.style.display = "";
-    combatPanel.style.display = "none";
-  } else if (activeTab === "combat") {
-    combatPanel.innerHTML = `<div class="spirit-sheet-combat">${combatContent}</div>`;
-    combatPanel.style.display = "";
-    sheetPanel.style.display = "none";
-  }
-
-  // Event wiring (same as before, but for both panels)
-  const save = () => { if (_spiritSave) _spiritSave(); };
-  const wire = (id, field) => {
-    document.getElementById(id)?.addEventListener("input", e => {
-      _viewingSpirit[field] = e.target.value;
-      save();
-    });
-  };
-  wire("spiritName",      "charName");
-  wire("spiritAge",       "age");
-  wire("spiritHpCurrent", "hpCurrent");
-  wire("spiritHpMax",     "hpMax");
-  wire("spiritCeCurrent", "ceCurrent");
-  wire("spiritCeMax",     "ceMax");
-  wire("spiritMovement",  "movement");
-  wire("spiritXp",        "xp");
-  document.getElementById("spiritHpCurrent2")?.addEventListener("input", e => {
-    _viewingSpirit.hpCurrent = e.target.value; save();
-  });
-  document.getElementById("spiritCeCurrent2")?.addEventListener("input", e => {
-    _viewingSpirit.ceCurrent = e.target.value; save();
-  });
-  document.getElementById("spiritImbueInput")?.addEventListener("input", e => {
-    _viewingSpirit.imbueLevel = parseInt(e.target.value, 10) || 1;
-    if (activeTab === "combat") renderSpiritSheetPanel(_viewingSpirit, "combat");
-    save();
-  });
-  document.getElementById("spiritGrade")?.addEventListener("change", e => {
-    _viewingSpirit.grade = e.target.value;
-    renderSpiritSheetPanel(_viewingSpirit, activeTab);
-    save();
-  });
-  document.querySelectorAll("[data-spirit-stat]").forEach(input => {
-    input.addEventListener("input", () => {
-      const key = input.dataset.spiritStat;
-      if (!_viewingSpirit.stats[key]) _viewingSpirit.stats[key] = { score:"", skills:[] };
-      _viewingSpirit.stats[key].score = input.value;
-      save();
-    });
-  });
-  document.querySelectorAll("[data-spirit-apt]").forEach(btn => {
-    btn.addEventListener("click", () => {
-      const [statKey, siStr] = btn.dataset.spiritApt.split(":");
-      const si = parseInt(siStr, 10);
-      if (!_viewingSpirit.stats[statKey]) _viewingSpirit.stats[statKey] = { score:"", skills:[] };
-      const skills = _viewingSpirit.stats[statKey].skills;
-      while (skills.length <= si) skills.push({ aptitude:0 });
-      const cur = parseInt(skills[si].aptitude, 10) || 0;
-      skills[si].aptitude = (cur + 1) % 3;
-      btn.textContent = aptitudeLabels[skills[si].aptitude];
-      save();
-    });
-  });
-  document.getElementById("spiritHealBtn")?.addEventListener("click", () => {
-    const ce = parseInt(_viewingSpirit.ceCurrent, 10) || 0;
-    if (ce < 5 || healingDice === 0) return;
-    _viewingSpirit.ceCurrent = String(ce - 5);
-    let total = TL;
-    const rolls = [];
-    for (let i = 0; i < healingDice; i++) {
-      const r = Math.floor(Math.random() * 8) + 1;
-      rolls.push(r);
-      total += r;
-    }
-    const resultStr = `${rolls.join(" + ")} + ${TL} (TL) = ${total}`;
-    const healBox = document.querySelector(".spirit-healing-box");
-    if (healBox) {
-      const existing = healBox.querySelector(".spirit-heal-result");
-      if (existing) existing.remove();
-      const resultEl = document.createElement("div");
-      resultEl.className = "spirit-heal-result combat-empty";
-      resultEl.textContent = resultStr;
-      healBox.appendChild(resultEl);
-    }
-    renderSpiritSheetPanel(_viewingSpirit, activeTab);
-    save();
-  });
-}
+  // ── ASSEMBLE ─────────────────────────────────────────────────────────────────
+  panel.innerHTML = `
+    <div class="spirit-sheet">
+      <div class="jujutsu-subtab-bar" role="tablist">
+        <button class="jujutsu-subtab${activeSubtab === "stats" ? " active" : ""}" data-spirit-subtab="stats" type="button" role="tab">Stats</button>
+        <button class="jujutsu-subtab${activeSubtab === "combat" ? " active" : ""}" data-spirit-subtab="combat" type="button" role="tab">Combat</button>
+      </div>
+      <div class="jujutsu-subpanel${activeSubtab === "stats" ? " active" : ""}" data-spirit-panel="stats">${statsContent}</div>
+      <div class="jujutsu-subpanel${activeSubtab === "combat" ? " active" : ""}" data-spirit-panel="combat">${combatContent}</div>
+    </div>`;
 
   // ── EVENT WIRING ─────────────────────────────────────────────────────────────
   const save = () => { if (_spiritSave) _spiritSave(); };
@@ -558,6 +495,7 @@ function renderSpiritSheetPanel(spirit, activeTab = "spirit-sheet") {
     renderSpiritSheetPanel(_viewingSpirit, activeSubtab);
     save();
   });
+}
 
 // ── DEV TOGGLE PANEL ─────────────────────────────────────────────────────────
 
@@ -704,6 +642,5 @@ export function initUiShell({
 
   applyGmLayout();
   _isInitialized = true;
-
   _renderRollHistory?.();
 }
