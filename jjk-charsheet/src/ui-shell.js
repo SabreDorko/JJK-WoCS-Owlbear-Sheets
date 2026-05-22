@@ -270,17 +270,19 @@ function renderSpiritSheetPanel(spirit, activeSubtab = "stats") {
           const ss = s.stats?.[stat.key] || { score:"", skills: stat.skills.map(()=>({aptitude:0})) };
           return `
             <div class="stat-block">
-              <div class="stat-header">
-                <span class="stat-label">${esc(stat.label)}</span>
-                <input class="stat-score" data-spirit-stat="${stat.key}" type="number" min="0" max="7"
-                  value="${esc(ss.score)}" placeholder="0" />
+              <div class="stat-score-side">
+                <div class="stat-label">${esc(stat.label)}</div>
+                <input class="stat-score-input" data-spirit-stat="${stat.key}" type="number" min="0" max="7"
+                  placeholder="—" value="${esc(ss.score)}" />
               </div>
-              <div class="skill-list">
+              <div class="skills-side">
                 ${stat.skills.map((skill, si) => {
                   const apt = Math.max(0, Math.min(2, parseInt(ss.skills?.[si]?.aptitude,10)||0));
                   return `<div class="skill-row">
+                    <div class="skill-dot${apt > 0 ? " filled" : ""}${apt === 2 ? " permanent" : ""}"
+                      data-spirit-apt="${stat.key}:${si}" role="checkbox"
+                      aria-label="${esc(skill)} aptitude" title="Click to cycle aptitude"></div>
                     <span class="skill-name">${esc(skill)}</span>
-                    <button class="apt-dot-btn" data-spirit-apt="${stat.key}:${si}">${aptitudeLabels[apt]}</button>
                   </div>`;
                 }).join("")}
               </div>
@@ -294,17 +296,19 @@ function renderSpiritSheetPanel(spirit, activeSubtab = "stats") {
           const ss = s.stats?.[stat.key] || { score:"", skills: stat.skills.map(()=>({aptitude:0})) };
           return `
             <div class="stat-block">
-              <div class="stat-header">
-                <span class="stat-label">${esc(stat.label)}</span>
-                <input class="stat-score" data-spirit-stat="${stat.key}" type="number" min="0" max="7"
-                  value="${esc(ss.score)}" placeholder="0" />
+              <div class="stat-score-side">
+                <div class="stat-label">${esc(stat.label)}</div>
+                <input class="stat-score-input" data-spirit-stat="${stat.key}" type="number" min="0" max="7"
+                  placeholder="—" value="${esc(ss.score)}" />
               </div>
-              <div class="skill-list">
+              <div class="skills-side">
                 ${stat.skills.map((skill, si) => {
                   const apt = Math.max(0, Math.min(2, parseInt(ss.skills?.[si]?.aptitude,10)||0));
                   return `<div class="skill-row">
+                    <div class="skill-dot${apt > 0 ? " filled" : ""}${apt === 2 ? " permanent" : ""}"
+                      data-spirit-apt="${stat.key}:${si}" role="checkbox"
+                      aria-label="${esc(skill)} aptitude" title="Click to cycle aptitude"></div>
                     <span class="skill-name">${esc(skill)}</span>
-                    <button class="apt-dot-btn" data-spirit-apt="${stat.key}:${si}">${aptitudeLabels[apt]}</button>
                   </div>`;
                 }).join("")}
               </div>
@@ -453,18 +457,19 @@ function renderSpiritSheetPanel(spirit, activeSubtab = "stats") {
     });
   });
 
-  // Aptitude buttons — reuse existing player apt-dot-btn class
-  panel.querySelectorAll("[data-spirit-apt]").forEach(btn => {
-    btn.addEventListener("click", () => {
-      const [statKey, siStr] = btn.dataset.spiritApt.split(":");
+  // Aptitude dots — click cycles 0 → 1 → 2 → 0, updates dot fill
+  panel.querySelectorAll("[data-spirit-apt]").forEach(dot => {
+    dot.addEventListener("click", () => {
+      const [statKey, siStr] = dot.dataset.spiritApt.split(":");
       const si = parseInt(siStr, 10);
       if (!_viewingSpirit.stats[statKey]) _viewingSpirit.stats[statKey] = { score:"", skills:[] };
       const skills = _viewingSpirit.stats[statKey].skills;
       while (skills.length <= si) skills.push({ aptitude:0 });
       const cur = parseInt(skills[si].aptitude, 10) || 0;
-      skills[si].aptitude = (cur + 1) % 3;
-      btn.textContent = aptitudeLabels[skills[si].aptitude];
-      // Update computed AC if TEC or SPD changed
+      const next = (cur + 1) % 3;
+      skills[si].aptitude = next;
+      dot.classList.toggle("filled",     next > 0);
+      dot.classList.toggle("permanent",  next === 2);
       save();
     });
   });
@@ -496,6 +501,7 @@ function renderSpiritSheetPanel(spirit, activeSubtab = "stats") {
     save();
   });
 }
+
 
 // ── DEV TOGGLE PANEL ─────────────────────────────────────────────────────────
 
