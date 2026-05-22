@@ -277,11 +277,15 @@ function renderSpiritSheetPanel(spirit, activeSubtab = "stats") {
               </div>
               <div class="skills-side">
                 ${stat.skills.map((skill, si) => {
-                  const apt = Math.max(0, Math.min(2, parseInt(ss.skills?.[si]?.aptitude,10)||0));
+                  const apt   = Math.max(0, Math.min(2, parseInt(ss.skills?.[si]?.aptitude,10)||0));
+                  const bonus = apt * 2;
+                  const bonusStr = bonus > 0 ? `+${bonus}` : "0";
                   return `<div class="skill-row">
                     <div class="skill-dot${apt > 0 ? " filled" : ""}${apt === 2 ? " permanent" : ""}"
                       data-spirit-apt="${stat.key}:${si}" role="checkbox"
                       aria-label="${esc(skill)} aptitude" title="Click to cycle aptitude"></div>
+                    <input class="skill-bonus-input" type="text" value="${bonusStr}" readonly
+                      data-spirit-bonus="${stat.key}:${si}" title="Aptitude bonus" />
                     <span class="skill-name">${esc(skill)}</span>
                   </div>`;
                 }).join("")}
@@ -303,11 +307,15 @@ function renderSpiritSheetPanel(spirit, activeSubtab = "stats") {
               </div>
               <div class="skills-side">
                 ${stat.skills.map((skill, si) => {
-                  const apt = Math.max(0, Math.min(2, parseInt(ss.skills?.[si]?.aptitude,10)||0));
+                  const apt   = Math.max(0, Math.min(2, parseInt(ss.skills?.[si]?.aptitude,10)||0));
+                  const bonus = apt * 2;
+                  const bonusStr = bonus > 0 ? `+${bonus}` : "0";
                   return `<div class="skill-row">
                     <div class="skill-dot${apt > 0 ? " filled" : ""}${apt === 2 ? " permanent" : ""}"
                       data-spirit-apt="${stat.key}:${si}" role="checkbox"
                       aria-label="${esc(skill)} aptitude" title="Click to cycle aptitude"></div>
+                    <input class="skill-bonus-input" type="text" value="${bonusStr}" readonly
+                      data-spirit-bonus="${stat.key}:${si}" title="Aptitude bonus" />
                     <span class="skill-name">${esc(skill)}</span>
                   </div>`;
                 }).join("")}
@@ -457,7 +465,7 @@ function renderSpiritSheetPanel(spirit, activeSubtab = "stats") {
     });
   });
 
-  // Aptitude dots — click cycles 0 → 1 → 2 → 0, updates dot fill
+  // Aptitude dots — click cycles 0 → 1 → 2 → 0, updates dot fill and bonus display
   panel.querySelectorAll("[data-spirit-apt]").forEach(dot => {
     dot.addEventListener("click", () => {
       const [statKey, siStr] = dot.dataset.spiritApt.split(":");
@@ -465,11 +473,13 @@ function renderSpiritSheetPanel(spirit, activeSubtab = "stats") {
       if (!_viewingSpirit.stats[statKey]) _viewingSpirit.stats[statKey] = { score:"", skills:[] };
       const skills = _viewingSpirit.stats[statKey].skills;
       while (skills.length <= si) skills.push({ aptitude:0 });
-      const cur = parseInt(skills[si].aptitude, 10) || 0;
+      const cur  = parseInt(skills[si].aptitude, 10) || 0;
       const next = (cur + 1) % 3;
       skills[si].aptitude = next;
-      dot.classList.toggle("filled",     next > 0);
-      dot.classList.toggle("permanent",  next === 2);
+      dot.classList.toggle("filled",    next > 0);
+      dot.classList.toggle("permanent", next === 2);
+      const bonusInput = panel.querySelector(`[data-spirit-bonus="${statKey}:${si}"]`);
+      if (bonusInput) bonusInput.value = next > 0 ? `+${next * 2}` : "0";
       save();
     });
   });
