@@ -328,7 +328,17 @@ function renderSpiritSheetPanel(spirit) {
             </div>
             <div class="vital-box header-mini-vital spirit-healing-box">
               <span class="vital-label">Healing (5 CE)</span>
-              <div class="spirit-healing-str" id="spiritHealingValue" style="cursor:pointer;${healingDice === 0 ? 'opacity:0.5;pointer-events:none;' : ''}" title="Click to roll healing">${esc(healingStr)}</div>
+              <div class="spirit-healing-str" id="spiritHealingValue"
+                style="${healingDice === 0
+                  ? 'opacity:0.45;pointer-events:none;cursor:default;'
+                  : (parseInt(s.ceCurrent, 10) >= 5
+                      ? 'cursor:pointer;'
+                      : 'opacity:0.45;pointer-events:none;cursor:not-allowed;')}"
+                title="${healingDice === 0
+                  ? 'N/A'
+                  : (parseInt(s.ceCurrent, 10) >= 5
+                      ? 'Click to heal (costs 5 CE)'
+                      : 'Not enough CE (need 5)')}">${esc(healingStr)}</div>
             </div>
           </div>
         </div>
@@ -438,32 +448,85 @@ function renderSpiritSheetPanel(spirit) {
     });
   });
 
-  // Healing value click — show roll toast and update CE
-  panel.querySelector('#spiritHealingValue')?.addEventListener('click', () => {
+  // Healing value click — roll dice, deduct 5 CE, add HP (no overheal), update all inputs
+  const healingValueEl = panel.querySelector('#spiritHealingValue');
+
+  const refreshHealBtnAppearance = () => {
+    if (!healingValueEl) return;
+    const healingDiceNow = healingDiceMap[_viewingSpirit.grade] ?? 0;
+    const ce = parseInt(_viewingSpirit.ceCurrent, 10);
+    const canHeal = healingDiceNow > 0 && Number.isFinite(ce) && ce >= 5;
+    const noHeal  = healingDiceNow === 0;
+    if (noHeal) {
+      healingValueEl.style.opacity        = "0.45";
+      healingValueEl.style.pointerEvents  = "none";
+      healingValueEl.style.cursor         = "default";
+      healingValueEl.title                = "N/A";
+    } else if (canHeal) {
+      healingValueEl.style.opacity        = "";
+      healingValueEl.style.pointerEvents  = "";
+      healingValueEl.style.cursor         = "pointer";
+      healingValueEl.title                = "Click to heal (costs 5 CE)";
+    } else {
+      healingValueEl.style.opacity        = "0.45";
+      healingValueEl.style.pointerEvents  = "none";
+      healingValueEl.style.cursor         = "not-allowed";
+      healingValueEl.title                = "Not enough CE (need 5)";
+    }
+  };
+
+  // Keep appearance in sync whenever CE changes via the input
+  panel.querySelector('#spiritCeCurrent')?.addEventListener('input', refreshHealBtnAppearance);
+
+  // Run once on open
+  refreshHealBtnAppearance();
+
+  healingValueEl?.addEventListener('click', () => {
     const TLnow = parseScore(_viewingSpirit.stats?.technique?.score);
     const healingDiceNow = healingDiceMap[_viewingSpirit.grade] ?? 0;
-    const ce = parseInt(_viewingSpirit.ceCurrent, 10) || 0;
-    if (ce < 5 || healingDiceNow === 0) return;
+    const ce = parseInt(_viewingSpirit.ceCurrent, 10);
+    if (!Number.isFinite(ce) || ce < 5 || healingDiceNow === 0) return;
+
+    // Deduct CE
     _viewingSpirit.ceCurrent = String(ce - 5);
-    // Update CE input in-place
-    const ceInput = panel.querySelector('#spiritHpCurrent') ? panel.querySelector('#spiritCeCurrent') : null;
-    if (ceInput) ceInput.value = _viewingSpirit.ceCurrent;
-    let total = TLnow;
+
+    // Roll healing dice
     const rolls = [];
     for (let i = 0; i < healingDiceNow; i++) {
-      const r = Math.floor(Math.random() * 8) + 1;
-      rolls.push(r);
-      total += r;
+      rolls.push(Math.floor(Math.random() * 8) + 1);
     }
-    // Show as roll toast (if available)
+    const rolled = rolls.reduce((a, b) => a + b, 0);
+    const total  = rolled + TLnow;
+
+    // Apply HP, capped at max (no overheal)
+    const hpMax     = parseInt(_viewingSpirit.hpMax, 10) || 0;
+    const hpCurrent = parseInt(_viewingSpirit.hpCurrent, 10) || 0;
+    _viewingSpirit.hpCurrent = String(Math.min(hpMax, hpCurrent + total));
+
+    // Update all CE inputs (sheet panel + combat panel mirrors)
+    ['spiritCeCurrent', 'spiritCeCurrent2'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.value = _viewingSpirit.ceCurrent;
+    });
+
+    // Update all HP inputs (sheet panel + combat panel mirrors)
+    ['spiritHpCurrent', 'spiritHpCurrent2'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.value = _viewingSpirit.hpCurrent;
+    });
+
+    // Re-check whether the heal button should still be active
+    refreshHealBtnAppearance();
+
+    // Show roll toast
     if (typeof window.showRollToast === 'function') {
       window.showRollToast(
-        'Technique',
+        'Healing',
         healingDiceNow,
         rolls,
         total,
         null,
-        'Healing',
+        _viewingSpirit.charName || 'Spirit',
         { die: 'd8', skillModifier: TLnow },
         null
       );

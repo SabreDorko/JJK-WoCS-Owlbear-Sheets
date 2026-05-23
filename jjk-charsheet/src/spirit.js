@@ -225,7 +225,21 @@ export function renderSpiritList() {
           </div>
         </div>
         <div class="spirit-quick-row">
-          <span class="spirit-quick-chip" title="Healing">⟳ ${escHtml(data.healingStr)}</span>
+          ${(() => {
+            const ce = parseInt(spirit.ceCurrent, 10);
+            const canHeal = data.healingDice > 0 && Number.isFinite(ce) && ce >= 5;
+            const noHeal  = data.healingDice === 0;
+            const style   = noHeal
+              ? 'pointer-events:none;opacity:0.45;'
+              : canHeal
+                ? 'cursor:pointer;'
+                : 'cursor:not-allowed;opacity:0.45;';
+            const title   = noHeal  ? 'N/A'
+                          : canHeal ? 'Click to heal (costs 5 CE)'
+                                    : 'Not enough CE (need 5)';
+            return `<span class="spirit-quick-chip spirit-heal-chip" data-spirit-heal="${spirit.id}"
+              style="${style}" title="${title}">⟳ ${escHtml(data.healingStr)}</span>`;
+          })()}
           <span class="spirit-quick-chip" title="Black Flash Range">${data.blackFlashRange != null ? `⚡ ${data.blackFlashRange}` : ""}</span>
           <span class="spirit-quick-chip" title="Imbue">◈ ${escHtml(data.imbueDie)}</span>
         </div>
@@ -257,6 +271,54 @@ export function renderSpiritList() {
     btn.addEventListener("click", e => {
       e.stopPropagation();
       deleteSpirit(btn.dataset.spiritDelete);
+    });
+  });
+
+  list.querySelectorAll("[data-spirit-heal]").forEach(chip => {
+    chip.addEventListener("click", e => {
+      e.stopPropagation();
+      const id = chip.dataset.spiritHeal;
+      const spirit = state.spirits.find(s => s.id === id);
+      if (!spirit) return;
+
+      const data = computeSpiritData(spirit);
+      if (data.healingDice === 0) return;
+
+      const ce = parseInt(spirit.ceCurrent, 10);
+      if (!Number.isFinite(ce) || ce < 5) return;
+
+      // Deduct CE
+      spirit.ceCurrent = String(ce - 5);
+
+      // Roll healing dice (Nd8 + TEC)
+      const rolls = [];
+      for (let i = 0; i < data.healingDice; i++) {
+        rolls.push(Math.floor(Math.random() * 8) + 1);
+      }
+      const rolled = rolls.reduce((a, b) => a + b, 0);
+      const total  = rolled + data.techniqueLevel;
+
+      // Apply HP, capped at max (no overheal)
+      const hpMax     = parseInt(spirit.hpMax, 10) || 0;
+      const hpCurrent = parseInt(spirit.hpCurrent, 10) || 0;
+      spirit.hpCurrent = String(Math.min(hpMax, hpCurrent + total));
+
+      scheduleSave();
+      renderSpiritList();
+
+      // Show roll toast if available
+      if (typeof window.showRollToast === "function") {
+        window.showRollToast(
+          "Healing",
+          data.healingDice,
+          rolls,
+          total,
+          null,
+          spirit.charName || "Spirit",
+          { die: "d8", skillModifier: data.techniqueLevel },
+          null
+        );
+      }
     });
   });
 }
