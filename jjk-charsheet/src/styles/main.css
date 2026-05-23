@@ -3,7 +3,7 @@
   transition: color 0.15s;
 }
 .spirit-healing-str:hover {
-  color: var(--accent-red, #b71c1c);
+  color: var(--accent);
 }
 /* Character Vitals Box (used for HP, CE, AC, Movement, Black Flash) */
 .character-vital-box {

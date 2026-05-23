@@ -147,55 +147,53 @@ function exitSpiritSheet() {
 }
 
 function renderSpiritSheetPanel(spirit) {
-    // ── SKILL ROLL TOASTS ─────────────────────────────────────────────
-    // Attach click listeners to skill names for rolling (with crit/bonus logic)
-    setTimeout(() => {
-      panel.querySelectorAll('.skill-name').forEach((el, idx) => {
-        el.style.cursor = 'pointer';
-        el.title = 'Roll this skill';
-        el.addEventListener('click', () => {
-          // Find statKey and skillIdx from parent .stat-block and .skill-row
-          const skillRow = el.closest('.skill-row');
-          const statBlock = el.closest('.stat-block');
-          if (!skillRow || !statBlock) return;
-          // Find statKey from stat-block's input
-          const statInput = statBlock.querySelector('.stat-score-input');
-          if (!statInput) return;
-          const statKey = statInput.dataset.spiritStat;
-          // Find skillIdx by index of .skill-row in .skills-side
-          const skillsSide = statBlock.querySelector('.skills-side');
-          const skillRows = Array.from(skillsSide.querySelectorAll('.skill-row'));
-          const skillIdx = skillRows.indexOf(skillRow);
-          // Get skill value
-          let val = 0;
-          const statObj = _viewingSpirit.stats?.[statKey];
-          if (statObj && Array.isArray(statObj.skills) && statObj.skills[skillIdx]) {
-            val = parseInt(statObj.skills[skillIdx].score, 10);
-            if (!Number.isFinite(val)) val = 0;
-          }
-          // Always roll 1d6 for skills, add crit logic
-          const rolls = [Math.floor(Math.random() * 6) + 1];
-          const total = rolls[0] + val;
-          const maxPossible = 6 + val;
-          const allOnes = rolls[0] === 1;
-          const critStatus = allOnes ? "fail" : (total >= maxPossible ? "success" : null);
-          const breakdown = { skillModifier: val, die: "d6" };
-          if (typeof window.showRollToast === 'function') {
-            const skillName = el.textContent;
-            window.showRollToast(
-              statKey.charAt(0).toUpperCase() + statKey.slice(1).toLowerCase(),
-              1,
-              rolls,
-              total,
-              critStatus,
-              skillName,
-              breakdown,
-              null
-            );
-          }
-        });
-      });
-    }, 0);
+  // ── SKILL ROLL TOASTS ─────────────────────────────────────────────
+  // Attach click listeners to skill names for rolling (with crit/bonus logic)
+  panel.querySelectorAll('.skill-name').forEach((el, idx) => {
+    el.style.cursor = 'pointer';
+    el.title = 'Roll this skill';
+    el.addEventListener('click', () => {
+      // Find statKey and skillIdx from parent .stat-block and .skill-row
+      const skillRow = el.closest('.skill-row');
+      const statBlock = el.closest('.stat-block');
+      if (!skillRow || !statBlock) return;
+      // Find statKey from stat-block's input
+      const statInput = statBlock.querySelector('.stat-score-input');
+      if (!statInput) return;
+      const statKey = statInput.dataset.spiritStat;
+      // Find skillIdx by index of .skill-row in .skills-side
+      const skillsSide = statBlock.querySelector('.skills-side');
+      const skillRows = Array.from(skillsSide.querySelectorAll('.skill-row'));
+      const skillIdx = skillRows.indexOf(skillRow);
+      // Get skill value
+      let val = 0;
+      const statObj = _viewingSpirit.stats?.[statKey];
+      if (statObj && Array.isArray(statObj.skills) && statObj.skills[skillIdx]) {
+        val = parseInt(statObj.skills[skillIdx].score, 10);
+        if (!Number.isFinite(val)) val = 0;
+      }
+      // Always roll 1d6 for skills, add crit logic
+      const rolls = [Math.floor(Math.random() * 6) + 1];
+      const total = rolls[0] + val;
+      const maxPossible = 6 + val;
+      const allOnes = rolls[0] === 1;
+      const critStatus = allOnes ? "fail" : (total >= maxPossible ? "success" : null);
+      const breakdown = { skillModifier: val, die: "d6" };
+      if (typeof window.showRollToast === 'function') {
+        const skillName = el.textContent;
+        window.showRollToast(
+          statKey.charAt(0).toUpperCase() + statKey.slice(1).toLowerCase(),
+          1,
+          rolls,
+          total,
+          critStatus,
+          skillName,
+          breakdown,
+          null
+        );
+      }
+    });
+  });
   const panel = document.getElementById("panel-spirit-sheet");
   if (!panel) return;
 
