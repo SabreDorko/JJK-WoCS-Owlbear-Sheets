@@ -242,12 +242,32 @@ function renderSpiritSheetPanel(spirit) {
               <input class="skill-bonus-input" type="number" min="0"
                 data-spirit-skill="${stat.key}:${si}"
                 value="${esc(skillScore)}" placeholder="—" />
-              <span class="skill-name">${esc(skill)}</span>
+              <span class="skill-name" data-spirit-skill-name="${stat.key}:${si}">${esc(skill)}</span>
             </div>`;
           }).join("")}
         </div>
       </div>`;
   };
+  // ── SKILL ROLL TOASTS ─────────────────────────────────────────────
+  // Attach click listeners to skill names for rolling
+  setTimeout(() => {
+    panel.querySelectorAll('[data-spirit-skill-name]').forEach(el => {
+      el.addEventListener('click', () => {
+        const [statKey, skillIdx] = el.dataset.spiritSkillName.split(":");
+        const statObj = _viewingSpirit.stats?.[statKey];
+        let val = 0;
+        if (statObj && Array.isArray(statObj.skills) && statObj.skills[skillIdx]) {
+          val = parseInt(statObj.skills[skillIdx].score, 10);
+          if (!Number.isFinite(val)) val = 0;
+        }
+        // Use imported showRollToast from rolls.js (should be injected by main.js)
+        if (typeof window.showRollToast === 'function') {
+          const skillName = el.textContent;
+          window.showRollToast(statKey.charAt(0).toUpperCase() + statKey.slice(1).toLowerCase(), 1, [val], val, null, skillName, { die: 'd6' }, null);
+        }
+      });
+    });
+  }, 0);
 
   panel.innerHTML = `
     <div class="spirit-sheet">
