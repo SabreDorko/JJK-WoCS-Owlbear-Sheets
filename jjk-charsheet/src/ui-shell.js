@@ -326,9 +326,7 @@ function renderSpiritSheetPanel(spirit) {
             </div>
             <div class="vital-box header-mini-vital spirit-healing-box">
               <span class="vital-label">Healing (5 CE)</span>
-              <div class="spirit-healing-str">${esc(healingStr)}</div>
-              <button class="inventory-mini-btn spirit-heal-btn" id="spiritHealBtn" type="button"
-                ${healingDice === 0 ? "disabled" : ""}>Use</button>
+              <div class="spirit-healing-str" id="spiritHealingValue" style="cursor:pointer;${healingDice === 0 ? 'opacity:0.5;pointer-events:none;' : ''}" title="Click to roll healing">${esc(healingStr)}</div>
             </div>
           </div>
         </div>
@@ -438,18 +436,16 @@ function renderSpiritSheetPanel(spirit) {
     });
   });
 
-  // Healing button — update CE in-place rather than re-rendering
-  document.getElementById("spiritHealBtn")?.addEventListener("click", () => {
+  // Healing value click — show roll toast and update CE
+  panel.querySelector('#spiritHealingValue')?.addEventListener('click', () => {
     const TLnow = parseScore(_viewingSpirit.stats?.technique?.score);
     const healingDiceNow = healingDiceMap[_viewingSpirit.grade] ?? 0;
     const ce = parseInt(_viewingSpirit.ceCurrent, 10) || 0;
     if (ce < 5 || healingDiceNow === 0) return;
     _viewingSpirit.ceCurrent = String(ce - 5);
-
     // Update CE input in-place
-    const ceInput = panel.querySelector("#spiritHpCurrent") ? panel.querySelector("#spiritCeCurrent") : null;
+    const ceInput = panel.querySelector('#spiritHpCurrent') ? panel.querySelector('#spiritCeCurrent') : null;
     if (ceInput) ceInput.value = _viewingSpirit.ceCurrent;
-
     let total = TLnow;
     const rolls = [];
     for (let i = 0; i < healingDiceNow; i++) {
@@ -457,15 +453,18 @@ function renderSpiritSheetPanel(spirit) {
       rolls.push(r);
       total += r;
     }
-    const resultStr = `${rolls.join(" + ")} + ${TLnow} (TL) = ${total}`;
-    const healBox = panel.querySelector(".spirit-healing-box");
-    if (healBox) {
-      const existing = healBox.querySelector(".spirit-heal-result");
-      if (existing) existing.remove();
-      const resultEl = document.createElement("div");
-      resultEl.className = "spirit-heal-result combat-empty";
-      resultEl.textContent = resultStr;
-      healBox.appendChild(resultEl);
+    // Show as roll toast (if available)
+    if (typeof window.showRollToast === 'function') {
+      window.showRollToast(
+        'Technique',
+        healingDiceNow,
+        rolls,
+        total,
+        null,
+        'Healing',
+        { die: 'd8', skillModifier: TLnow },
+        null
+      );
     }
     save();
   });
