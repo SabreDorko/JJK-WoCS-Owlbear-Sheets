@@ -157,14 +157,32 @@ function renderSpiritSheetPanel(spirit) {
   const updateDerived = () => {
     const TL = parseScore(_viewingSpirit.stats?.technique?.score);
     const SL = parseScore(_viewingSpirit.stats?.speed?.score);
+    const PL = parseScore(_viewingSpirit.stats?.power?.score);
     const ac = TL + SL;
+    const hpMax      = 10 + (PL * 5);
+    const ceMax      = 15 + (TL * 5);
+    const movement   = 30 + (SL * 5);
     const healingDiceMap = { "5":0,"4":1,"Semi-3":1,"3":2,"Semi-2":2,"2":3,"Semi-1":3,"1":4,"Special Grade":5 };
     const healingDice = healingDiceMap[_viewingSpirit.grade] ?? 0;
     const healingStr = healingDice > 0 ? `${healingDice}d8 + ${TL} (TL)` : "N/A";
     const xpThreshold = parseScore(_viewingSpirit.sorcererXp) || TL * 2;
 
+    // Persist computed values to state
+    _viewingSpirit.hpMax    = String(hpMax);
+    _viewingSpirit.ceMax    = String(ceMax);
+    _viewingSpirit.movement = String(movement);
+
     const acInput = panel.querySelector(".ac-inside");
     if (acInput) acInput.value = ac;
+
+    const hpMaxEl = panel.querySelector("#spiritHpMax");
+    if (hpMaxEl) hpMaxEl.value = hpMax;
+
+    const ceMaxEl = panel.querySelector("#spiritCeMax");
+    if (ceMaxEl) ceMaxEl.value = ceMax;
+
+    const movementEl = panel.querySelector("#spiritMovement");
+    if (movementEl) movementEl.value = movement;
 
     const healStrEl = panel.querySelector(".spirit-healing-str");
     if (healStrEl) healStrEl.textContent = healingStr;
@@ -181,11 +199,20 @@ function renderSpiritSheetPanel(spirit) {
 
   const TL = parseScore(s.stats?.technique?.score);
   const SL = parseScore(s.stats?.speed?.score);
+  const PL = parseScore(s.stats?.power?.score);
   const ac = TL + SL;
+  const hpMax    = 10 + (PL * 5);
+  const ceMax    = 15 + (TL * 5);
+  const movement = 30 + (SL * 5);
   const healingDiceMap = { "5":0,"4":1,"Semi-3":1,"3":2,"Semi-2":2,"2":3,"Semi-1":3,"1":4,"Special Grade":5 };
   const healingDice = healingDiceMap[s.grade] ?? 0;
   const healingStr = healingDice > 0 ? `${healingDice}d8 + ${TL} (TL)` : "N/A";
   const xpThreshold = parseScore(s.sorcererXp) || TL * 2;
+
+  // Sync computed vitals into state on open
+  s.hpMax    = String(hpMax);
+  s.ceMax    = String(ceMax);
+  s.movement = String(movement);
 
   const esc = str => String(str ?? "")
     .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
@@ -268,7 +295,7 @@ function renderSpiritSheetPanel(spirit) {
             <div class="hp-row">
               <input class="hp-input" id="spiritHpCurrent" type="number" min="0" value="${esc(s.hpCurrent)}" placeholder="0" />
               <span class="hp-sep">/</span>
-              <input class="hp-input" id="spiritHpMax" type="number" min="0" value="${esc(s.hpMax)}" placeholder="0" />
+              <input class="hp-input" id="spiritHpMax" type="number" value="${hpMax}" readonly style="cursor:default;opacity:0.7;" />
             </div>
           </div>
           <div class="character-vital-box">
@@ -276,7 +303,7 @@ function renderSpiritSheetPanel(spirit) {
             <div class="hp-row">
               <input class="hp-input" id="spiritCeCurrent" type="number" min="0" value="${esc(s.ceCurrent)}" placeholder="0" />
               <span class="hp-sep">/</span>
-              <input class="hp-input" id="spiritCeMax" type="number" min="0" value="${esc(s.ceMax)}" placeholder="0" />
+              <input class="hp-input" id="spiritCeMax" type="number" value="${ceMax}" readonly style="cursor:default;opacity:0.7;" />
             </div>
           </div>
           <div class="character-vital-box">
@@ -296,7 +323,7 @@ function renderSpiritSheetPanel(spirit) {
           <div class="character-vital-box">
             <span class="vital-label">Movement</span>
             <div class="move-row">
-              <input class="move-input" id="spiritMovement" value="${esc(s.movement || "")}" placeholder="—" />
+              <input class="move-input" id="spiritMovement" value="${movement}" readonly style="cursor:default;opacity:0.7;" />
               <span class="move-unit">ft</span>
             </div>
           </div>
@@ -332,10 +359,7 @@ function renderSpiritSheetPanel(spirit) {
 
   wire("spiritName",      "charName");
   wire("spiritHpCurrent", "hpCurrent");
-  wire("spiritHpMax",     "hpMax");
   wire("spiritCeCurrent", "ceCurrent");
-  wire("spiritCeMax",     "ceMax");
-  wire("spiritMovement",  "movement");
   wire("spiritXp",        "xp");
 
   // Grade — update derived values in-place, no full re-render
