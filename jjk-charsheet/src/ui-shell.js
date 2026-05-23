@@ -22,7 +22,7 @@ function scheduleSave() { if (_scheduleSave) _scheduleSave(); }
 const GM_HOME_TABS   = ["party", "npcs", "spirits", "notes"]; // GM home tabs
 const PLAYER_TABS    = ["character", "archetype", "inventory", "combat", "jujutsu", "notes"];
 const MEMBER_TABS    = ["character", "archetype", "inventory", "combat", "jujutsu"]; // no notes when viewing a member
-const SPIRIT_TABS    = ["spirit-sheet"]; // spirit gets its own dedicated panel
+const SPIRIT_TABS    = ["spirit-sheet", "spirit-combat"]; // spirit gets its own dedicated panels
 
 // ── GM LAYOUT ─────────────────────────────────────────────────────────────────
 
@@ -125,8 +125,14 @@ export function enterSpiritSheet(spiritState, scheduleSave) {
   _viewingSpirit = spiritState;
   _spiritSave    = scheduleSave || null;
 
-  // Render the spirit sheet into its dedicated panel
+  // Render both spirit panels
   renderSpiritSheetPanel(spiritState);
+  renderSpiritCombatPanel(spiritState);
+
+  // Wire the top-level spirit-combat tab to re-render on click (keeps data fresh)
+  document.querySelector(".tab[data-tab='spirit-combat']")?.addEventListener("click", () => {
+    if (_viewingSpirit) renderSpiritCombatPanel(_viewingSpirit);
+  });
 
   applyGmLayout();
   _activateMainTab?.("spirit-sheet");
@@ -140,25 +146,46 @@ function exitSpiritSheet() {
   _activateMainTab?.("spirits");
 }
 
-function renderSpiritSheetPanel(spirit, activeSubtab = "stats") {
+function renderSpiritSheetPanel(spirit) {
   const panel = document.getElementById("panel-spirit-sheet");
   if (!panel) return;
 
   const s = spirit;
   const parseScore = v => { const n = parseInt(v, 10); return Number.isFinite(n) ? Math.max(0, n) : 0; };
+
+  // Helper: recompute and push derived values into the DOM without re-rendering
+  const updateDerived = () => {
+    const TL = parseScore(_viewingSpirit.stats?.technique?.score);
+    const SL = parseScore(_viewingSpirit.stats?.speed?.score);
+    const ac = TL + SL;
+    const healingDiceMap = { "5":0,"4":1,"Semi-3":1,"3":2,"Semi-2":2,"2":3,"Semi-1":3,"1":4,"Special Grade":5 };
+    const healingDice = healingDiceMap[_viewingSpirit.grade] ?? 0;
+    const healingStr = healingDice > 0 ? `${healingDice}d8 + ${TL} (TL)` : "N/A";
+    const xpThreshold = parseScore(_viewingSpirit.sorcererXp) || TL * 2;
+
+    const acInput = panel.querySelector(".ac-inside");
+    if (acInput) acInput.value = ac;
+
+    const healStrEl = panel.querySelector(".spirit-healing-str");
+    if (healStrEl) healStrEl.textContent = healingStr;
+
+    const healBtn = panel.querySelector("#spiritHealBtn");
+    if (healBtn) healBtn.disabled = healingDice === 0;
+
+    const xpThreshEl = panel.querySelector(".spirit-xp-threshold-val");
+    if (xpThreshEl) xpThreshEl.textContent = xpThreshold;
+
+    // Also push to combat panel
+    renderSpiritCombatPanel(_viewingSpirit);
+  };
+
   const TL = parseScore(s.stats?.technique?.score);
   const SL = parseScore(s.stats?.speed?.score);
-  const IL = parseScore(s.stats?.intelligence?.score);
   const ac = TL + SL;
-  const bfRange = (TL >= 2 && TL <= 7) ? TL * 4 + 4 : null;
-  const imbueLevel = Math.max(1, Math.min(3, parseInt(s.imbueLevel, 10) || 1));
-  const imbueDie = imbueLevel === 1 ? "1d4" : imbueLevel === 2 ? "1d4+2" : "2d4";
-  const imbueDC = TL * 2;
-  const xpThreshold = parseScore(s.sorcererXp) || TL * 2;
-  const martialAvail = IL >= 4;
   const healingDiceMap = { "5":0,"4":1,"Semi-3":1,"3":2,"Semi-2":2,"2":3,"Semi-1":3,"1":4,"Special Grade":5 };
   const healingDice = healingDiceMap[s.grade] ?? 0;
   const healingStr = healingDice > 0 ? `${healingDice}d8 + ${TL} (TL)` : "N/A";
+  const xpThreshold = parseScore(s.sorcererXp) || TL * 2;
 
   const esc = str => String(str ?? "")
     .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
@@ -171,240 +198,127 @@ function renderSpiritSheetPanel(spirit, activeSubtab = "stats") {
     { key:"intelligence", label:"INTELLIGENCE", skills:["Cursed Technique Education","General Education","Medical Education","Perception","Tech Education"] },
     { key:"cooperation",  label:"COOPERATION",  skills:["Charisma","Combo","Deception","Insight","Persuasion"] },
   ];
-  const aptitudeLabels = ["○","◑","●"];
 
-  // ── STATS SUBTAB ────────────────────────────────────────────────────────────
-  const statsContent = `
-    <!-- Header — mirrors character tab layout -->
-    <div class="header-grid">
-      <div>
-        <div class="jjk-label">呪術廻戦 · Cursed Spirit</div>
-        <input class="name-input" id="spiritName" value="${esc(s.charName || "")}" placeholder="Spirit Name" />
-        <div class="field-label">Spirit Name</div>
-      </div>
-      <div style="display:flex;align-items:center;justify-content:center;padding-top:4px;">
-        <div class="crest"><div class="crest-inner">霊</div></div>
-      </div>
-      <div class="meta-grid">
-        <div class="meta-field">
-          <div class="field-label">Grade</div>
-          <select class="meta-select" id="spiritGrade">
-            ${GRADES.map(g => `<option${s.grade === g ? " selected" : ""}>${esc(g)}</option>`).join("")}
-          </select>
+  const renderStatBlock = (stat) => {
+    const ss = s.stats?.[stat.key] || { score: "", skills: [] };
+    return `
+      <div class="stat-block">
+        <div class="stat-score-side">
+          <div class="stat-label">${esc(stat.label)}</div>
+          <input class="stat-score-input" data-spirit-stat="${stat.key}" type="number" min="0" max="7"
+            placeholder="—" value="${esc(ss.score)}" />
         </div>
-        <div class="meta-field">
-          <div class="field-label">Age</div>
-          <input class="meta-input" id="spiritAge" type="number" min="0" placeholder="—" value="${esc(s.age || "")}" />
-        </div>
-        <div class="header-mini-vitals">
-          <div class="vital-box header-mini-vital">
-            <span class="vital-label">Points</span>
-            <div class="header-mini-value">
-              <input class="header-mini-input" id="spiritXp" type="number" min="0" placeholder="0" value="${esc(s.xp || "0")}" />
-            </div>
-          </div>
-          <div class="vital-box header-mini-vital">
-            <span class="vital-label">XP Threshold</span>
-            <div class="header-mini-value" style="font-family:'Cinzel',serif;font-size:13px;">${xpThreshold}</div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="divider"></div>
-
-    <!-- Main body — vitals col + stats cols -->
-    <div class="main-body">
-
-      <!-- Vitals column -->
-      <div class="vitals-col">
-        <div class="character-vital-box">
-          <span class="vital-label">Health</span>
-          <div class="hp-row">
-            <input class="hp-input" id="spiritHpCurrent" type="number" min="0" value="${esc(s.hpCurrent)}" placeholder="0" />
-            <span class="hp-sep">/</span>
-            <input class="hp-input" id="spiritHpMax" type="number" min="0" value="${esc(s.hpMax)}" placeholder="0" />
-          </div>
-        </div>
-        <div class="character-vital-box">
-          <span class="vital-label">Cursed Energy</span>
-          <div class="hp-row">
-            <input class="hp-input" id="spiritCeCurrent" type="number" min="0" value="${esc(s.ceCurrent)}" placeholder="0" />
-            <span class="hp-sep">/</span>
-            <input class="hp-input" id="spiritCeMax" type="number" min="0" value="${esc(s.ceMax)}" placeholder="0" />
-          </div>
-        </div>
-        <div class="character-vital-box">
-          <div class="shield-wrap">
-            <svg viewBox="0 0 60 68" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M30 4L5 13V36C5 50 17 62 30 66C43 62 55 50 55 36V13L30 4Z" stroke="#1a1410" stroke-width="1.8" fill="#e2d9c8"/>
-              <path d="M30 9L9 17V36C9 48 19 58 30 62C41 58 51 48 51 36V17L30 9Z" stroke="#1a1410" stroke-width="0.8" fill="none" stroke-dasharray="2 2"/>
-              <foreignObject x="11" y="22" width="38" height="28">
-                <div xmlns="http://www.w3.org/1999/xhtml" style="display:flex;align-items:center;justify-content:center;height:100%">
-                  <input class="ac-inside" value="${esc(ac)}" readonly style="cursor:default;" />
-                </div>
-              </foreignObject>
-            </svg>
-          </div>
-          <div class="vital-label" style="text-align:center;margin-top:2px;">Armor Class</div>
-        </div>
-        <div class="character-vital-box">
-          <span class="vital-label">Movement</span>
-          <div class="move-row">
-            <input class="move-input" id="spiritMovement" value="${esc(s.movement || "")}" placeholder="—" />
-            <span class="move-unit">ft</span>
-          </div>
-        </div>
-        <!-- Healing — below Movement as requested -->
-        <div class="character-vital-box spirit-healing-box">
-          <span class="vital-label">Healing (5 CE)</span>
-          <div class="spirit-healing-str">${esc(healingStr)}</div>
-          <button class="inventory-mini-btn spirit-heal-btn" id="spiritHealBtn" type="button"
-            ${healingDice === 0 ? "disabled" : ""}>Use</button>
-        </div>
-      </div>
-
-      <!-- Center stats: Power, Speed, Technique -->
-      <div class="stats-col">
-        ${STATS.slice(0,3).map(stat => {
-          const ss = s.stats?.[stat.key] || { score:"", skills: stat.skills.map(()=>({aptitude:0})) };
-          return `
-            <div class="stat-block">
-              <div class="stat-score-side">
-                <div class="stat-label">${esc(stat.label)}</div>
-                <input class="stat-score-input" data-spirit-stat="${stat.key}" type="number" min="0" max="7"
-                  placeholder="—" value="${esc(ss.score)}" />
-              </div>
-              <div class="skills-side">
-                ${stat.skills.map((skill, si) => {
-                  const apt   = Math.max(0, Math.min(2, parseInt(ss.skills?.[si]?.aptitude,10)||0));
-                  const bonus = apt * 2;
-                  const bonusStr = bonus > 0 ? `+${bonus}` : "0";
-                  return `<div class="skill-row">
-                    <div class="skill-dot${apt > 0 ? " filled" : ""}${apt === 2 ? " permanent" : ""}"
-                      data-spirit-apt="${stat.key}:${si}" role="checkbox"
-                      aria-label="${esc(skill)} aptitude" title="Click to cycle aptitude"></div>
-                    <input class="skill-bonus-input" type="text" value="${bonusStr}" readonly
-                      data-spirit-bonus="${stat.key}:${si}" title="Aptitude bonus" />
-                    <span class="skill-name">${esc(skill)}</span>
-                  </div>`;
-                }).join("")}
-              </div>
+        <div class="skills-side">
+          ${stat.skills.map((skill, si) => {
+            const skillScore = ss.skills?.[si]?.score ?? "";
+            return `<div class="skill-row">
+              <input class="skill-bonus-input" type="number" min="0"
+                data-spirit-skill="${stat.key}:${si}"
+                value="${esc(skillScore)}" placeholder="—" />
+              <span class="skill-name">${esc(skill)}</span>
             </div>`;
-        }).join("")}
-      </div>
-
-      <!-- Right stats: Intelligence, Cooperation -->
-      <div class="intel-col">
-        ${STATS.slice(3).map(stat => {
-          const ss = s.stats?.[stat.key] || { score:"", skills: stat.skills.map(()=>({aptitude:0})) };
-          return `
-            <div class="stat-block">
-              <div class="stat-score-side">
-                <div class="stat-label">${esc(stat.label)}</div>
-                <input class="stat-score-input" data-spirit-stat="${stat.key}" type="number" min="0" max="7"
-                  placeholder="—" value="${esc(ss.score)}" />
-              </div>
-              <div class="skills-side">
-                ${stat.skills.map((skill, si) => {
-                  const apt   = Math.max(0, Math.min(2, parseInt(ss.skills?.[si]?.aptitude,10)||0));
-                  const bonus = apt * 2;
-                  const bonusStr = bonus > 0 ? `+${bonus}` : "0";
-                  return `<div class="skill-row">
-                    <div class="skill-dot${apt > 0 ? " filled" : ""}${apt === 2 ? " permanent" : ""}"
-                      data-spirit-apt="${stat.key}:${si}" role="checkbox"
-                      aria-label="${esc(skill)} aptitude" title="Click to cycle aptitude"></div>
-                    <input class="skill-bonus-input" type="text" value="${bonusStr}" readonly
-                      data-spirit-bonus="${stat.key}:${si}" title="Aptitude bonus" />
-                    <span class="skill-name">${esc(skill)}</span>
-                  </div>`;
-                }).join("")}
-              </div>
-            </div>`;
-        }).join("")}
-      </div>
-
-    </div>`;
-
-  // ── COMBAT SUBTAB ────────────────────────────────────────────────────────────
-  const combatContent = `
-    <!-- Combat header row -->
-    <div class="combat-header-grid" style="grid-template-columns:1fr 1fr 1fr;margin-bottom:0.5em;">
-      <div class="vital-box" style="display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:6px 0 2px 0;">
-        <span class="combat-label" style="margin-bottom:0.5em;margin-top:0.1em;">HP</span>
-        <div class="combat-value" style="margin-top:-4px;">
-          <input type="number" class="hp-input" id="spiritHpCurrent2" min="0" value="${esc(s.hpCurrent)}" />
-          <span class="hp-sep">/</span>
-          <span class="hp-input" style="border:none;background:transparent;width:auto;">${esc(s.hpMax) || "—"}</span>
+          }).join("")}
         </div>
-      </div>
-      <div class="vital-box" style="display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:6px 0 2px 0;">
-        <span class="combat-label" style="margin-bottom:0.5em;margin-top:0.1em;">CE</span>
-        <div class="combat-value" style="margin-top:-4px;">
-          <input type="number" class="hp-input" id="spiritCeCurrent2" min="0" value="${esc(s.ceCurrent)}" />
-          <span class="hp-sep">/</span>
-          <span class="hp-input" style="border:none;background:transparent;width:auto;">${esc(s.ceMax) || "—"}</span>
-        </div>
-      </div>
-      <div class="vital-box" style="display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:6px 0 2px 0;">
-        <span class="combat-label" style="margin-bottom:0.5em;margin-top:0.1em;">AC</span>
-        <div class="combat-value" style="margin-top:-4px;">${ac}</div>
-      </div>
-    </div>
-    <div class="combat-header-grid" style="grid-template-columns:1fr 1fr 1fr;margin-bottom:0.5em;">
-      <div class="character-vital-box black-flash-box" style="padding-top:2px;padding-bottom:2px;">
-        <div class="black-flash-label" style="color:var(--accent);font-size:11px;letter-spacing:1.5px;text-transform:uppercase;margin-top:2px;margin-bottom:0;">Black Flash</div>
-        <div class="black-flash-value" style="font-size:24px;font-weight:600;color:#110d0a;line-height:1;min-height:24px;">${bfRange ?? "—"}</div>
-        <div class="black-flash-label" style="color:var(--accent);font-size:11px;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:0;">Range</div>
-      </div>
-      <div class="vital-box" style="display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:6px 0 2px 0;">
-        <span class="combat-label" style="margin-bottom:0.5em;margin-top:0.1em;">Points Threshold</span>
-        <div class="combat-value" style="margin-top:-4px;">${xpThreshold}</div>
-      </div>
-      <div class="vital-box combat-imbue-field" style="padding:0 0 0.5px 0;">
-        <div class="combat-imbue-split" style="min-height:28px;">
-          <div class="combat-imbue-left" style="min-width:52px;">
-            <span class="vital-label" style="margin-bottom:0;">Imbue</span>
-            <input type="number" id="spiritImbueInput" class="combat-imbue-input" min="1" max="3" value="${imbueLevel}" />
-          </div>
-          <div class="combat-imbue-right">
-            <div class="combat-imbue-die">${esc(imbueDie)}</div>
-          </div>
-        </div>
-      </div>
-    </div>
+      </div>`;
+  };
 
-    <!-- Cursed Abilities -->
-    <div class="combat-actions-section">
-      <div class="combat-section-title">Cursed Abilities</div>
-      <div id="spiritAbilitiesList" class="combat-attacks-list">
-        <span class="combat-empty">No cursed abilities yet.</span>
-      </div>
-      <button class="inventory-mini-btn" id="addSpiritAbilityBtn" type="button" style="margin-top:6px;">+ Add Ability</button>
-    </div>
-
-    <!-- Martial Arts (INT ≥ 4 only) -->
-    ${martialAvail ? `
-    <div class="combat-actions-section">
-      <div class="combat-section-title">Martial Arts</div>
-      <span class="combat-empty">Martial arts editor — coming soon.</span>
-    </div>` : ""}
-
-    <!-- Cursed Skills -->
-    <div class="combat-actions-section">
-      <div class="combat-section-title">Cursed Skills</div>
-      <span class="combat-empty">Skill editor — coming soon.</span>
-    </div>`;
-
-  // ── ASSEMBLE ─────────────────────────────────────────────────────────────────
   panel.innerHTML = `
     <div class="spirit-sheet">
-      <div class="jujutsu-subtab-bar" role="tablist">
-        <button class="jujutsu-subtab${activeSubtab === "stats" ? " active" : ""}" data-spirit-subtab="stats" type="button" role="tab">Stats</button>
-        <button class="jujutsu-subtab${activeSubtab === "combat" ? " active" : ""}" data-spirit-subtab="combat" type="button" role="tab">Combat</button>
+      <!-- Header -->
+      <div class="header-grid">
+        <div>
+          <div class="jjk-label">呪術廻戦 · Cursed Spirit</div>
+          <input class="name-input" id="spiritName" value="${esc(s.charName || "")}" placeholder="Spirit Name" />
+          <div class="field-label">Spirit Name</div>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:center;padding-top:4px;">
+          <div class="crest"><div class="crest-inner">霊</div></div>
+        </div>
+        <div class="meta-grid">
+          <div class="meta-field" style="grid-column:1/-1;">
+            <div class="field-label">Grade</div>
+            <select class="meta-select" id="spiritGrade">
+              ${GRADES.map(g => `<option${s.grade === g ? " selected" : ""}>${esc(g)}</option>`).join("")}
+            </select>
+          </div>
+          <div class="header-mini-vitals">
+            <div class="vital-box header-mini-vital">
+              <span class="vital-label">Points</span>
+              <div class="header-mini-value">
+                <input class="header-mini-input" id="spiritXp" type="number" min="0" placeholder="0" value="${esc(s.xp || "0")}" />
+              </div>
+            </div>
+            <div class="vital-box header-mini-vital">
+              <span class="vital-label">XP Threshold</span>
+              <div class="header-mini-value spirit-xp-threshold-val" style="font-family:'Cinzel',serif;font-size:13px;">${xpThreshold}</div>
+            </div>
+          </div>
+        </div>
       </div>
-      <div class="jujutsu-subpanel${activeSubtab === "stats" ? " active" : ""}" data-spirit-panel="stats">${statsContent}</div>
-      <div class="jujutsu-subpanel${activeSubtab === "combat" ? " active" : ""}" data-spirit-panel="combat">${combatContent}</div>
+
+      <div class="divider"></div>
+
+      <!-- Main body -->
+      <div class="main-body">
+
+        <!-- Vitals column -->
+        <div class="vitals-col">
+          <div class="character-vital-box">
+            <span class="vital-label">Health</span>
+            <div class="hp-row">
+              <input class="hp-input" id="spiritHpCurrent" type="number" min="0" value="${esc(s.hpCurrent)}" placeholder="0" />
+              <span class="hp-sep">/</span>
+              <input class="hp-input" id="spiritHpMax" type="number" min="0" value="${esc(s.hpMax)}" placeholder="0" />
+            </div>
+          </div>
+          <div class="character-vital-box">
+            <span class="vital-label">Cursed Energy</span>
+            <div class="hp-row">
+              <input class="hp-input" id="spiritCeCurrent" type="number" min="0" value="${esc(s.ceCurrent)}" placeholder="0" />
+              <span class="hp-sep">/</span>
+              <input class="hp-input" id="spiritCeMax" type="number" min="0" value="${esc(s.ceMax)}" placeholder="0" />
+            </div>
+          </div>
+          <div class="character-vital-box">
+            <div class="shield-wrap">
+              <svg viewBox="0 0 60 68" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M30 4L5 13V36C5 50 17 62 30 66C43 62 55 50 55 36V13L30 4Z" stroke="#1a1410" stroke-width="1.8" fill="#e2d9c8"/>
+                <path d="M30 9L9 17V36C9 48 19 58 30 62C41 58 51 48 51 36V17L30 9Z" stroke="#1a1410" stroke-width="0.8" fill="none" stroke-dasharray="2 2"/>
+                <foreignObject x="11" y="22" width="38" height="28">
+                  <div xmlns="http://www.w3.org/1999/xhtml" style="display:flex;align-items:center;justify-content:center;height:100%">
+                    <input class="ac-inside" value="${esc(ac)}" readonly style="cursor:default;" />
+                  </div>
+                </foreignObject>
+              </svg>
+            </div>
+            <div class="vital-label" style="text-align:center;margin-top:2px;">Armor Class</div>
+          </div>
+          <div class="character-vital-box">
+            <span class="vital-label">Movement</span>
+            <div class="move-row">
+              <input class="move-input" id="spiritMovement" value="${esc(s.movement || "")}" placeholder="—" />
+              <span class="move-unit">ft</span>
+            </div>
+          </div>
+          <div class="character-vital-box spirit-healing-box">
+            <span class="vital-label">Healing (5 CE)</span>
+            <div class="spirit-healing-str">${esc(healingStr)}</div>
+            <button class="inventory-mini-btn spirit-heal-btn" id="spiritHealBtn" type="button"
+              ${healingDice === 0 ? "disabled" : ""}>Use</button>
+          </div>
+        </div>
+
+        <!-- Center stats: Power, Speed, Technique -->
+        <div class="stats-col">
+          ${STATS.slice(0,3).map(renderStatBlock).join("")}
+        </div>
+
+        <!-- Right stats: Intelligence, Cooperation -->
+        <div class="intel-col">
+          ${STATS.slice(3).map(renderStatBlock).join("")}
+        </div>
+
+      </div>
     </div>`;
 
   // ── EVENT WIRING ─────────────────────────────────────────────────────────────
@@ -416,15 +330,7 @@ function renderSpiritSheetPanel(spirit, activeSubtab = "stats") {
     });
   };
 
-  // Subtab switching — preserves state on switch
-  panel.querySelectorAll("[data-spirit-subtab]").forEach(btn => {
-    btn.addEventListener("click", () => {
-      renderSpiritSheetPanel(_viewingSpirit, btn.dataset.spiritSubtab);
-    });
-  });
-
   wire("spiritName",      "charName");
-  wire("spiritAge",       "age");
   wire("spiritHpCurrent", "hpCurrent");
   wire("spiritHpMax",     "hpMax");
   wire("spiritCeCurrent", "ceCurrent");
@@ -432,73 +338,58 @@ function renderSpiritSheetPanel(spirit, activeSubtab = "stats") {
   wire("spiritMovement",  "movement");
   wire("spiritXp",        "xp");
 
-  // Combat tab HP/CE mirrors (keep in sync)
-  document.getElementById("spiritHpCurrent2")?.addEventListener("input", e => {
-    _viewingSpirit.hpCurrent = e.target.value; save();
-  });
-  document.getElementById("spiritCeCurrent2")?.addEventListener("input", e => {
-    _viewingSpirit.ceCurrent = e.target.value; save();
-  });
-
-  // Imbue level
-  document.getElementById("spiritImbueInput")?.addEventListener("input", e => {
-    _viewingSpirit.imbueLevel = parseInt(e.target.value, 10) || 1;
-    // Re-render combat tab to update die display
-    if (activeSubtab === "combat") renderSpiritSheetPanel(_viewingSpirit, "combat");
-    save();
-  });
-
-  // Grade
+  // Grade — update derived values in-place, no full re-render
   document.getElementById("spiritGrade")?.addEventListener("change", e => {
     _viewingSpirit.grade = e.target.value;
-    renderSpiritSheetPanel(_viewingSpirit, activeSubtab);
+    updateDerived();
     save();
   });
 
-  // Stat score inputs
+  // Stat score inputs — update state and refresh derived values in-place
   panel.querySelectorAll("[data-spirit-stat]").forEach(input => {
     input.addEventListener("input", () => {
       const key = input.dataset.spiritStat;
-      if (!_viewingSpirit.stats[key]) _viewingSpirit.stats[key] = { score:"", skills:[] };
+      if (!_viewingSpirit.stats[key]) _viewingSpirit.stats[key] = { score: "", skills: [] };
       _viewingSpirit.stats[key].score = input.value;
+      updateDerived();
       save();
     });
   });
 
-  // Aptitude dots — click cycles 0 → 1 → 2 → 0, updates dot fill and bonus display
-  panel.querySelectorAll("[data-spirit-apt]").forEach(dot => {
-    dot.addEventListener("click", () => {
-      const [statKey, siStr] = dot.dataset.spiritApt.split(":");
+  // Subskill score inputs
+  panel.querySelectorAll("[data-spirit-skill]").forEach(input => {
+    input.addEventListener("input", () => {
+      const [statKey, siStr] = input.dataset.spiritSkill.split(":");
       const si = parseInt(siStr, 10);
-      if (!_viewingSpirit.stats[statKey]) _viewingSpirit.stats[statKey] = { score:"", skills:[] };
+      if (!_viewingSpirit.stats[statKey]) _viewingSpirit.stats[statKey] = { score: "", skills: [] };
       const skills = _viewingSpirit.stats[statKey].skills;
-      while (skills.length <= si) skills.push({ aptitude:0 });
-      const cur  = parseInt(skills[si].aptitude, 10) || 0;
-      const next = (cur + 1) % 3;
-      skills[si].aptitude = next;
-      dot.classList.toggle("filled",    next > 0);
-      dot.classList.toggle("permanent", next === 2);
-      const bonusInput = panel.querySelector(`[data-spirit-bonus="${statKey}:${si}"]`);
-      if (bonusInput) bonusInput.value = next > 0 ? `+${next * 2}` : "0";
+      while (skills.length <= si) skills.push({});
+      skills[si].score = input.value;
       save();
     });
   });
 
-  // Healing button
+  // Healing button — update CE in-place rather than re-rendering
   document.getElementById("spiritHealBtn")?.addEventListener("click", () => {
+    const TLnow = parseScore(_viewingSpirit.stats?.technique?.score);
+    const healingDiceNow = healingDiceMap[_viewingSpirit.grade] ?? 0;
     const ce = parseInt(_viewingSpirit.ceCurrent, 10) || 0;
-    if (ce < 5 || healingDice === 0) return;
+    if (ce < 5 || healingDiceNow === 0) return;
     _viewingSpirit.ceCurrent = String(ce - 5);
-    let total = TL;
+
+    // Update CE input in-place
+    const ceInput = panel.querySelector("#spiritHpCurrent") ? panel.querySelector("#spiritCeCurrent") : null;
+    if (ceInput) ceInput.value = _viewingSpirit.ceCurrent;
+
+    let total = TLnow;
     const rolls = [];
-    for (let i = 0; i < healingDice; i++) {
+    for (let i = 0; i < healingDiceNow; i++) {
       const r = Math.floor(Math.random() * 8) + 1;
       rolls.push(r);
       total += r;
     }
-    // Show roll result inline — replace alert with toast later
-    const resultStr = `${rolls.join(" + ")} + ${TL} (TL) = ${total}`;
-    const healBox = document.querySelector(".spirit-healing-box");
+    const resultStr = `${rolls.join(" + ")} + ${TLnow} (TL) = ${total}`;
+    const healBox = panel.querySelector(".spirit-healing-box");
     if (healBox) {
       const existing = healBox.querySelector(".spirit-heal-result");
       if (existing) existing.remove();
@@ -507,11 +398,125 @@ function renderSpiritSheetPanel(spirit, activeSubtab = "stats") {
       resultEl.textContent = resultStr;
       healBox.appendChild(resultEl);
     }
-    renderSpiritSheetPanel(_viewingSpirit, activeSubtab);
     save();
   });
 }
 
+
+// ── SPIRIT COMBAT PANEL ───────────────────────────────────────────────────────
+
+function renderSpiritCombatPanel(spirit) {
+  const panel = document.getElementById("panel-spirit-combat");
+  if (!panel) return;
+
+  const s = spirit;
+  const parseScore = v => { const n = parseInt(v, 10); return Number.isFinite(n) ? Math.max(0, n) : 0; };
+  const TL = parseScore(s.stats?.technique?.score);
+  const SL = parseScore(s.stats?.speed?.score);
+  const IL = parseScore(s.stats?.intelligence?.score);
+  const ac = TL + SL;
+  const bfRange = (TL >= 2 && TL <= 7) ? TL * 4 + 4 : null;
+  const imbueLevel = Math.max(1, Math.min(3, parseInt(s.imbueLevel, 10) || 1));
+  const imbueDie = imbueLevel === 1 ? "1d4" : imbueLevel === 2 ? "1d4+2" : "2d4";
+  const xpThreshold = parseScore(s.sorcererXp) || TL * 2;
+  const martialAvail = IL >= 4;
+
+  const esc = str => String(str ?? "")
+    .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+
+  panel.innerHTML = `
+    <div class="spirit-sheet">
+      <!-- Combat header row -->
+      <div class="combat-header-grid" style="grid-template-columns:1fr 1fr 1fr;margin-bottom:0.5em;">
+        <div class="vital-box" style="display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:6px 0 2px 0;">
+          <span class="combat-label" style="margin-bottom:0.5em;margin-top:0.1em;">HP</span>
+          <div class="combat-value" style="margin-top:-4px;">
+            <input type="number" class="hp-input" id="spiritHpCurrent2" min="0" value="${esc(s.hpCurrent)}" />
+            <span class="hp-sep">/</span>
+            <span class="hp-input" style="border:none;background:transparent;width:auto;">${esc(s.hpMax) || "—"}</span>
+          </div>
+        </div>
+        <div class="vital-box" style="display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:6px 0 2px 0;">
+          <span class="combat-label" style="margin-bottom:0.5em;margin-top:0.1em;">CE</span>
+          <div class="combat-value" style="margin-top:-4px;">
+            <input type="number" class="hp-input" id="spiritCeCurrent2" min="0" value="${esc(s.ceCurrent)}" />
+            <span class="hp-sep">/</span>
+            <span class="hp-input" style="border:none;background:transparent;width:auto;">${esc(s.ceMax) || "—"}</span>
+          </div>
+        </div>
+        <div class="vital-box" style="display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:6px 0 2px 0;">
+          <span class="combat-label" style="margin-bottom:0.5em;margin-top:0.1em;">AC</span>
+          <div class="combat-value" style="margin-top:-4px;">${ac}</div>
+        </div>
+      </div>
+      <div class="combat-header-grid" style="grid-template-columns:1fr 1fr 1fr;margin-bottom:0.5em;">
+        <div class="character-vital-box black-flash-box" style="padding-top:2px;padding-bottom:2px;">
+          <div class="black-flash-label" style="color:var(--accent);font-size:11px;letter-spacing:1.5px;text-transform:uppercase;margin-top:2px;margin-bottom:0;">Black Flash</div>
+          <div class="black-flash-value" style="font-size:24px;font-weight:600;color:#110d0a;line-height:1;min-height:24px;">${bfRange ?? "—"}</div>
+          <div class="black-flash-label" style="color:var(--accent);font-size:11px;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:0;">Range</div>
+        </div>
+        <div class="vital-box" style="display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:6px 0 2px 0;">
+          <span class="combat-label" style="margin-bottom:0.5em;margin-top:0.1em;">Points Threshold</span>
+          <div class="combat-value" style="margin-top:-4px;">${xpThreshold}</div>
+        </div>
+        <div class="vital-box combat-imbue-field" style="padding:0 0 0.5px 0;">
+          <div class="combat-imbue-split" style="min-height:28px;">
+            <div class="combat-imbue-left" style="min-width:52px;">
+              <span class="vital-label" style="margin-bottom:0;">Imbue</span>
+              <input type="number" id="spiritImbueInput" class="combat-imbue-input" min="1" max="3" value="${imbueLevel}" />
+            </div>
+            <div class="combat-imbue-right">
+              <div class="combat-imbue-die">${esc(imbueDie)}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Cursed Abilities -->
+      <div class="combat-actions-section">
+        <div class="combat-section-title">Cursed Abilities</div>
+        <div id="spiritAbilitiesList" class="combat-attacks-list">
+          <span class="combat-empty">No cursed abilities yet.</span>
+        </div>
+        <button class="inventory-mini-btn" id="addSpiritAbilityBtn" type="button" style="margin-top:6px;">+ Add Ability</button>
+      </div>
+
+      ${martialAvail ? `
+      <div class="combat-actions-section">
+        <div class="combat-section-title">Martial Arts</div>
+        <span class="combat-empty">Martial arts editor — coming soon.</span>
+      </div>` : ""}
+
+      <div class="combat-actions-section">
+        <div class="combat-section-title">Cursed Skills</div>
+        <span class="combat-empty">Skill editor — coming soon.</span>
+      </div>
+    </div>`;
+
+  // ── EVENT WIRING ─────────────────────────────────────────────────────────────
+  const save = () => { if (_spiritSave) _spiritSave(); };
+
+  // HP/CE mirrors — keep in sync with the stats panel
+  document.getElementById("spiritHpCurrent2")?.addEventListener("input", e => {
+    _viewingSpirit.hpCurrent = e.target.value;
+    const mirror = document.getElementById("spiritHpCurrent");
+    if (mirror) mirror.value = e.target.value;
+    save();
+  });
+  document.getElementById("spiritCeCurrent2")?.addEventListener("input", e => {
+    _viewingSpirit.ceCurrent = e.target.value;
+    const mirror = document.getElementById("spiritCeCurrent");
+    if (mirror) mirror.value = e.target.value;
+    save();
+  });
+
+  // Imbue level — re-render combat panel to update die display
+  document.getElementById("spiritImbueInput")?.addEventListener("input", e => {
+    _viewingSpirit.imbueLevel = parseInt(e.target.value, 10) || 1;
+    renderSpiritCombatPanel(_viewingSpirit);
+    save();
+  });
+}
 
 // ── DEV TOGGLE PANEL ─────────────────────────────────────────────────────────
 

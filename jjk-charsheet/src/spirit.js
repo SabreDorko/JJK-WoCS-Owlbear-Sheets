@@ -60,7 +60,7 @@ function generateId() {
 function createBlankSpirit() {
   const stats = {};
   ALL_STATS.forEach(s => {
-    stats[s.key] = { score: "", skills: s.skills.map(() => ({ aptitude: 0 })) };
+    stats[s.key] = { score: "", skills: s.skills.map(() => ({ score: "" })) };
   });
 
   return {
