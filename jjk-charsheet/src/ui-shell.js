@@ -147,6 +147,9 @@ function exitSpiritSheet() {
 }
 
 function renderSpiritSheetPanel(spirit) {
+  const panel = document.getElementById("panel-spirit-sheet");
+  if (!panel) return;
+
   // ── SKILL ROLL TOASTS ─────────────────────────────────────────────
   // Attach click listeners to skill names for rolling (with crit/bonus logic)
   panel.querySelectorAll('.skill-name').forEach((el, idx) => {
@@ -194,8 +197,6 @@ function renderSpiritSheetPanel(spirit) {
       }
     });
   });
-  const panel = document.getElementById("panel-spirit-sheet");
-  if (!panel) return;
 
   const s = spirit;
   const parseScore = v => { const n = parseInt(v, 10); return Number.isFinite(n) ? Math.max(0, n) : 0; };
