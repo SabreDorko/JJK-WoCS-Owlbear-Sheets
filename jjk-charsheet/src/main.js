@@ -170,6 +170,7 @@ if (typeof window !== "undefined") {
   window.scheduleSave            = () => scheduleSave();
   window.refreshCombatTab        = refreshCombatTab;
   window.applyCharacterStateToUI = applyCharacterStateToUI;
+  window.showRollToast           = showRollToast;
 }
 
 // ── SAVE STATUS ───────────────────────────────────────────────────────────────

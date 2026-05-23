@@ -1,3 +1,10 @@
+/* Spirit healing value hover accent */
+.spirit-healing-str {
+  transition: color 0.15s;
+}
+.spirit-healing-str:hover {
+  color: var(--accent-red, #b71c1c);
+}
 /* Character Vitals Box (used for HP, CE, AC, Movement, Black Flash) */
 .character-vital-box {
   border: 1.5px solid var(--ink);
