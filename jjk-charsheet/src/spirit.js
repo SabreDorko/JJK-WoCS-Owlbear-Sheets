@@ -125,7 +125,7 @@ export function computeSpiritData(spirit) {
   // Healing
   const healingDice  = getHealingDice(spirit?.grade || "5");
   const healingStr   = healingDice > 0
-    ? `${healingDice}d8 + ${techniqueLevel} (TL)`
+    ? `${healingDice}d8 + ${techniqueLevel}`
     : "N/A";
 
   // Martial Arts available if INT ≥ 4

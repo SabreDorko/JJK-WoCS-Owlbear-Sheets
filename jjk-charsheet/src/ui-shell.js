@@ -164,7 +164,7 @@ function renderSpiritSheetPanel(spirit) {
     const movement   = 30 + (SL * 5);
     const healingDiceMap = { "5":0,"4":1,"Semi-3":1,"3":2,"Semi-2":2,"2":3,"Semi-1":3,"1":4,"Special Grade":5 };
     const healingDice = healingDiceMap[_viewingSpirit.grade] ?? 0;
-    const healingStr = healingDice > 0 ? `${healingDice}d8 + ${TL} (TL)` : "N/A";
+    const healingStr = healingDice > 0 ? `${healingDice}d8 + ${TL}` : "N/A";
     const xpThreshold = parseScore(_viewingSpirit.sorcererXp) || TL * 2;
 
     // Persist computed values to state
@@ -206,7 +206,7 @@ function renderSpiritSheetPanel(spirit) {
   const movement = 30 + (SL * 5);
   const healingDiceMap = { "5":0,"4":1,"Semi-3":1,"3":2,"Semi-2":2,"2":3,"Semi-1":3,"1":4,"Special Grade":5 };
   const healingDice = healingDiceMap[s.grade] ?? 0;
-  const healingStr = healingDice > 0 ? `${healingDice}d8 + ${TL} (TL)` : "N/A";
+  const healingStr = healingDice > 0 ? `${healingDice}d8 + ${TL}` : "N/A";
   const xpThreshold = parseScore(s.sorcererXp) || TL * 2;
 
   // Sync computed vitals into state on open
@@ -276,7 +276,7 @@ function renderSpiritSheetPanel(spirit) {
               </div>
             </div>
             <div class="vital-box header-mini-vital">
-              <span class="vital-label">XP Threshold</span>
+              <span class="vital-label">Experience Threshold</span>
               <div class="header-mini-value spirit-xp-threshold-val" style="font-family:'Cinzel',serif;font-size:13px;">${xpThreshold}</div>
             </div>
           </div>
@@ -295,7 +295,7 @@ function renderSpiritSheetPanel(spirit) {
             <div class="hp-row">
               <input class="hp-input" id="spiritHpCurrent" type="number" min="0" value="${esc(s.hpCurrent)}" placeholder="0" />
               <span class="hp-sep">/</span>
-              <input class="hp-input" id="spiritHpMax" type="number" value="${hpMax}" readonly style="cursor:default;opacity:0.7;" />
+              <input class="hp-input" id="spiritHpMax" type="number" value="${hpMax}" readonly style="cursor:default;" />
             </div>
           </div>
           <div class="character-vital-box">
@@ -303,7 +303,7 @@ function renderSpiritSheetPanel(spirit) {
             <div class="hp-row">
               <input class="hp-input" id="spiritCeCurrent" type="number" min="0" value="${esc(s.ceCurrent)}" placeholder="0" />
               <span class="hp-sep">/</span>
-              <input class="hp-input" id="spiritCeMax" type="number" value="${ceMax}" readonly style="cursor:default;opacity:0.7;" />
+              <input class="hp-input" id="spiritCeMax" type="number" value="${ceMax}" readonly style="cursor:default;" />
             </div>
           </div>
           <div class="character-vital-box">
@@ -323,7 +323,7 @@ function renderSpiritSheetPanel(spirit) {
           <div class="character-vital-box">
             <span class="vital-label">Movement</span>
             <div class="move-row">
-              <input class="move-input" id="spiritMovement" value="${movement}" readonly style="cursor:default;opacity:0.7;" />
+              <input class="move-input" id="spiritMovement" value="${movement}" readonly style="cursor:default;" />
               <span class="move-unit">ft</span>
             </div>
           </div>
@@ -480,7 +480,7 @@ function renderSpiritCombatPanel(spirit) {
           <div class="black-flash-label" style="color:var(--accent);font-size:11px;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:0;">Range</div>
         </div>
         <div class="vital-box" style="display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:6px 0 2px 0;">
-          <span class="combat-label" style="margin-bottom:0.5em;margin-top:0.1em;">Points Threshold</span>
+          <span class="combat-label" style="margin-bottom:0.5em;margin-top:0.1em;">Experience Threshold</span>
           <div class="combat-value" style="margin-top:-4px;">${xpThreshold}</div>
         </div>
         <div class="vital-box combat-imbue-field" style="padding:0 0 0.5px 0;">
