@@ -275,9 +275,11 @@ function renderSpiritSheetPanel(spirit) {
                 <input class="header-mini-input" id="spiritXp" type="number" min="0" placeholder="0" value="${esc(s.xp || "0")}" />
               </div>
             </div>
-            <div class="vital-box header-mini-vital">
-              <span class="vital-label">Experience Threshold</span>
-              <div class="header-mini-value spirit-xp-threshold-val" style="font-family:'Cinzel',serif;font-size:13px;">${xpThreshold}</div>
+            <div class="vital-box header-mini-vital spirit-healing-box">
+              <span class="vital-label">Healing (5 CE)</span>
+              <div class="spirit-healing-str">${esc(healingStr)}</div>
+              <button class="inventory-mini-btn spirit-heal-btn" id="spiritHealBtn" type="button"
+                ${healingDice === 0 ? "disabled" : ""}>Use</button>
             </div>
           </div>
         </div>
@@ -326,12 +328,6 @@ function renderSpiritSheetPanel(spirit) {
               <input class="move-input" id="spiritMovement" value="${movement}" readonly style="cursor:default;" />
               <span class="move-unit">ft</span>
             </div>
-          </div>
-          <div class="character-vital-box spirit-healing-box">
-            <span class="vital-label">Healing (5 CE)</span>
-            <div class="spirit-healing-str">${esc(healingStr)}</div>
-            <button class="inventory-mini-btn spirit-heal-btn" id="spiritHealBtn" type="button"
-              ${healingDice === 0 ? "disabled" : ""}>Use</button>
           </div>
         </div>
 
