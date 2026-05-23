@@ -173,10 +173,12 @@ function renderSpiritSheetPanel(spirit) {
             val = parseInt(statObj.skills[skillIdx].score, 10);
             if (!Number.isFinite(val)) val = 0;
           }
-          // Always roll 1d6 for skills, add crit logic
+          // Always roll 1d6 for skills, add crit logic (include bonus in crit threshold)
           const rolls = [Math.floor(Math.random() * 6) + 1];
           const total = rolls[0] + val;
-          const maxPossible = 6 + val;
+          const dieSides = 6;
+          const diceCount = 1;
+          const maxPossible = (dieSides * diceCount) + val;
           const allOnes = rolls[0] === 1;
           const critStatus = allOnes ? "fail" : (total >= maxPossible ? "success" : null);
           const breakdown = { skillModifier: val, die: "d6" };
@@ -184,7 +186,7 @@ function renderSpiritSheetPanel(spirit) {
             const skillName = el.textContent;
             window.showRollToast(
               statKey.charAt(0).toUpperCase() + statKey.slice(1).toLowerCase(),
-              1,
+              diceCount,
               rolls,
               total,
               critStatus,
