@@ -17,6 +17,112 @@ let _scheduleSave   = null;
 let _onOpenSpirit   = null;
 let _searchQuery    = "";
 
+// ── OVERRIDE HELPERS ──────────────────────────────────────────────────────────
+// Mirrors the same overrides.derived pattern used in character.js.
+
+export function ensureSpiritOverrides(spirit) {
+  if (!spirit.overrides || typeof spirit.overrides !== "object") spirit.overrides = {};
+  if (!spirit.overrides.derived || typeof spirit.overrides.derived !== "object") spirit.overrides.derived = {};
+}
+
+export function getSpiritDerivedOverride(spirit, key) {
+  ensureSpiritOverrides(spirit);
+  const v = parseInt(spirit.overrides.derived[key], 10);
+  return Number.isFinite(v) ? v : null;
+}
+
+export function setSpiritDerivedOverride(spirit, key, rawValue) {
+  ensureSpiritOverrides(spirit);
+  const v = parseInt(rawValue, 10);
+  if (Number.isFinite(v)) spirit.overrides.derived[key] = v;
+  else delete spirit.overrides.derived[key];
+}
+
+export function clearSpiritDerivedOverride(spirit, key) {
+  ensureSpiritOverrides(spirit);
+  delete spirit.overrides.derived[key];
+}
+
+// ── ROLL HELPERS ──────────────────────────────────────────────────────────────
+
+function rollDicePool(n) {
+  return Array.from({ length: n }, () => Math.floor(Math.random() * 6) + 1);
+}
+
+export function spiritRollWithMode(statScore, bonus, rollMode) {
+  const compute = rolls => rolls.reduce((a, b) => a + b, 0) + bonus;
+  const first   = rollDicePool(statScore);
+  const firstTot = compute(first);
+  if (rollMode === "normal") {
+    return { rolls: first, total: firstTot, diceCount: statScore, firstRolls: first, firstTotal: firstTot, secondRolls: null, secondTotal: null, selectedRollIndex: 0 };
+  }
+  const second    = rollDicePool(statScore);
+  const secondTot = compute(second);
+  const idx = rollMode === "advantage"
+    ? (firstTot >= secondTot ? 0 : 1)
+    : (firstTot <= secondTot ? 0 : 1);
+  return {
+    rolls: idx === 0 ? first : second,
+    total: idx === 0 ? firstTot : secondTot,
+    diceCount: statScore,
+    firstRolls: first, firstTotal: firstTot,
+    secondRolls: second, secondTotal: secondTot,
+    selectedRollIndex: idx,
+  };
+}
+
+export function buildSpiritRollBreakdown(base, rollMode, r) {
+  if (rollMode === "normal") return base;
+  return { ...base, rollMode, comparedRolls: [r.firstRolls, r.secondRolls], comparedTotals: [r.firstTotal, r.secondTotal], selectedRollIndex: r.selectedRollIndex };
+}
+
+// ── ROLL MODE MENU ────────────────────────────────────────────────────────────
+// Singleton menu; created once and reused across all spirit sheet renders.
+
+let _rollModeMenu = null;
+
+export function ensureSpiritRollModeMenu() {
+  if (_rollModeMenu) return _rollModeMenu;
+  const menu = document.createElement("div");
+  menu.className = "roll-mode-menu";
+  menu.hidden = true;
+  menu.innerHTML = `
+    <button type="button" class="roll-mode-item" data-spirit-roll-mode="advantage">Roll with Advantage</button>
+    <button type="button" class="roll-mode-item" data-spirit-roll-mode="disadvantage">Roll with Disadvantage</button>
+    <button type="button" class="roll-mode-item" data-spirit-roll-mode="normal">Normal Roll</button>
+  `;
+  menu.addEventListener("click", e => {
+    const btn = e.target.closest("[data-spirit-roll-mode]");
+    if (!btn) return;
+    const mode   = btn.dataset.spiritRollMode;
+    const action = _rollModeMenu._pendingAction;
+    _rollModeMenu.hidden = true;
+    _rollModeMenu._pendingAction = null;
+    if (action && mode) action(mode);
+  });
+  document.body.appendChild(menu);
+  document.addEventListener("click",  () => { if (_rollModeMenu) _rollModeMenu.hidden = true; });
+  document.addEventListener("scroll", () => { if (_rollModeMenu) _rollModeMenu.hidden = true; }, true);
+  document.addEventListener("keydown", e => { if (e.key === "Escape" && _rollModeMenu) _rollModeMenu.hidden = true; });
+  _rollModeMenu = menu;
+  return _rollModeMenu;
+}
+
+export function openSpiritRollModeMenu(event, onSelectMode) {
+  event.preventDefault();
+  event.stopPropagation();
+  const menu = ensureSpiritRollModeMenu();
+  menu._pendingAction = onSelectMode;
+  menu.hidden = false;
+  menu.style.left = "0px";
+  menu.style.top  = "0px";
+  requestAnimationFrame(() => {
+    const rect = menu.getBoundingClientRect();
+    menu.style.left = `${Math.max(8, Math.min(event.clientX, window.innerWidth  - rect.width  - 8))}px`;
+    menu.style.top  = `${Math.max(8, Math.min(event.clientY, window.innerHeight - rect.height - 8))}px`;
+  });
+}
+
 function getState() { return _getState ? _getState() : null; }
 function scheduleSave() { if (_scheduleSave) _scheduleSave(); }
 
@@ -105,8 +211,17 @@ export function computeSpiritData(spirit) {
   const speedLevel     = parseScore(spirit?.stats?.speed?.score);
   const intLevel       = parseScore(spirit?.stats?.intelligence?.score);
 
-  // AC = techniqueLevel + speedLevel (same as players, no archetype bonuses)
-  const ac = techniqueLevel + speedLevel;
+  // Derived base values
+  const baseAc       = techniqueLevel + speedLevel;
+  const baseHpMax    = 10 + powerLevel * 5;
+  const baseCeMax    = 15 + techniqueLevel * 5;
+  const baseMovement = 30 + speedLevel * 5;
+
+  // Apply overrides if present (same pattern as character.js)
+  const ac       = getSpiritDerivedOverride(spirit, "ac")       ?? baseAc;
+  const hpMax    = getSpiritDerivedOverride(spirit, "hpMax")    ?? baseHpMax;
+  const ceMax    = getSpiritDerivedOverride(spirit, "ceMax")    ?? baseCeMax;
+  const movement = getSpiritDerivedOverride(spirit, "movement") ?? baseMovement;
 
   // Black Flash Range
   let blackFlashRange = null;
@@ -131,12 +246,21 @@ export function computeSpiritData(spirit) {
   // Martial Arts available if INT ≥ 4
   const martialArtsAvailable = intLevel >= 4;
 
+  // Which derived fields have overrides stored
+  const hasAcOverride       = getSpiritDerivedOverride(spirit, "ac")       !== null;
+  const hasHpMaxOverride    = getSpiritDerivedOverride(spirit, "hpMax")    !== null;
+  const hasCeMaxOverride    = getSpiritDerivedOverride(spirit, "ceMax")    !== null;
+  const hasMovementOverride = getSpiritDerivedOverride(spirit, "movement") !== null;
+
   return {
     techniqueLevel,
     powerLevel,
     speedLevel,
     intLevel,
     ac,
+    hpMax,
+    ceMax,
+    movement,
     blackFlashRange,
     imbueDie,
     imbueDC,
@@ -146,6 +270,10 @@ export function computeSpiritData(spirit) {
     healingStr,
     healingCeCost: 5,
     martialArtsAvailable,
+    hasAcOverride,
+    hasHpMaxOverride,
+    hasCeMaxOverride,
+    hasMovementOverride,
   };
 }
 
@@ -225,21 +353,7 @@ export function renderSpiritList() {
           </div>
         </div>
         <div class="spirit-quick-row">
-          ${(() => {
-            const ce = parseInt(spirit.ceCurrent, 10);
-            const canHeal = data.healingDice > 0 && Number.isFinite(ce) && ce >= 5;
-            const noHeal  = data.healingDice === 0;
-            const style   = noHeal
-              ? 'pointer-events:none;opacity:0.45;'
-              : canHeal
-                ? 'cursor:pointer;'
-                : 'cursor:not-allowed;opacity:0.45;';
-            const title   = noHeal  ? 'N/A'
-                          : canHeal ? 'Click to heal (costs 5 CE)'
-                                    : 'Not enough CE (need 5)';
-            return `<span class="spirit-quick-chip spirit-heal-chip" data-spirit-heal="${spirit.id}"
-              style="${style}" title="${title}">⟳ ${escHtml(data.healingStr)}</span>`;
-          })()}
+          <span class="spirit-quick-chip" title="Healing">⟳ ${escHtml(data.healingStr)}</span>
           <span class="spirit-quick-chip" title="Black Flash Range">${data.blackFlashRange != null ? `⚡ ${data.blackFlashRange}` : ""}</span>
           <span class="spirit-quick-chip" title="Imbue">◈ ${escHtml(data.imbueDie)}</span>
         </div>
@@ -271,54 +385,6 @@ export function renderSpiritList() {
     btn.addEventListener("click", e => {
       e.stopPropagation();
       deleteSpirit(btn.dataset.spiritDelete);
-    });
-  });
-
-  list.querySelectorAll("[data-spirit-heal]").forEach(chip => {
-    chip.addEventListener("click", e => {
-      e.stopPropagation();
-      const id = chip.dataset.spiritHeal;
-      const spirit = state.spirits.find(s => s.id === id);
-      if (!spirit) return;
-
-      const data = computeSpiritData(spirit);
-      if (data.healingDice === 0) return;
-
-      const ce = parseInt(spirit.ceCurrent, 10);
-      if (!Number.isFinite(ce) || ce < 5) return;
-
-      // Deduct CE
-      spirit.ceCurrent = String(ce - 5);
-
-      // Roll healing dice (Nd8 + TEC)
-      const rolls = [];
-      for (let i = 0; i < data.healingDice; i++) {
-        rolls.push(Math.floor(Math.random() * 8) + 1);
-      }
-      const rolled = rolls.reduce((a, b) => a + b, 0);
-      const total  = rolled + data.techniqueLevel;
-
-      // Apply HP, capped at max (no overheal)
-      const hpMax     = parseInt(spirit.hpMax, 10) || 0;
-      const hpCurrent = parseInt(spirit.hpCurrent, 10) || 0;
-      spirit.hpCurrent = String(Math.min(hpMax, hpCurrent + total));
-
-      scheduleSave();
-      renderSpiritList();
-
-      // Show roll toast if available
-      if (typeof window.showRollToast === "function") {
-        window.showRollToast(
-          "Healing",
-          data.healingDice,
-          rolls,
-          total,
-          null,
-          spirit.charName || "Spirit",
-          { die: "d8", skillModifier: data.techniqueLevel },
-          null
-        );
-      }
     });
   });
 }
