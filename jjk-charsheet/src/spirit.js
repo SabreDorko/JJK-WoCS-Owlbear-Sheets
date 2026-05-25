@@ -352,11 +352,7 @@ export function renderSpiritList() {
               </span>`).join("")}
           </div>
         </div>
-        <div class="spirit-quick-row">
-          <span class="spirit-quick-chip" title="Healing">⟳ ${escHtml(data.healingStr)}</span>
-          <span class="spirit-quick-chip" title="Black Flash Range">${data.blackFlashRange != null ? `⚡ ${data.blackFlashRange}` : ""}</span>
-          <span class="spirit-quick-chip" title="Imbue">◈ ${escHtml(data.imbueDie)}</span>
-        </div>
+
       </div>`;
   }).join("");
 
