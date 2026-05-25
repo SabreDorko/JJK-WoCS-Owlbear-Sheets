@@ -174,30 +174,6 @@ function renderSpiritSheetPanel(spirit) {
         }
 
         // Derived fields: HP Max, CE Max, AC, Movement
-        function ensureSpiritDerivedOverrideMarker(inputEl, fieldKey) {
-          if (!inputEl || !inputEl.parentElement) return;
-          let marker = inputEl.parentElement.querySelector(`.override-marker-btn[data-derived-override-clear='${fieldKey}']`);
-          if (!marker) {
-            marker = document.createElement("button");
-            marker.type = "button";
-            marker.className = "override-marker-btn derived-override-marker";
-            marker.dataset.derivedOverrideClear = fieldKey;
-            marker.textContent = "*";
-            inputEl.parentElement.style.position = "relative";
-            marker.addEventListener("click", () => {
-              if (!isSpiritOverrideMode()) return;
-              clearSpiritDerivedOverride(spirit, fieldKey);
-              inputEl.value = '';
-              updateSpiritOverrideFields();
-            });
-            inputEl.parentElement.appendChild(marker);
-          }
-          const hasOverride = getSpiritDerivedOverride(spirit, fieldKey) !== null;
-          marker.classList.toggle("visible", hasOverride);
-          marker.title = isSpiritOverrideMode() ? "Click to clear override" : "Overridden";
-          marker.tabIndex = isSpiritOverrideMode() && hasOverride ? 0 : -1;
-        }
-
         function updateSpiritOverrideFields() {
           const hpMaxEl = panel.querySelector("#spiritHpMax");
           const ceMaxEl = panel.querySelector("#spiritCeMax");
@@ -205,36 +181,24 @@ function renderSpiritSheetPanel(spirit) {
           const moveEl  = panel.querySelector("#spiritMovement");
           const editable = isSpiritOverrideMode();
           if (hpMaxEl) {
-            const override = getSpiritDerivedOverride(spirit, "hpMax");
-            if (override !== null) hpMaxEl.value = override;
             hpMaxEl.readOnly = !editable;
             hpMaxEl.style.cursor = editable ? "text" : "default";
             hpMaxEl.title = editable ? "Manual override enabled" : "Auto-calculated";
-            ensureSpiritDerivedOverrideMarker(hpMaxEl, "hpMax");
           }
           if (ceMaxEl) {
-            const override = getSpiritDerivedOverride(spirit, "ceMax");
-            if (override !== null) ceMaxEl.value = override;
             ceMaxEl.readOnly = !editable;
             ceMaxEl.style.cursor = editable ? "text" : "default";
             ceMaxEl.title = editable ? "Manual override enabled" : "Auto-calculated";
-            ensureSpiritDerivedOverrideMarker(ceMaxEl, "ceMax");
           }
           if (acEl) {
-            const override = getSpiritDerivedOverride(spirit, "ac");
-            if (override !== null) acEl.value = override;
             acEl.readOnly = !editable;
             acEl.style.cursor = editable ? "text" : "default";
             acEl.title = editable ? "Manual override enabled" : "Auto-calculated";
-            ensureSpiritDerivedOverrideMarker(acEl, "ac");
           }
           if (moveEl) {
-            const override = getSpiritDerivedOverride(spirit, "movement");
-            if (override !== null) moveEl.value = override;
             moveEl.readOnly = !editable;
             moveEl.style.cursor = editable ? "text" : "default";
             moveEl.title = editable ? "Manual override enabled" : "Auto-calculated";
-            ensureSpiritDerivedOverrideMarker(moveEl, "movement");
           }
         }
         updateSpiritOverrideFields();
@@ -430,8 +394,7 @@ function renderSpiritSheetPanel(spirit) {
           <div class="jjk-label">呪術廻戦 · Cursed Spirit</div>
           <input class="name-input" id="spiritName" value="${esc(s.charName || "")}" placeholder="Spirit Name" />
           <div class="field-label">Spirit Name</div>
-          <button id="spiritOverrideModeBtn" class="override-mode-btn" type="button">
-            <svg viewBox="0 0 13 13" style="margin-right:4px;vertical-align:middle;"><circle cx="6.5" cy="6.5" r="6" stroke="currentColor" stroke-width="1.2" fill="none"/><path d="M6.5 3.5v3.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><circle cx="6.5" cy="9.2" r=".7" fill="currentColor"/></svg>
+          <button id="spiritOverrideModeBtn" class="override-mode-btn" type="button" style="margin-top:6px;">
             <span id="spiritOverrideModeBtnLabel">Override</span>
           </button>
         </div>
