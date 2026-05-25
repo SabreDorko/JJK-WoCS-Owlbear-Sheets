@@ -17,6 +17,27 @@ let _scheduleSave   = null;
 let _onOpenSpirit   = null;
 let _searchQuery    = "";
 
+// ── SPIRIT OVERRIDE MODE ─────────────────────────────────────────────
+// Per-spirit toggle; resets when a new spirit is opened.
+let _spiritOverrideMode = false;
+let _lastSpiritId = null;
+
+export function isSpiritOverrideMode() {
+  return _spiritOverrideMode;
+}
+
+export function toggleSpiritOverrideMode() {
+  _spiritOverrideMode = !_spiritOverrideMode;
+}
+
+// Call this when a spirit is opened; resets override mode if spirit changes
+export function handleOpenSpiritOverride(spirit) {
+  if (_lastSpiritId !== spirit.id) {
+    _spiritOverrideMode = false;
+    _lastSpiritId = spirit.id;
+  }
+}
+
 // ── OVERRIDE HELPERS ──────────────────────────────────────────────────────────
 // Mirrors the same overrides.derived pattern used in character.js.
 
@@ -449,6 +470,10 @@ export function initSpirits({
       renderSpiritList();
     });
   }
+
+  // Optionally, wire up override mode button for spirits here if you have one:
+  // const overrideBtn = document.getElementById("spiritOverrideModeBtn");
+  // if (overrideBtn) overrideBtn.addEventListener("click", () => { toggleSpiritOverrideMode(); /* re-render UI as needed */ });
 }
 
 // ── TINY HELPERS ─────────────────────────────────────────────────────────────

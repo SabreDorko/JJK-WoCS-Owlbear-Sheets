@@ -155,6 +155,84 @@ function exitSpiritSheet() {
 }
 
 function renderSpiritSheetPanel(spirit) {
+      // Wire up the override mode button and derived field editability
+      import("./spirit.js").then(({ isSpiritOverrideMode, toggleSpiritOverrideMode, setSpiritDerivedOverride, clearSpiritDerivedOverride }) => {
+        const overrideBtn = panel.querySelector("#spiritOverrideModeBtn");
+        const label = panel.querySelector("#spiritOverrideModeBtnLabel");
+        function updateSpiritOverrideButtonUI() {
+          overrideBtn.classList.toggle("active", isSpiritOverrideMode());
+          if (label) label.textContent = "Override";
+          overrideBtn.title = isSpiritOverrideMode() ? "Disable manual overrides" : "Enable manual overrides";
+        }
+        if (overrideBtn) {
+          overrideBtn.addEventListener("click", () => {
+            toggleSpiritOverrideMode();
+            updateSpiritOverrideButtonUI();
+            updateSpiritOverrideFields();
+          });
+          updateSpiritOverrideButtonUI();
+        }
+
+        // Derived fields: HP Max, CE Max, AC, Movement
+        function updateSpiritOverrideFields() {
+          const hpMaxEl = panel.querySelector("#spiritHpMax");
+          const ceMaxEl = panel.querySelector("#spiritCeMax");
+          const acEl    = panel.querySelector(".ac-inside");
+          const moveEl  = panel.querySelector("#spiritMovement");
+          const editable = isSpiritOverrideMode();
+          if (hpMaxEl) {
+            hpMaxEl.readOnly = !editable;
+            hpMaxEl.style.cursor = editable ? "text" : "default";
+            hpMaxEl.title = editable ? "Manual override enabled" : "Auto-calculated";
+          }
+          if (ceMaxEl) {
+            ceMaxEl.readOnly = !editable;
+            ceMaxEl.style.cursor = editable ? "text" : "default";
+            ceMaxEl.title = editable ? "Manual override enabled" : "Auto-calculated";
+          }
+          if (acEl) {
+            acEl.readOnly = !editable;
+            acEl.style.cursor = editable ? "text" : "default";
+            acEl.title = editable ? "Manual override enabled" : "Auto-calculated";
+          }
+          if (moveEl) {
+            moveEl.readOnly = !editable;
+            moveEl.style.cursor = editable ? "text" : "default";
+            moveEl.title = editable ? "Manual override enabled" : "Auto-calculated";
+          }
+        }
+        updateSpiritOverrideFields();
+
+        // Save overrides on input if in override mode
+        const hpMaxEl = panel.querySelector("#spiritHpMax");
+        if (hpMaxEl) {
+          hpMaxEl.addEventListener("input", e => {
+            if (!isSpiritOverrideMode()) return;
+            setSpiritDerivedOverride(spirit, "hpMax", e.target.value);
+          });
+        }
+        const ceMaxEl = panel.querySelector("#spiritCeMax");
+        if (ceMaxEl) {
+          ceMaxEl.addEventListener("input", e => {
+            if (!isSpiritOverrideMode()) return;
+            setSpiritDerivedOverride(spirit, "ceMax", e.target.value);
+          });
+        }
+        const acEl = panel.querySelector(".ac-inside");
+        if (acEl) {
+          acEl.addEventListener("input", e => {
+            if (!isSpiritOverrideMode()) return;
+            setSpiritDerivedOverride(spirit, "ac", e.target.value);
+          });
+        }
+        const moveEl = panel.querySelector("#spiritMovement");
+        if (moveEl) {
+          moveEl.addEventListener("input", e => {
+            if (!isSpiritOverrideMode()) return;
+            setSpiritDerivedOverride(spirit, "movement", e.target.value);
+          });
+        }
+      });
     // ── SKILL ROLL TOASTS ─────────────────────────────────────────────
     // Attach click listeners to skill names for rolling (with crit/bonus logic)
     setTimeout(() => {
@@ -316,6 +394,9 @@ function renderSpiritSheetPanel(spirit) {
           <div class="jjk-label">呪術廻戦 · Cursed Spirit</div>
           <input class="name-input" id="spiritName" value="${esc(s.charName || "")}" placeholder="Spirit Name" />
           <div class="field-label">Spirit Name</div>
+          <button id="spiritOverrideModeBtn" class="override-mode-btn" type="button" style="margin-top:6px;">
+            <span id="spiritOverrideModeBtnLabel">Override</span>
+          </button>
         </div>
         <div style="display:flex;align-items:center;justify-content:center;padding-top:4px;">
           <div class="crest"><div class="crest-inner">霊</div></div>
