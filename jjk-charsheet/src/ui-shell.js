@@ -1,5 +1,19 @@
 import { isGm, getGmOverride, setGmOverride, getObrRole } from "./gm.js";
 import { initSpiritTechniques, renderAbilitiesSummary, wireSpiritAbilitiesGrid } from "./spirit-techniques.js";
+import {
+  computeSpiritData,
+  ensureSpiritOverrides,
+  getSpiritDerivedOverride,
+  setSpiritDerivedOverride,
+  clearSpiritDerivedOverride,
+  isSpiritOverrideMode,
+  toggleSpiritOverrideMode,
+  handleOpenSpiritOverride,
+  spiritRollWithMode,
+  buildSpiritRollBreakdown,
+  openSpiritRollModeMenu,
+  SPIRIT_GRADES,
+} from "./spirit.js";
 
 let _activateMainTab = null;
 let _getActiveRollTab = null;
@@ -155,206 +169,79 @@ function exitSpiritSheet() {
 }
 
 function renderSpiritSheetPanel(spirit) {
-      // Wire up the override mode button and derived field editability
-      import("./spirit.js").then(({ isSpiritOverrideMode, toggleSpiritOverrideMode, setSpiritDerivedOverride, clearSpiritDerivedOverride }) => {
-        const overrideBtn = panel.querySelector("#spiritOverrideModeBtn");
-        const label = panel.querySelector("#spiritOverrideModeBtnLabel");
-        function updateSpiritOverrideButtonUI() {
-          overrideBtn.classList.toggle("active", isSpiritOverrideMode());
-          if (label) label.textContent = "Override";
-          overrideBtn.title = isSpiritOverrideMode() ? "Disable manual overrides" : "Enable manual overrides";
-        }
-        if (overrideBtn) {
-          overrideBtn.addEventListener("click", () => {
-            toggleSpiritOverrideMode();
-            updateSpiritOverrideButtonUI();
-            updateSpiritOverrideFields();
-          });
-          updateSpiritOverrideButtonUI();
-        }
-
-        // Derived fields: HP Max, CE Max, AC, Movement
-        function updateSpiritOverrideFields() {
-          const hpMaxEl = panel.querySelector("#spiritHpMax");
-          const ceMaxEl = panel.querySelector("#spiritCeMax");
-          const acEl    = panel.querySelector(".ac-inside");
-          const moveEl  = panel.querySelector("#spiritMovement");
-          const editable = isSpiritOverrideMode();
-          if (hpMaxEl) {
-            hpMaxEl.readOnly = !editable;
-            hpMaxEl.style.cursor = editable ? "text" : "default";
-            hpMaxEl.title = editable ? "Manual override enabled" : "Auto-calculated";
-          }
-          if (ceMaxEl) {
-            ceMaxEl.readOnly = !editable;
-            ceMaxEl.style.cursor = editable ? "text" : "default";
-            ceMaxEl.title = editable ? "Manual override enabled" : "Auto-calculated";
-          }
-          if (acEl) {
-            acEl.readOnly = !editable;
-            acEl.style.cursor = editable ? "text" : "default";
-            acEl.title = editable ? "Manual override enabled" : "Auto-calculated";
-          }
-          if (moveEl) {
-            moveEl.readOnly = !editable;
-            moveEl.style.cursor = editable ? "text" : "default";
-            moveEl.title = editable ? "Manual override enabled" : "Auto-calculated";
-          }
-        }
-        updateSpiritOverrideFields();
-
-        // Save overrides on input if in override mode
-        const hpMaxEl = panel.querySelector("#spiritHpMax");
-        if (hpMaxEl) {
-          hpMaxEl.addEventListener("input", e => {
-            if (!isSpiritOverrideMode()) return;
-            setSpiritDerivedOverride(spirit, "hpMax", e.target.value);
-          });
-        }
-        const ceMaxEl = panel.querySelector("#spiritCeMax");
-        if (ceMaxEl) {
-          ceMaxEl.addEventListener("input", e => {
-            if (!isSpiritOverrideMode()) return;
-            setSpiritDerivedOverride(spirit, "ceMax", e.target.value);
-          });
-        }
-        const acEl = panel.querySelector(".ac-inside");
-        if (acEl) {
-          acEl.addEventListener("input", e => {
-            if (!isSpiritOverrideMode()) return;
-            setSpiritDerivedOverride(spirit, "ac", e.target.value);
-          });
-        }
-        const moveEl = panel.querySelector("#spiritMovement");
-        if (moveEl) {
-          moveEl.addEventListener("input", e => {
-            if (!isSpiritOverrideMode()) return;
-            setSpiritDerivedOverride(spirit, "movement", e.target.value);
-          });
-        }
-      });
-    // ── SKILL ROLL TOASTS ─────────────────────────────────────────────
-    // Attach click listeners to skill names for rolling (with crit/bonus logic)
-    setTimeout(() => {
-      panel.querySelectorAll('.skill-name').forEach((el, idx) => {
-        el.style.cursor = 'pointer';
-        el.title = 'Roll this skill';
-        el.addEventListener('click', () => {
-          // Find statKey and skillIdx from parent .stat-block and .skill-row
-          const skillRow = el.closest('.skill-row');
-          const statBlock = el.closest('.stat-block');
-          if (!skillRow || !statBlock) return;
-          // Find statKey from stat-block's input
-          const statInput = statBlock.querySelector('.stat-score-input');
-          if (!statInput) return;
-          const statKey = statInput.dataset.spiritStat;
-          // Find skillIdx by index of .skill-row in .skills-side
-          const skillsSide = statBlock.querySelector('.skills-side');
-          const skillRows = Array.from(skillsSide.querySelectorAll('.skill-row'));
-          const skillIdx = skillRows.indexOf(skillRow);
-          // Get skill value
-          let val = 0;
-          const statObj = _viewingSpirit.stats?.[statKey];
-          if (statObj && Array.isArray(statObj.skills) && statObj.skills[skillIdx]) {
-            val = parseInt(statObj.skills[skillIdx].score, 10);
-            if (!Number.isFinite(val)) val = 0;
-          }
-          // Always roll 1d6 for skills, add crit logic (include bonus in crit threshold)
-          const rolls = [Math.floor(Math.random() * 6) + 1];
-          const total = rolls[0] + val;
-          const dieSides = 6;
-          const diceCount = 1;
-          const maxPossible = (dieSides * diceCount) + val;
-          const allOnes = rolls[0] === 1;
-          const critStatus = allOnes ? "fail" : (total >= maxPossible ? "success" : null);
-          const breakdown = { skillModifier: val, die: "d6" };
-          if (typeof window.showRollToast === 'function') {
-            const skillName = el.textContent;
-            window.showRollToast(
-              statKey.charAt(0).toUpperCase() + statKey.slice(1).toLowerCase(),
-              diceCount,
-              rolls,
-              total,
-              critStatus,
-              skillName,
-              breakdown,
-              null
-            );
-          }
-        });
-      });
-    }, 0);
   const panel = document.getElementById("panel-spirit-sheet");
   if (!panel) return;
 
-  const s = spirit;
-  const parseScore = v => { const n = parseInt(v, 10); return Number.isFinite(n) ? Math.max(0, n) : 0; };
+  // Reset override mode when switching to a different spirit
+  handleOpenSpiritOverride(spirit);
 
-  // Helper: recompute and push derived values into the DOM without re-rendering
-  const updateDerived = () => {
-    const TL = parseScore(_viewingSpirit.stats?.technique?.score);
-    const SL = parseScore(_viewingSpirit.stats?.speed?.score);
-    const PL = parseScore(_viewingSpirit.stats?.power?.score);
-    const ac = TL + SL;
-    const hpMax      = 10 + (PL * 5);
-    const ceMax      = 15 + (TL * 5);
-    const movement   = 30 + (SL * 5);
-    const healingDiceMap = { "5":0,"4":1,"Semi-3":1,"3":2,"Semi-2":2,"2":3,"Semi-1":3,"1":4,"Special Grade":5 };
-    const healingDice = healingDiceMap[_viewingSpirit.grade] ?? 0;
-    const healingStr = healingDice > 0 ? `${healingDice}d8 + ${TL}` : "N/A";
-    const xpThreshold = parseScore(_viewingSpirit.sorcererXp) || TL * 2;
+  const s   = spirit;
+  const om  = isSpiritOverrideMode();
+  const save = () => { if (_spiritSave) _spiritSave(); };
+  const esc  = str => String(str ?? "")
+    .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
 
-    // Persist computed values to state
-    _viewingSpirit.hpMax    = String(hpMax);
-    _viewingSpirit.ceMax    = String(ceMax);
-    _viewingSpirit.movement = String(movement);
-
-    const acInput = panel.querySelector(".ac-inside");
-    if (acInput) acInput.value = ac;
-
-    const hpMaxEl = panel.querySelector("#spiritHpMax");
-    if (hpMaxEl) hpMaxEl.value = hpMax;
-
-    const ceMaxEl = panel.querySelector("#spiritCeMax");
-    if (ceMaxEl) ceMaxEl.value = ceMax;
-
-    const movementEl = panel.querySelector("#spiritMovement");
-    if (movementEl) movementEl.value = movement;
-
-    const healStrEl = panel.querySelector(".spirit-healing-str");
-    if (healStrEl) healStrEl.textContent = healingStr;
-
-    const healBtn = panel.querySelector("#spiritHealBtn");
-    if (healBtn) healBtn.disabled = healingDice === 0;
-
-    const xpThreshEl = panel.querySelector(".spirit-xp-threshold-val");
-    if (xpThreshEl) xpThreshEl.textContent = xpThreshold;
-
-    // Also push to combat panel
-    renderSpiritCombatPanel(_viewingSpirit);
+  // ── DERIVED VALUES ────────────────────────────────────────────────────────
+  // computeSpiritData reads overrides.derived first, falls back to auto-calc.
+  ensureSpiritOverrides(s);
+  const data = computeSpiritData(s);
+  const { TL, SL, PL, ac, hpMax, ceMax, movement, healingDice, healingStr } = {
+    TL: data.techniqueLevel, SL: data.speedLevel, PL: data.powerLevel,
+    ac: data.ac, hpMax: data.hpMax, ceMax: data.ceMax, movement: data.movement,
+    healingDice: data.healingDice, healingStr: data.healingStr,
   };
+  const xpThreshold = data.xpThreshold;
 
-  const TL = parseScore(s.stats?.technique?.score);
-  const SL = parseScore(s.stats?.speed?.score);
-  const PL = parseScore(s.stats?.power?.score);
-  const ac = TL + SL;
-  const hpMax    = 10 + (PL * 5);
-  const ceMax    = 15 + (TL * 5);
-  const movement = 30 + (SL * 5);
-  const healingDiceMap = { "5":0,"4":1,"Semi-3":1,"3":2,"Semi-2":2,"2":3,"Semi-1":3,"1":4,"Special Grade":5 };
-  const healingDice = healingDiceMap[s.grade] ?? 0;
-  const healingStr = healingDice > 0 ? `${healingDice}d8 + ${TL}` : "N/A";
-  const xpThreshold = parseScore(s.sorcererXp) || TL * 2;
-
-  // Sync computed vitals into state on open
+  // Persist effective values to state so combat panel / list card are correct
   s.hpMax    = String(hpMax);
   s.ceMax    = String(ceMax);
   s.movement = String(movement);
 
-  const esc = str => String(str ?? "")
-    .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+  // ── HELPERS ───────────────────────────────────────────────────────────────
+  const parseScore = v => { const n = parseInt(v, 10); return Number.isFinite(n) ? Math.max(0, n) : 0; };
 
-  const GRADES = ["5","4","Semi-3","3","Semi-2","2","Semi-1","1","Special Grade"];
+  // Re-compute derived values in-place (called when a stat score changes).
+  // Respects any stored overrides — only auto-updates fields that are NOT overridden.
+  const updateDerived = () => {
+    const d = computeSpiritData(_viewingSpirit);
+    _viewingSpirit.hpMax    = String(d.hpMax);
+    _viewingSpirit.ceMax    = String(d.ceMax);
+    _viewingSpirit.movement = String(d.movement);
+
+    if (!getSpiritDerivedOverride(_viewingSpirit, "hpMax"))    { const el = panel.querySelector("#spiritHpMax");   if (el) el.value = d.hpMax; }
+    if (!getSpiritDerivedOverride(_viewingSpirit, "ceMax"))    { const el = panel.querySelector("#spiritCeMax");   if (el) el.value = d.ceMax; }
+    if (!getSpiritDerivedOverride(_viewingSpirit, "ac"))       { const el = panel.querySelector(".ac-inside");     if (el) el.value = d.ac;    }
+    if (!getSpiritDerivedOverride(_viewingSpirit, "movement")) { const el = panel.querySelector("#spiritMovement");if (el) el.value = d.movement; }
+
+    const healStrEl = panel.querySelector(".spirit-healing-str");
+    if (healStrEl) healStrEl.textContent = d.healingStr;
+
+    // Refresh override marker visibility
+    refreshAllMarkers();
+    renderSpiritCombatPanel(_viewingSpirit);
+  };
+
+  // Override marker * badge — shows when a field has a stored override
+  const markerFor = (key) => {
+    const has = getSpiritDerivedOverride(s, key) !== null;
+    return `<button type="button" class="override-marker-btn${has ? " visible" : ""}"
+      data-spirit-derived-clear="${key}"
+      title="${om ? "Click to clear override" : "Overridden"}"
+      ${om ? "" : 'tabindex="-1"'}>*</button>`;
+  };
+
+  const refreshAllMarkers = () => {
+    ["hpMax","ceMax","ac","movement"].forEach(key => {
+      const btn = panel.querySelector(`[data-spirit-derived-clear="${key}"]`);
+      if (!btn) return;
+      const has = getSpiritDerivedOverride(_viewingSpirit, key) !== null;
+      btn.classList.toggle("visible", has);
+      btn.title    = isSpiritOverrideMode() ? "Click to clear override" : "Overridden";
+      btn.tabIndex = isSpiritOverrideMode() && has ? 0 : -1;
+    });
+  };
+
+  // ── STAT BLOCKS ───────────────────────────────────────────────────────────
   const STATS = [
     { key:"power",        label:"POWER",        skills:["Athletics","Combat","Fortitude","Intimidation","Strength"] },
     { key:"speed",        label:"SPEED",        skills:["Precision","Reaction","Stealth","Tempo"] },
@@ -363,14 +250,15 @@ function renderSpiritSheetPanel(spirit) {
     { key:"cooperation",  label:"COOPERATION",  skills:["Charisma","Combo","Deception","Insight","Persuasion"] },
   ];
 
-  const renderStatBlock = (stat) => {
+  const renderStatBlock = stat => {
     const ss = s.stats?.[stat.key] || { score: "", skills: [] };
     return `
       <div class="stat-block">
         <div class="stat-score-side">
           <div class="stat-label">${esc(stat.label)}</div>
           <input class="stat-score-input" data-spirit-stat="${stat.key}" type="number" min="0" max="7"
-            placeholder="—" value="${esc(ss.score)}" />
+            placeholder="—" value="${esc(ss.score)}"
+            style="cursor:pointer;" title="Click to roll · Right-click for advantage/disadvantage" />
         </div>
         <div class="skills-side">
           ${stat.skills.map((skill, si) => {
@@ -379,12 +267,25 @@ function renderSpiritSheetPanel(spirit) {
               <input class="skill-bonus-input" type="number" min="0"
                 data-spirit-skill="${stat.key}:${si}"
                 value="${esc(skillScore)}" placeholder="—" />
-              <span class="skill-name">${esc(skill)}</span>
+              <span class="skill-name" data-spirit-skill-roll="${stat.key}:${si}"
+                style="cursor:pointer;" title="Click to roll · Right-click for advantage/disadvantage">${esc(skill)}</span>
             </div>`;
           }).join("")}
         </div>
       </div>`;
   };
+
+  // ── HEALING BUTTON STATE ──────────────────────────────────────────────────
+  const ceNum  = parseInt(s.ceCurrent, 10) || 0;
+  const canHeal = healingDice > 0 && ceNum >= 5;
+  const healStyle = healingDice === 0
+    ? "opacity:0.45;pointer-events:none;cursor:default;"
+    : canHeal ? "cursor:pointer;" : "opacity:0.45;pointer-events:none;cursor:not-allowed;";
+  const healTitle = healingDice === 0 ? "N/A"
+    : canHeal ? "Click to heal (costs 5 CE)" : "Not enough CE (need 5)";
+
+  // ── RENDER HTML ───────────────────────────────────────────────────────────
+  const derivedRO = om ? "" : "readonly";
 
   panel.innerHTML = `
     <div class="spirit-sheet">
@@ -394,7 +295,14 @@ function renderSpiritSheetPanel(spirit) {
           <div class="jjk-label">呪術廻戦 · Cursed Spirit</div>
           <input class="name-input" id="spiritName" value="${esc(s.charName || "")}" placeholder="Spirit Name" />
           <div class="field-label">Spirit Name</div>
-          <button id="spiritOverrideModeBtn" class="override-mode-btn" type="button" style="margin-top:6px;">
+          <button class="info-btn${om ? " active" : ""}" id="spiritOverrideModeBtn" type="button"
+            aria-label="Toggle override mode"
+            title="${om ? "Disable manual overrides" : "Enable manual overrides"}">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"
+              aria-hidden="true" focusable="false">
+              <path d="M3 17.25V21h3.75L19.81 7.94l-3.75-3.75L3 17.25z" stroke="currentColor" stroke-width="1.4" fill="none"/>
+              <path d="M14.06 4.19l3.75 3.75" stroke="currentColor" stroke-width="1.4"/>
+            </svg>
             <span id="spiritOverrideModeBtnLabel">Override</span>
           </button>
         </div>
@@ -405,7 +313,7 @@ function renderSpiritSheetPanel(spirit) {
           <div class="meta-field" style="grid-column:1/-1;">
             <div class="field-label">Grade</div>
             <select class="meta-select" id="spiritGrade">
-              ${GRADES.map(g => `<option${s.grade === g ? " selected" : ""}>${esc(g)}</option>`).join("")}
+              ${SPIRIT_GRADES.map(g => `<option${s.grade === g ? " selected" : ""}>${esc(g)}</option>`).join("")}
             </select>
           </div>
           <div class="header-mini-vitals">
@@ -417,7 +325,8 @@ function renderSpiritSheetPanel(spirit) {
             </div>
             <div class="vital-box header-mini-vital spirit-healing-box">
               <span class="vital-label">Healing (5 CE)</span>
-              <div class="spirit-healing-str" id="spiritHealingValue" style="cursor:pointer;${healingDice === 0 ? 'opacity:0.5;pointer-events:none;' : ''}" title="Click to roll healing">${esc(healingStr)}</div>
+              <div class="spirit-healing-str" id="spiritHealingValue"
+                style="${healStyle}" title="${healTitle}">${esc(healingStr)}</div>
             </div>
           </div>
         </div>
@@ -430,40 +339,61 @@ function renderSpiritSheetPanel(spirit) {
 
         <!-- Vitals column -->
         <div class="vitals-col">
-          <div class="character-vital-box">
-            <span class="vital-label">Health</span>
+          <div class="character-vital-box" id="spiritHpVitalBox">
+            <div style="display:flex;align-items:center;justify-content:space-between;">
+              <span class="vital-label">Health</span>
+              ${markerFor("hpMax")}
+            </div>
             <div class="hp-row">
-              <input class="hp-input" id="spiritHpCurrent" type="number" min="0" value="${esc(s.hpCurrent)}" placeholder="0" />
+              <input class="hp-input" id="spiritHpCurrent" type="number" min="0"
+                value="${esc(s.hpCurrent)}" placeholder="0" />
               <span class="hp-sep">/</span>
-              <input class="hp-input" id="spiritHpMax" type="number" value="${hpMax}" readonly style="cursor:default;" />
+              <input class="hp-input" id="spiritHpMax" type="number"
+                value="${hpMax}" ${derivedRO}
+                title="${om ? "Manual override enabled" : "Auto-calculated"}" />
             </div>
           </div>
-          <div class="character-vital-box">
-            <span class="vital-label">Cursed Energy</span>
+          <div class="character-vital-box" id="spiritCeVitalBox">
+            <div style="display:flex;align-items:center;justify-content:space-between;">
+              <span class="vital-label">Cursed Energy</span>
+              ${markerFor("ceMax")}
+            </div>
             <div class="hp-row">
-              <input class="hp-input" id="spiritCeCurrent" type="number" min="0" value="${esc(s.ceCurrent)}" placeholder="0" />
+              <input class="hp-input" id="spiritCeCurrent" type="number" min="0"
+                value="${esc(s.ceCurrent)}" placeholder="0" />
               <span class="hp-sep">/</span>
-              <input class="hp-input" id="spiritCeMax" type="number" value="${ceMax}" readonly style="cursor:default;" />
+              <input class="hp-input" id="spiritCeMax" type="number"
+                value="${ceMax}" ${derivedRO}
+                title="${om ? "Manual override enabled" : "Auto-calculated"}" />
             </div>
           </div>
-          <div class="character-vital-box">
+          <div class="character-vital-box" id="spiritAcVitalBox">
+            <div style="display:flex;align-items:center;justify-content:space-between;">
+              <span class="vital-label" style="text-align:center;margin-top:2px;">Armor Class</span>
+              ${markerFor("ac")}
+            </div>
             <div class="shield-wrap">
               <svg viewBox="0 0 60 68" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path d="M30 4L5 13V36C5 50 17 62 30 66C43 62 55 50 55 36V13L30 4Z" stroke="#1a1410" stroke-width="1.8" fill="#e2d9c8"/>
                 <path d="M30 9L9 17V36C9 48 19 58 30 62C41 58 51 48 51 36V17L30 9Z" stroke="#1a1410" stroke-width="0.8" fill="none" stroke-dasharray="2 2"/>
                 <foreignObject x="11" y="22" width="38" height="28">
                   <div xmlns="http://www.w3.org/1999/xhtml" style="display:flex;align-items:center;justify-content:center;height:100%">
-                    <input class="ac-inside" value="${esc(ac)}" readonly style="cursor:default;" />
+                    <input class="ac-inside" value="${ac}" ${derivedRO}
+                      title="${om ? "Manual override enabled" : "Auto-calculated"}" />
                   </div>
                 </foreignObject>
               </svg>
             </div>
-            <div class="vital-label" style="text-align:center;margin-top:2px;">Armor Class</div>
           </div>
-          <div class="character-vital-box">
-            <span class="vital-label">Movement</span>
+          <div class="character-vital-box" id="spiritMovVitalBox">
+            <div style="display:flex;align-items:center;justify-content:space-between;">
+              <span class="vital-label">Movement</span>
+              ${markerFor("movement")}
+            </div>
             <div class="move-row">
-              <input class="move-input" id="spiritMovement" value="${movement}" readonly style="cursor:default;" />
+              <input class="move-input" id="spiritMovement"
+                value="${movement}" ${derivedRO}
+                title="${om ? "Manual override enabled" : "Auto-calculated"}" />
               <span class="move-unit">ft</span>
             </div>
           </div>
@@ -471,7 +401,7 @@ function renderSpiritSheetPanel(spirit) {
 
         <!-- Center stats: Power, Speed, Technique -->
         <div class="stats-col">
-          ${STATS.slice(0,3).map(renderStatBlock).join("")}
+          ${STATS.slice(0, 3).map(renderStatBlock).join("")}
         </div>
 
         <!-- Right stats: Intelligence, Cooperation -->
@@ -482,39 +412,96 @@ function renderSpiritSheetPanel(spirit) {
       </div>
     </div>`;
 
-  // ── EVENT WIRING ─────────────────────────────────────────────────────────────
-  const save = () => { if (_spiritSave) _spiritSave(); };
+  // ── OVERRIDE BUTTON ───────────────────────────────────────────────────────
+  panel.querySelector("#spiritOverrideModeBtn")?.addEventListener("click", () => {
+    toggleSpiritOverrideMode();
+    // Re-render — simplest way to flip readonly state and button appearance
+    renderSpiritSheetPanel(_viewingSpirit);
+  });
+
+  // ── DERIVED FIELD OVERRIDE INPUTS ─────────────────────────────────────────
+  // Wire all four derived inputs. When override mode is on, typing stores the
+  // value; the * badge can be clicked to clear it and revert to auto-calc.
+  [
+    { id: "spiritHpMax",   key: "hpMax"    },
+    { id: "spiritCeMax",   key: "ceMax"    },
+    { id: "spiritMovement",key: "movement" },
+  ].forEach(({ id, key }) => {
+    document.getElementById(id)?.addEventListener("input", e => {
+      if (!isSpiritOverrideMode()) return;
+      setSpiritDerivedOverride(_viewingSpirit, key, e.target.value);
+      // Persist effective value to state immediately
+      const d = computeSpiritData(_viewingSpirit);
+      _viewingSpirit.hpMax    = String(d.hpMax);
+      _viewingSpirit.ceMax    = String(d.ceMax);
+      _viewingSpirit.movement = String(d.movement);
+      refreshAllMarkers();
+      save();
+    });
+  });
+
+  // AC lives inside an SVG foreignObject — select by class
+  panel.querySelector(".ac-inside")?.addEventListener("input", e => {
+    if (!isSpiritOverrideMode()) return;
+    setSpiritDerivedOverride(_viewingSpirit, "ac", e.target.value);
+    refreshAllMarkers();
+    save();
+  });
+
+  // Clear-marker * buttons
+  panel.querySelectorAll("[data-spirit-derived-clear]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      if (!isSpiritOverrideMode()) return;
+      clearSpiritDerivedOverride(_viewingSpirit, btn.dataset.spiritDerivedClear);
+      renderSpiritSheetPanel(_viewingSpirit); // re-render so value reverts visually
+      save();
+    });
+  });
+
+  // ── GRADE ─────────────────────────────────────────────────────────────────
+  document.getElementById("spiritGrade")?.addEventListener("change", e => {
+    _viewingSpirit.grade = e.target.value;
+    renderSpiritSheetPanel(_viewingSpirit); // healing dice depends on grade
+    save();
+  });
+
+  // ── SIMPLE FIELDS ─────────────────────────────────────────────────────────
   const wire = (id, field) => {
     document.getElementById(id)?.addEventListener("input", e => {
       _viewingSpirit[field] = e.target.value;
       save();
     });
   };
-
   wire("spiritName",      "charName");
   wire("spiritHpCurrent", "hpCurrent");
   wire("spiritCeCurrent", "ceCurrent");
   wire("spiritXp",        "xp");
 
-  // Grade — update derived values in-place, no full re-render
-  document.getElementById("spiritGrade")?.addEventListener("change", e => {
-    _viewingSpirit.grade = e.target.value;
-    updateDerived();
-    save();
-  });
-
-  // Stat score inputs — update state and refresh derived values in-place
+  // ── STAT SCORE INPUTS ────────────────────────────────────────────────────
   panel.querySelectorAll("[data-spirit-stat]").forEach(input => {
+    const statKey = input.dataset.spiritStat;
+
+    const doRoll = rollMode => {
+      const score = parseInt(input.value, 10) || 0;
+      if (score < 1) return;
+      const r         = spiritRollWithMode(score, 0, rollMode);
+      const breakdown = buildSpiritRollBreakdown({ die: "d6" }, rollMode, r);
+      const label     = statKey.charAt(0).toUpperCase() + statKey.slice(1).toLowerCase();
+      window.showRollToast?.(label, r.diceCount, r.rolls, r.total, null, null, breakdown,
+        rollMode === "normal" ? null : rollMode);
+    };
+
+    input.addEventListener("click",       ()    => doRoll("normal"));
+    input.addEventListener("contextmenu", event => openSpiritRollModeMenu(event, doRoll));
     input.addEventListener("input", () => {
-      const key = input.dataset.spiritStat;
-      if (!_viewingSpirit.stats[key]) _viewingSpirit.stats[key] = { score: "", skills: [] };
-      _viewingSpirit.stats[key].score = input.value;
+      if (!_viewingSpirit.stats[statKey]) _viewingSpirit.stats[statKey] = { score: "", skills: [] };
+      _viewingSpirit.stats[statKey].score = input.value;
       updateDerived();
       save();
     });
   });
 
-  // Subskill score inputs
+  // ── SKILL INPUTS ──────────────────────────────────────────────────────────
   panel.querySelectorAll("[data-spirit-skill]").forEach(input => {
     input.addEventListener("input", () => {
       const [statKey, siStr] = input.dataset.spiritSkill.split(":");
@@ -527,36 +514,62 @@ function renderSpiritSheetPanel(spirit) {
     });
   });
 
-  // Healing value click — show roll toast and update CE
-  panel.querySelector('#spiritHealingValue')?.addEventListener('click', () => {
-    const TLnow = parseScore(_viewingSpirit.stats?.technique?.score);
-    const healingDiceNow = healingDiceMap[_viewingSpirit.grade] ?? 0;
+  // ── SKILL NAME ROLLS ──────────────────────────────────────────────────────
+  panel.querySelectorAll("[data-spirit-skill-roll]").forEach(el => {
+    const [statKey, siStr] = el.dataset.spiritSkillRoll.split(":");
+    const si        = parseInt(siStr, 10);
+    const skillName = el.textContent.trim();
+
+    const doRoll = rollMode => {
+      const score = parseInt(_viewingSpirit.stats?.[statKey]?.score, 10) || 0;
+      if (score < 1) return;
+      const bonus     = parseInt(_viewingSpirit.stats?.[statKey]?.skills?.[si]?.score, 10) || 0;
+      const r         = spiritRollWithMode(score, bonus, rollMode);
+      const maxPoss   = score * 6 + bonus;
+      const allOnes   = r.rolls.every(d => d === 1);
+      const crit      = rollMode === "normal"
+        ? (allOnes ? "fail" : r.total >= maxPoss ? "success" : null) : null;
+      const breakdown = buildSpiritRollBreakdown({ skillModifier: bonus, die: "d6" }, rollMode, r);
+      const label     = statKey.charAt(0).toUpperCase() + statKey.slice(1).toLowerCase();
+      window.showRollToast?.(label, r.diceCount, r.rolls, r.total, crit, skillName, breakdown,
+        rollMode === "normal" ? null : rollMode);
+    };
+
+    el.addEventListener("click",       ()    => doRoll("normal"));
+    el.addEventListener("contextmenu", event => openSpiritRollModeMenu(event, doRoll));
+  });
+
+  // ── HEALING ───────────────────────────────────────────────────────────────
+  const healEl = panel.querySelector("#spiritHealingValue");
+  const refreshHealAppearance = () => {
+    if (!healEl) return;
+    const d   = computeSpiritData(_viewingSpirit);
+    const ce  = parseInt(_viewingSpirit.ceCurrent, 10) || 0;
+    const can = d.healingDice > 0 && ce >= 5;
+    healEl.style.opacity       = (d.healingDice === 0 || !can) ? "0.45" : "";
+    healEl.style.pointerEvents = (d.healingDice === 0 || !can) ? "none" : "";
+    healEl.style.cursor        = d.healingDice === 0 ? "default" : can ? "pointer" : "not-allowed";
+    healEl.title               = d.healingDice === 0 ? "N/A" : can ? "Click to heal (costs 5 CE)" : "Not enough CE (need 5)";
+  };
+
+  document.getElementById("spiritCeCurrent")?.addEventListener("input", refreshHealAppearance);
+
+  healEl?.addEventListener("click", () => {
+    const d  = computeSpiritData(_viewingSpirit);
     const ce = parseInt(_viewingSpirit.ceCurrent, 10) || 0;
-    if (ce < 5 || healingDiceNow === 0) return;
+    if (d.healingDice === 0 || ce < 5) return;
+
     _viewingSpirit.ceCurrent = String(ce - 5);
-    // Update CE input in-place
-    const ceInput = panel.querySelector('#spiritHpCurrent') ? panel.querySelector('#spiritCeCurrent') : null;
-    if (ceInput) ceInput.value = _viewingSpirit.ceCurrent;
-    let total = TLnow;
-    const rolls = [];
-    for (let i = 0; i < healingDiceNow; i++) {
-      const r = Math.floor(Math.random() * 8) + 1;
-      rolls.push(r);
-      total += r;
-    }
-    // Show as roll toast (if available)
-    if (typeof window.showRollToast === 'function') {
-      window.showRollToast(
-        'Technique',
-        healingDiceNow,
-        rolls,
-        total,
-        null,
-        'Healing',
-        { die: 'd8', skillModifier: TLnow },
-        null
-      );
-    }
+    const rolls  = Array.from({ length: d.healingDice }, () => Math.floor(Math.random() * 8) + 1);
+    const total  = rolls.reduce((a, b) => a + b, 0) + d.techniqueLevel;
+    const hpCur  = parseInt(_viewingSpirit.hpCurrent, 10) || 0;
+    _viewingSpirit.hpCurrent = String(Math.min(d.hpMax, hpCur + total));
+
+    ["spiritCeCurrent","spiritCeCurrent2"].forEach(id => { const el = document.getElementById(id); if (el) el.value = _viewingSpirit.ceCurrent; });
+    ["spiritHpCurrent","spiritHpCurrent2"].forEach(id => { const el = document.getElementById(id); if (el) el.value = _viewingSpirit.hpCurrent; });
+    refreshHealAppearance();
+    window.showRollToast?.("Healing", d.healingDice, rolls, total, null,
+      _viewingSpirit.charName || "Spirit", { die: "d8", skillModifier: d.techniqueLevel }, null);
     save();
   });
 }
